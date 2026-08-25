@@ -1,11 +1,17 @@
-# lib/hid_keyboard.py - USB HID 键盘驱动
-# 实现 USB HID 键盘功能，支持中文输入
+# lib/hid_keyboard.py - USB HID 键盘驱动 (修复版)
+# 实现 USB HID 键盘功能
 
 import time
-import usb_hid
-from machine import Pin
 
-# USB HID 键盘报告描述符
+# 尝试导入 usb_hid，如果失败则使用模拟模式
+try:
+    import usb_hid
+    USB_HID_AVAILABLE = True
+except ImportError:
+    USB_HID_AVAILABLE = False
+    print("Warning: usb_hid not available, running in test mode")
+
+# USB HID 键盘报告描述符 (标准 6-key rollover)
 KEYBOARD_REPORT_DESCRIPTOR = bytes([
     0x05, 0x01,  # Usage Page (Generic Desktop)
     0x09, 0x06,  # Usage (Keyboard)
@@ -24,7 +30,7 @@ KEYBOARD_REPORT_DESCRIPTOR = bytes([
     # 保留字节
     0x95, 0x01,  # Report Count (1)
     0x75, 0x08,  # Report Size (8)
-    0x81, 0x03,  # Input (Constant)
+    0x81, 0x01,  # Input (Constant) - 修复: 使用 0x01 而不是 0x03
     
     # LED 输出报告
     0x05, 0x08,  # Usage Page (LEDs)
@@ -37,10 +43,10 @@ KEYBOARD_REPORT_DESCRIPTOR = bytes([
     # LED 填充
     0x95, 0x01,  # Report Count (1)
     0x75, 0x03,  # Report Size (3)
-    0x91, 0x03,  # Output (Constant)
+    0x91, 0x01,  # Output (Constant) - 修复: 使用 0x01
     
     # 按键数组（6个同时按键）
-    0x05, 0x08,  # Usage Page (LEDs) - 用于数组索引
+    0x05, 0x07,  # Usage Page (Key Codes) - 修复: 应该是 0x07
     0x19, 0x00,  # Usage Minimum (0)
     0x29, 0xFF,  # Usage Maximum (255)
     0x15, 0x00,  # Logical Minimum (0)
@@ -52,8 +58,7 @@ KEYBOARD_REPORT_DESCRIPTOR = bytes([
     0xC0  # End Collection
 ])
 
-# 键盘码映射（USB HID Usage Tables）
-# 普通按键
+# 键盘码映射
 KEY_CODES = {
     'A': 0x04, 'B': 0x05, 'C': 0x06, 'D': 0x07, 'E': 0x08,
     'F': 0x09, 'G': 0x0A, 'H': 0x0B, 'I': 0x0C, 'J': 0x0D,
@@ -83,73 +88,65 @@ KEY_CODES = {
     'SLASH': 0x38, '/': 0x38,
     'CAPSLOCK': 0x39,
     
-    # 功能键
     'F1': 0x3A, 'F2': 0x3B, 'F3': 0x3C, 'F4': 0x3D,
     'F5': 0x3E, 'F6': 0x3F, 'F7': 0x40, 'F8': 0x41,
     'F9': 0x42, 'F10': 0x43, 'F11': 0x44, 'F12': 0x45,
     
-    # 控制键
-    'PRINTSCREEN': 0x46,
-    'SCROLLLOCK': 0x47,
-    'PAUSE': 0x48,
-    'INSERT': 0x49,
-    'HOME': 0x4A,
-    'PAGEUP': 0x4B,
-    'DELETE': 0x4C,
-    'END': 0x4D,
-    'PAGEDOWN': 0x4E,
-    'RIGHT': 0x4F,
-    'LEFT': 0x50,
-    'DOWN': 0x51,
-    'UP': 0x52,
-    'NUMLOCK': 0x53,
-    'MENU': 0x65, 'APP': 0x65,
+    'PRINTSCREEN': 0x46, 'SCROLLLOCK': 0x47, 'PAUSE': 0x48,
+    'INSERT': 0x49, 'HOME': 0x4A, 'PAGEUP': 0x4B,
+    'DELETE': 0x4C, 'END': 0x4D, 'PAGEDOWN': 0x4E,
+    'RIGHT': 0x4F, 'LEFT': 0x50, 'DOWN': 0x51, 'UP': 0x52,
+    'NUMLOCK': 0x53, 'MENU': 0x65,
     
-    # 数字小键盘
     'KP_0': 0x62, 'KP_1': 0x59, 'KP_2': 0x5A, 'KP_3': 0x5B,
     'KP_4': 0x5C, 'KP_5': 0x5D, 'KP_6': 0x5E, 'KP_7': 0x5F,
     'KP_8': 0x60, 'KP_9': 0x61,
-    'KP_DECIMAL': 0x63, 'KP_MULTIPLY': 0x55, 'KP_ADD': 0x57,
-    'KP_SUBTRACT': 0x56, 'KP_DIVIDE': 0x54, 'KP_ENTER': 0x58,
 }
 
-# 修饰键位掩码
 MODIFIER_CODES = {
     'CTRL': 0x01, 'CONTROL': 0x01,
     'SHIFT': 0x02,
     'ALT': 0x04,
-    'GUI': 0x08, 'WIN': 0x08, 'COMMAND': 0x08,
+    'GUI': 0x08, 'WIN': 0x08,
     'LEFTCTRL': 0x01, 'LEFTSHIFT': 0x02, 'LEFTALT': 0x04, 'LEFTGUI': 0x08,
     'RIGHTCTRL': 0x10, 'RIGHTSHIFT': 0x20, 'RIGHTALT': 0x40, 'RIGHTGUI': 0x80,
 }
 
-# 数字小键盘码映射（用于 Unicode 输入）
 NUMPAD_CODES = {
     '0': 0x62, '1': 0x59, '2': 0x5A, '3': 0x5B, '4': 0x5C,
     '5': 0x5D, '6': 0x5E, '7': 0x5F, '8': 0x60, '9': 0x61,
 }
+
 
 class HidKeyboard:
     """USB HID 键盘"""
     
     def __init__(self):
         """初始化 USB HID 键盘"""
-        try:
-            self.device = usb_hid.Device(
-                report_descriptor=KEYBOARD_REPORT_DESCRIPTOR,
-                subclass=1,  # Boot 设备子类
-                protocol=1,  # Boot 协议（键盘）
-                report_length=8,
-                in_report_length=8,
-                out_report_length=1,
-            )
-            print("USB HID keyboard device created")
-        except Exception as e:
-            print(f"USB HID init error: {e}")
-            raise
+        self.device = None
+        self.test_mode = not USB_HID_AVAILABLE
+        
+        if USB_HID_AVAILABLE:
+            try:
+                # MicroPython USB HID 初始化
+                self.device = usb_hid.Device(
+                    report_descriptor=KEYBOARD_REPORT_DESCRIPTOR,
+                    subclass=1,
+                    protocol=1,
+                )
+                print("USB HID keyboard device created")
+            except Exception as e:
+                print(f"USB HID init error: {e}")
+                self.test_mode = True
+        else:
+            print("Running in test mode (no USB HID)")
     
     def _send_report(self, report):
         """发送 HID 报告"""
+        if self.test_mode:
+            print(f"TEST: Send report {[hex(b) for b in report]}")
+            return
+        
         try:
             self.device.write(report)
         except Exception as e:
@@ -160,51 +157,40 @@ class HidKeyboard:
         key_upper = key.upper()
         if key_upper in KEY_CODES:
             return KEY_CODES[key_upper]
-        # 尝试单字符
-        if len(key) == 1:
-            if key in KEY_CODES:
-                return KEY_CODES[key]
-            # 大写字母需要 Shift
-            if key.isupper():
-                return KEY_CODES.get(key.upper(), None)
+        if len(key) == 1 and key in KEY_CODES:
+            return KEY_CODES[key]
         return None
     
     def _get_shift_for_char(self, char):
         """检查字符是否需要 Shift 键"""
-        shift_chars = {
+        shift_chars = '!@#$%^&*()_+{}|:"~<>?'
+        return char in shift_chars
+    
+    def _char_to_hid(self, char):
+        """将 ASCII 字符转换为 HID 码和修饰键"""
+        # 直接匹配
+        if char in KEY_CODES:
+            return 0x00, KEY_CODES[char]
+        
+        # 小写字母
+        if char.isalpha() and char.islower():
+            return 0x00, KEY_CODES.get(char.upper())
+        
+        # 大写字母 - 需要 Shift
+        if char.isupper():
+            return 0x02, KEY_CODES.get(char)
+        
+        # 特殊字符
+        shift_map = {
             '!': '1', '@': '2', '#': '3', '$': '4', '%': '5',
             '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
             '_': '-', '+': '=', '{': '[', '}': ']', '|': '\\',
             ':': ';', '"': "'", '~': '`', '<': ',', '>': '.', '?': '/',
         }
-        return char in shift_chars
-    
-    def _char_to_hid(self, char):
-        """将 ASCII 字符转换为 HID 码和修饰键"""
-        # 普通字符
-        if char in KEY_CODES:
-            return 0x00, KEY_CODES[char]
-        
-        # 需要 Shift 的字符
-        if self._get_shift_for_char(char):
-            shift_map = {
-                '!': '1', '@': '2', '#': '3', '$': '4', '%': '5',
-                '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
-                '_': '-', '+': '=', '{': '[', '}': ']', '|': '\\',
-                ':': ';', '"': "'", '~': '`', '<': ',', '>': '.', '?': '/',
-            }
-            if char in shift_map:
-                base_key = shift_map[char]
-                if base_key.upper() in KEY_CODES:
-                    return 0x02, KEY_CODES[base_key.upper()]  # Shift modifier
-        
-        # 小写字母
-        if char.isalpha() and char.islower():
-            return 0x00, KEY_CODES.get(char.upper(), None)
-        
-        # 大写字母
-        if char.isupper():
-            return 0x02, KEY_CODES.get(char, None)  # Shift
+        if char in shift_map:
+            base = shift_map[char]
+            if base in KEY_CODES:
+                return 0x02, KEY_CODES[base]
         
         return None, None
     
@@ -214,14 +200,12 @@ class HidKeyboard:
         if key_code is None:
             return f"ERR:INVALID_KEY:{key}"
         
-        # 按下按键
         report = bytearray(8)
         report[2] = key_code
         self._send_report(report)
         
         time.sleep_ms(10)
         
-        # 释放按键
         report = bytearray(8)
         self._send_report(report)
         
@@ -241,7 +225,6 @@ class HidKeyboard:
         if key_code is None:
             return f"ERR:INVALID_KEY:{key}"
         
-        # 按下组合键
         report = bytearray(8)
         report[0] = mod_mask
         report[2] = key_code
@@ -249,7 +232,6 @@ class HidKeyboard:
         
         time.sleep_ms(10)
         
-        # 释放按键
         report = bytearray(8)
         self._send_report(report)
         
@@ -277,16 +259,13 @@ class HidKeyboard:
         """输入文本字符串"""
         for char in text:
             if char == '\n':
-                # 换行符转换为 Enter
                 self.press_key("ENTER")
             elif ord(char) < 128:
-                # ASCII 字符
                 if not self.type_char(char):
                     return f"ERR:UNSUPPORTED_CHAR:{char}"
             else:
-                # Unicode 字符（中文等）
-                codepoint = ord(char)
-                self.type_unicode(codepoint)
+                # Unicode 字符使用 Alt+Numpad
+                self.type_unicode(ord(char))
             
             time.sleep_ms(5)
         
@@ -298,10 +277,9 @@ class HidKeyboard:
         
         # 按住 Left Alt
         report = bytearray(8)
-        report[0] = 0x04  # Left Alt modifier
+        report[0] = 0x04  # Left Alt
         self._send_report(report)
-        
-        time.sleep_ms(10)
+        time.sleep_ms(20)
         
         # 输入十进制数字
         for digit in decimal_str:
@@ -309,25 +287,24 @@ class HidKeyboard:
                 return "ERR:INVALID_DIGIT"
             
             numpad_code = NUMPAD_CODES[digit]
+            
+            # 按下数字键
             report = bytearray(8)
             report[0] = 0x04  # Left Alt
             report[2] = numpad_code
             self._send_report(report)
-            
             time.sleep_ms(10)
             
-            # 释放按键（但保持 Alt）
+            # 释放数字键（保持 Alt）
             report = bytearray(8)
             report[0] = 0x04  # Left Alt
+            report[2] = 0x00
             self._send_report(report)
-            
             time.sleep_ms(10)
         
         # 释放 Alt
         report = bytearray(8)
         self._send_report(report)
-        
         time.sleep_ms(50)
         
         return "OK"
-

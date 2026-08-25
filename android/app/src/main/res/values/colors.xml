@@ -1,14 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
-    <color name="accent">#FF9800</color>
-    <color name="connected">#4CAF50</color>
-    <color name="disconnected">#F44336</color>
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="background">#F5F5F5</color>
-    <color name="card_background">#FFFFFF</color>
-    <color name="key_button_bg">#E3F2FD</color>
-    <color name="key_button_text">#1976D2</color>
+    <!-- 主色 -->
+    <color name="primary">#4FC3F7</color>
+    <color name="primary_dark">#0288D1</color>
+    <color name="accent">#FFB74D</color>
+    <color name="on_primary">#0A0E14</color>
+
+    <!-- 背景 -->
+    <color name="background">#0F1115</color>
+    <color name="card_background">#171A20</color>
+    <color name="card_stroke">#2A2F3A</color>
+
+    <!-- 文字 -->
+    <color name="text_primary">#E8EAF0</color>
+    <color name="text_secondary">#8B93A3</color>
+    <color name="text_hint">#5C6472</color>
+
+    <!-- 状态 -->
+    <color name="connected">#66BB6A</color>
+    <color name="disconnected">#EF5350</color>
+    <color name="connected_bg">#1B2E22</color>
+    <color name="disconnected_bg">#331F22</color>
+
+    <!-- 按钮 -->
+    <color name="btn_primary">#4FC3F7</color>
+    <color name="btn_primary_pressed">#81D4FA</color>
+    <color name="btn_primary_disabled">#2A3340</color>
+    <color name="btn_primary_text">#0A0E14</color>
+    <color name="btn_primary_text_disabled">#55606F</color>
+
+    <color name="btn_secondary">#232833</color>
+    <color name="btn_secondary_pressed">#2E3440</color>
+    <color name="btn_secondary_disabled">#1A1D24</color>
+    <color name="btn_secondary_text">#C6CDD8</color>
+    <color name="btn_secondary_text_disabled">#4A525F</color>
+
+    <color name="btn_key">#1F242E</color>
+    <color name="btn_key_pressed">#2C3340</color>
+    <color name="btn_key_disabled">#161A20</color>
+    <color name="btn_key_text">#9FD4F7</color>
+    <color name="btn_key_text_pressed">#CBE9FC</color>
+    <color name="btn_key_text_disabled">#3E4652</color>
+
+    <color name="btn_enter">#1B3A4D</color>
+    <color name="btn_enter_pressed">#23506B</color>
+    <color name="btn_enter_disabled">#15242E</color>
+    <color name="btn_enter_text">#7FD0F0</color>
+    <color name="btn_enter_text_disabled">#35505F</color>
+
+    <color name="ripple">#26FFFFFF</color>
+
+    <!-- 输入框 -->
+    <color name="input_bg">#12151B</color>
+    <color name="input_stroke">#2A2F3A</color>
+    <color name="input_stroke_focused">#4FC3F7</color>
+
+    <!-- 列表 / 日志 -->
+    <color name="list_bg">#12151B</color>
+    <color name="log_bg">#0C0E12</color>
 </resources>

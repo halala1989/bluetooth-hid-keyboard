@@ -1,86 +1,113 @@
-# BLE HID 虚拟键盘
+# Pico W BLE → USB HID 键盘
 
-通过 Raspberry Pi Pico W 实现的 USB HID 虚拟键盘，使用蓝牙低功耗（BLE）从安卓手机接收输入，在目标电脑上模拟键盘操作。
-
-## 系统架构
+本项目在 **Raspberry Pi Pico W** 上实现一个标准 USB HID 键盘。Pico W 通过 USB 连接 Windows 10/11 电脑，通过 BLE 连接 Android 手机；手机输入的文本/按键通过 Pico W 转换为 USB HID 报告发送给电脑。
 
 ```
-[安卓手机 App] --BLE--> [Pico W] --USB HID--> [Windows 电脑]
+Android App  --BLE GATT-->  Pico W  --USB HID Keyboard-->  Windows PC
 ```
 
-## 功能特性
+目标电脑端**不需要安装任何程序、驱动或服务**，也不读取/监控屏幕。
 
-- **USB HID 键盘**：即插即用，无需在目标电脑安装任何软件
-- **BLE 无线连接**：通过蓝牙低功耗与安卓手机连接
-- **中文输入支持**：使用 Alt+Numpad Unicode 方法输入任意中文字符
-- **完整键盘功能**：支持所有标准按键、组合键、光标控制
-- **安全可靠**：不监测屏幕、不安装软件、纯硬件方案
+## 中文/Unicode 输入方式（重要）
 
-## 项目结构
+USB HID 键盘标准只能发送按键，不能直接发送 Unicode/汉字，因此固件模拟 Windows 内置的几种 Alt 码输入方式。固件支持 4 种模式，App 里可一键切换（UMOD 命令）：
 
-```
-├── pico/                    # Pico W MicroPython 固件
-│   ├── boot.py             # 启动配置
-│   ├── main.py             # 主程序
-│   └── lib/
-│       ├── ble_server.py   # BLE GATT 服务器
-│       ├── hid_keyboard.py # USB HID 键盘驱动
-│       └── protocol.py     # 通信协议解析
-├── android/                 # Android 客户端应用
-│   └── app/
-│       └── src/main/
-│           ├── java/com/hidble/keyboard/
-│           │   ├── MainActivity.kt    # 主界面
-│           │   ├── BleManager.kt      # BLE 管理器
-│           │   └── HidProtocol.kt     # 协议封装
-│           └── res/
-│               ├── layout/            # 布局文件
-│               └── values/            # 资源文件
-└── docs/
-    ├── PROTOCOL.md         # BLE 通信协议
-    └── SETUP.md            # 详细设置指南
+| 模式 | 命令 | 原理 | 适用 |
+|---|---|---|---|
+| **Alt+X（默认）** | `UMOD:3` | 输入十六进制码点后按 `Alt+X` 转换 | **Win11 记事本**、写字板、Word、OneNote、Outlook 等 RichEdit 应用；**无需注册表、无需 NumLock** |
+| 十六进制 | `UMOD:1` | `Alt + 小键盘+ + 十六进制码` | 浏览器/聊天等大多数应用；需 `EnableHexNumpad` 注册表 + NumLock；**Win11 记事本无效**（小键盘 + 会被记事本拦截） |
+| 十进制 | `UMOD:0` | `Alt + 0 + 十进制码点` | RichEdit 应用；无需注册表 |
+| GBK | `UMOD:2` | `Alt + 小键盘十进制 GBK 机内码` | 仅中文版 Windows |
+
+> **当前验证结果**：Win11 自带记事本 + Alt+X 模式可以正常输入中文；ChatGPT 等浏览器对话框不支持 Alt+X（非 RichEdit），需在浏览器里切换到“十六进制”模式（需注册表+NumLock），或后续采用微软拼音 `vuc` 方案（见 docs/PROGRESS.md）。
+
+开启十六进制模式所需注册表（可选，只影响模式 1）：
+
+```powershell
+reg add "HKCU\Control Panel\Input Method" /v EnableHexNumpad /t REG_SZ /d 1 /f
 ```
 
-## 快速开始
+这不是安装程序，只是打开 Windows 自带的 Unicode 十六进制输入功能。修改后需注销/重启一次。
 
-### 1. 准备 Pico W
+## 目录结构
 
-1. 下载 MicroPython 固件：https://micropython.org/download/RPI_PICO_W/
-2. 按住 BOOTSEL 按钮，插入 USB，将 `.uf2` 文件拖入 RPI-RP2 驱动器
-3. 等待驱动器自动弹出（不要提前拔线！）
-4. 将 `pico/` 目录下的所有文件复制到 Pico W
+```
+pico_firmware/          # Pico SDK C 固件（推荐，已可编译）
+  ├─ CMakeLists.txt
+  ├─ main.c             # BLE GATT、命令分发
+  ├─ usb_hid.c/.h       # USB HID 键盘与输入状态机（Alt+X/十六进制/十进制/GBK）
+  ├─ gbk_table.c/.h     # Unicode→GBK 表（用 tools/gen_gbk_table.py 生成）
+  ├─ usb_descriptors.c  # USB HID 描述符
+  ├─ tusb_config.h / btstack_config.h / hid_keyboard.gatt
+firmware/
+  └─ pico_ble_hid_keyboard.uf2  # 预编译固件
+android/                # Android Kotlin 客户端（深色 UI，含中文输入模式切换）
+docs/                   # 协议、设置、工作进度
+tools/
+  ├─ elf2uf2.py        # ELF→UF2 脚本（512 字节/块，魔术值已校验）
+  ├─ gen_gbk_table.py  # 生成 gbk_table.c/.h
+  └─ verify_uf2.py      # 验证 UF2 块结构/魔术值
+```
 
-### 2. 安装 Android 应用
+> `pico/` 目录是早期 MicroPython 试验代码，仅作历史参考。
 
-1. 使用 Android Studio 打开 `android/` 目录
-2. 编译并安装到安卓手机
-3. 或直接使用预编译的 APK（如有提供）
+## 快速使用
 
-### 3. 使用方法
+### 1. 刷写 Pico W
 
-1. 将 Pico W 通过 USB 连接到电脑
-2. 在安卓手机上打开 HID BLE Keyboard 应用
-3. 点击"扫描设备"，找到并连接 Pico W
-4. 在文本框中输入文字，按发送键
-5. 文字将自动输入到电脑上当前活动的窗口中
+1. 按住 Pico W 的 `BOOTSEL`，插入电脑 USB。
+2. 出现 `RPI-RP2` 盘符后，把 `firmware/pico_ble_hid_keyboard.uf2` 复制进去。
+3. 等待设备自动重启。Windows 会识别为一个 USB HID 键盘。
 
-## BLE 通信协议
+### 2. 安装 Android App
 
-详见 [docs/PROTOCOL.md](docs/PROTOCOL.md)
+用 Android Studio 打开 `android/` 连接手机编译安装；或自行生成 debug APK：
 
-## 硬件要求
+```powershell
+cd android
+.\gradlew.bat assembleDebug
+```
 
-- Raspberry Pi Pico W（带 CYW43438 蓝牙芯片）
-- Micro-USB 数据线
-- 运行 Android 8.0+ 的手机（支持 BLE）
+APK 输出路径：
 
-## 注意事项
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
 
-- 中文字符使用 Alt+Numpad Unicode 方法输入，需要目标电脑支持
-- 首次连接可能需要几秒钟配对
-- BLE 传输距离约 10 米，取决于环境干扰
-- 长文本会分包发送，避免 BLE MTU 限制
+### 3. 连接和输入
 
-## 许可证
+1. 把 Pico W 插到目标电脑。
+2. 手机打开蓝牙和本应用。
+3. 点“扫描设备”，选择 `Pico HID Keyboard`。
+4. 在文本框输入汉字/英文/数字，点发送；中文输入模式默认 Alt+X（记事本/Word 等用），浏览器等切“十六进制”。
 
-MIT License
+未连接时 Pico W LED 慢闪，BLE 连接后常亮。
+
+## 从源码编译固件
+
+需要：
+
+- ARM GCC 工具链（`arm-none-eabi-gcc`）
+- CMake + Ninja
+- Pico SDK，并设置 `PICO_SDK_PATH=D:\pico\pico-sdk`
+- 一个主机 C/C++ 编译器用于编译 `pioasm`（例如 MinGW-w64）
+
+Windows PowerShell 例子（也可直接运行 `build_firmware.ps1`）：
+
+```powershell
+& .\build_firmware.ps1
+```
+
+生成文件位于：
+
+```text
+firmware/pico_ble_hid_keyboard.uf2
+```
+
+## BLE 协议
+
+详见 [docs/PROTOCOL.md](docs/PROTOCOL.md)。
+
+## License
+
+MIT

@@ -5,8 +5,6 @@ import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
@@ -16,51 +14,28 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
-/**
- * 主界面 - BLE HID 键盘 Android 客户端
- */
 class MainActivity : AppCompatActivity() {
     
     companion object {
-        private const val TAG = "MainActivity"
         private const val PERMISSION_REQUEST_CODE = 1001
     }
     
-    // UI 组件
     private lateinit var statusText: TextView
+    private lateinit var statusDot: TextView
     private lateinit var deviceNameText: TextView
     private lateinit var scanButton: Button
     private lateinit var disconnectButton: Button
     private lateinit var textInput: EditText
     private lateinit var sendButton: Button
     private lateinit var commandLog: TextView
+    private lateinit var deviceList: ListView
     
-    // 功能按钮
-    private lateinit var btnEnter: Button
-    private lateinit var btnBackspace: Button
-    private lateinit var btnTab: Button
-    private lateinit var btnEscape: Button
-    private lateinit var btnDelete: Button
-    
-    // 光标控制按钮
-    private lateinit var btnUp: Button
-    private lateinit var btnDown: Button
-    private lateinit var btnLeft: Button
-    private lateinit var btnRight: Button
-    private lateinit var btnHome: Button
-    private lateinit var btnEnd: Button
-    
-    // 组合键按钮
-    private lateinit var btnCtrlC: Button
-    private lateinit var btnCtrlV: Button
-    private lateinit var btnCtrlX: Button
-    private lateinit var btnCtrlA: Button
-    private lateinit var btnCtrlZ: Button
-    private lateinit var btnCtrlS: Button
-    
-    // BLE 管理器
     private lateinit var bleManager: BleManager
     private lateinit var hidProtocol: HidProtocol
+    
+    private val discoveredDevices = mutableListOf<BluetoothDevice>()
+    private val deviceNames = mutableListOf<String>()
+    private lateinit var deviceListAdapter: ArrayAdapter<String>
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,43 +48,20 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun initViews() {
-        // 连接状态
         statusText = findViewById(R.id.statusText)
+        statusDot = findViewById(R.id.statusDot)
         deviceNameText = findViewById(R.id.deviceNameText)
         scanButton = findViewById(R.id.scanButton)
         disconnectButton = findViewById(R.id.disconnectButton)
-        
-        // 文本输入
         textInput = findViewById(R.id.textInput)
         sendButton = findViewById(R.id.sendButton)
-        
-        // 命令日志
         commandLog = findViewById(R.id.commandLog)
         
-        // 功能按钮
-        btnEnter = findViewById(R.id.btnEnter)
-        btnBackspace = findViewById(R.id.btnBackspace)
-        btnTab = findViewById(R.id.btnTab)
-        btnEscape = findViewById(R.id.btnEscape)
-        btnDelete = findViewById(R.id.btnDelete)
+        // 设备列表
+        deviceList = findViewById(R.id.deviceList)
+        deviceListAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceNames)
+        deviceList.adapter = deviceListAdapter
         
-        // 光标控制
-        btnUp = findViewById(R.id.btnUp)
-        btnDown = findViewById(R.id.btnDown)
-        btnLeft = findViewById(R.id.btnLeft)
-        btnRight = findViewById(R.id.btnRight)
-        btnHome = findViewById(R.id.btnHome)
-        btnEnd = findViewById(R.id.btnEnd)
-        
-        // 组合键
-        btnCtrlC = findViewById(R.id.btnCtrlC)
-        btnCtrlV = findViewById(R.id.btnCtrlV)
-        btnCtrlX = findViewById(R.id.btnCtrlX)
-        btnCtrlA = findViewById(R.id.btnCtrlA)
-        btnCtrlZ = findViewById(R.id.btnCtrlZ)
-        btnCtrlS = findViewById(R.id.btnCtrlS)
-        
-        // 初始状态
         updateConnectionState(false)
     }
     
@@ -117,16 +69,23 @@ class MainActivity : AppCompatActivity() {
         bleManager = BleManager(this)
         hidProtocol = HidProtocol(bleManager)
         
-        // 设置 BLE 回调
         bleManager.onConnectionStateChanged = { connected ->
             runOnUiThread {
                 updateConnectionState(connected)
             }
         }
         
-        bleManager.onDeviceFound = { device, rssi ->
+        bleManager.onDeviceFound = { device, rssi, name ->
             runOnUiThread {
-                showDeviceDialog(device, rssi)
+                // 添加到设备列表
+                if (!discoveredDevices.contains(device)) {
+                    discoveredDevices.add(device)
+                    val displayName = name ?: "未知设备"
+                    val entry = "$displayName (${device.address}) RSSI: $rssi"
+                    deviceNames.add(entry)
+                    deviceListAdapter.notifyDataSetChanged()
+                    appendLog("发现: $entry")
+                }
             }
         }
         
@@ -145,23 +104,26 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun setupListeners() {
-        // 扫描按钮
         scanButton.setOnClickListener {
             if (!bleManager.isBleAvailable()) {
                 Toast.makeText(this, "蓝牙不可用", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            
+            // 清空设备列表
+            discoveredDevices.clear()
+            deviceNames.clear()
+            deviceListAdapter.notifyDataSetChanged()
+            
             appendLog("开始扫描...")
             bleManager.startScan()
         }
         
-        // 断开按钮
         disconnectButton.setOnClickListener {
             bleManager.disconnect()
             appendLog("已断开连接")
         }
         
-        // 发送按钮
         sendButton.setOnClickListener {
             val text = textInput.text.toString()
             if (text.isNotEmpty()) {
@@ -172,69 +134,115 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // 中文输入模式
+        findViewById<Button>(R.id.btnModeAltX).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.setUnicodeMode(3) }
+            appendLog("中文输入模式: Alt+X（默认，记事本/Word 等，无需注册表）")
+        }
+        findViewById<Button>(R.id.btnModeHex).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.setUnicodeMode(1) }
+            appendLog("中文输入模式: 十六进制（Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效）")
+        }
+        findViewById<Button>(R.id.btnModeDecimal).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.setUnicodeMode(0) }
+            appendLog("中文输入模式: 十进制（Alt+0+码点，记事本/Word 等）")
+        }
+        findViewById<Button>(R.id.btnModeGbk).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.setUnicodeMode(2) }
+            appendLog("中文输入模式: GBK 机内码（仅中文版 Windows）")
+        }
         
-        // 文本输入框 - 实时发送（可选）
-        textInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {}
-        })
+        // 设备列表点击事件
+        deviceList.setOnItemClickListener { _, _, position, _ ->
+            if (position < discoveredDevices.size) {
+                val device = discoveredDevices[position]
+                val name = deviceNames[position]
+                
+                AlertDialog.Builder(this)
+                    .setTitle("连接设备")
+                    .setMessage("确定要连接到 $name 吗？")
+                    .setPositiveButton("连接") { _, _ ->
+                        appendLog("正在连接到 $name...")
+                        bleManager.connect(device)
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            }
+        }
         
         // 功能按钮
-        btnEnter.setOnClickListener { lifecycleScope.launch { hidProtocol.enter(); appendLog("Enter") } }
-        btnBackspace.setOnClickListener { lifecycleScope.launch { hidProtocol.backspace(); appendLog("Backspace") } }
-        btnTab.setOnClickListener { lifecycleScope.launch { hidProtocol.tab(); appendLog("Tab") } }
-        btnEscape.setOnClickListener { lifecycleScope.launch { hidProtocol.escape(); appendLog("Escape") } }
-        btnDelete.setOnClickListener { lifecycleScope.launch { hidProtocol.delete(); appendLog("Delete") } }
+        findViewById<Button>(R.id.btnEnter).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.enter(); appendLog("Enter") } 
+        }
+        findViewById<Button>(R.id.btnBackspace).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.backspace(); appendLog("Backspace") } 
+        }
+        findViewById<Button>(R.id.btnTab).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.tab(); appendLog("Tab") } 
+        }
+        findViewById<Button>(R.id.btnEscape).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.escape(); appendLog("Escape") } 
+        }
+        findViewById<Button>(R.id.btnDelete).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.delete(); appendLog("Delete") } 
+        }
         
         // 光标控制
-        btnUp.setOnClickListener { lifecycleScope.launch { hidProtocol.arrowUp(); appendLog("↑") } }
-        btnDown.setOnClickListener { lifecycleScope.launch { hidProtocol.arrowDown(); appendLog("↓") } }
-        btnLeft.setOnClickListener { lifecycleScope.launch { hidProtocol.arrowLeft(); appendLog("←") } }
-        btnRight.setOnClickListener { lifecycleScope.launch { hidProtocol.arrowRight(); appendLog("→") } }
-        btnHome.setOnClickListener { lifecycleScope.launch { hidProtocol.home(); appendLog("Home") } }
-        btnEnd.setOnClickListener { lifecycleScope.launch { hidProtocol.end(); appendLog("End") } }
+        findViewById<Button>(R.id.btnUp).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.arrowUp(); appendLog("↑") } 
+        }
+        findViewById<Button>(R.id.btnDown).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.arrowDown(); appendLog("↓") } 
+        }
+        findViewById<Button>(R.id.btnLeft).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.arrowLeft(); appendLog("←") } 
+        }
+        findViewById<Button>(R.id.btnRight).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.arrowRight(); appendLog("→") } 
+        }
+        findViewById<Button>(R.id.btnHome).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.home(); appendLog("Home") } 
+        }
+        findViewById<Button>(R.id.btnEnd).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.end(); appendLog("End") } 
+        }
         
         // 组合键
-        btnCtrlC.setOnClickListener { lifecycleScope.launch { hidProtocol.copy(); appendLog("Ctrl+C") } }
-        btnCtrlV.setOnClickListener { lifecycleScope.launch { hidProtocol.paste(); appendLog("Ctrl+V") } }
-        btnCtrlX.setOnClickListener { lifecycleScope.launch { hidProtocol.cut(); appendLog("Ctrl+X") } }
-        btnCtrlA.setOnClickListener { lifecycleScope.launch { hidProtocol.selectAll(); appendLog("Ctrl+A") } }
-        btnCtrlZ.setOnClickListener { lifecycleScope.launch { hidProtocol.undo(); appendLog("Ctrl+Z") } }
-        btnCtrlS.setOnClickListener { lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") } }
-    }
-    
-    private fun showDeviceDialog(device: BluetoothDevice, rssi: Int) {
-        val name = device.name ?: "未知设备"
-        val address = device.address
-        
-        AlertDialog.Builder(this)
-            .setTitle("发现设备")
-            .setMessage("设备名称: $name\nMAC 地址: $address\n信号强度: $rssi dBm\n\n是否连接？")
-            .setPositiveButton("连接") { _, _ ->
-                appendLog("正在连接到 $name...")
-                bleManager.connect(device)
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        findViewById<Button>(R.id.btnCtrlC).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.copy(); appendLog("Ctrl+C") } 
+        }
+        findViewById<Button>(R.id.btnCtrlV).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.paste(); appendLog("Ctrl+V") } 
+        }
+        findViewById<Button>(R.id.btnCtrlX).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.cut(); appendLog("Ctrl+X") } 
+        }
+        findViewById<Button>(R.id.btnCtrlA).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.selectAll(); appendLog("Ctrl+A") } 
+        }
+        findViewById<Button>(R.id.btnCtrlZ).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.undo(); appendLog("Ctrl+Z") } 
+        }
+        findViewById<Button>(R.id.btnCtrlS).setOnClickListener { 
+            lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") } 
+        }
     }
     
     private fun updateConnectionState(connected: Boolean) {
         if (connected) {
             statusText.text = "已连接"
             statusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
+            statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
             scanButton.isEnabled = false
             disconnectButton.isEnabled = true
-            textInput.isEnabled = true
-            sendButton.isEnabled = true
             deviceNameText.text = "Pico HID Keyboard"
         } else {
             statusText.text = "未连接"
             statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+            statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
             scanButton.isEnabled = true
             disconnectButton.isEnabled = false
-            textInput.isEnabled = false
-            sendButton.isEnabled = false
             deviceNameText.text = "请扫描并连接设备"
         }
     }
@@ -246,13 +254,11 @@ class MainActivity : AppCompatActivity() {
         
         commandLog.append(logEntry)
         
-        // 限制日志行数
         val lines = commandLog.text.lines()
         if (lines.size > 50) {
             commandLog.text = lines.takeLast(50).joinToString("\n")
         }
         
-        // 滚动到底部
         val scrollView = commandLog.parent as? ScrollView
         scrollView?.post {
             scrollView.fullScroll(View.FOCUS_DOWN)

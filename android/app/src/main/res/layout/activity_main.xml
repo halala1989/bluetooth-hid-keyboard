@@ -2,44 +2,69 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@color/background"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="14dp">
 
         <!-- 标题 -->
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="BLE HID 键盘"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp"
+            android:layout_marginTop="4dp">
 
-        <!-- 连接状态区域 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌨ BLE HID 键盘"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="手机输入 → 电脑"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+
+        <!-- 连接状态卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="状态: "
-                    android:textSize="16sp" />
+                    android:text="● "
+                    android:textSize="16sp"
+                    android:textColor="@color/disconnected"
+                    android:id="@+id/statusDot" />
 
                 <TextView
                     android:id="@+id/statusText"
@@ -56,8 +81,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="请扫描并连接设备"
-                android:textSize="14sp"
-                android:textColor="#666666"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
                 android:layout_marginBottom="12dp" />
 
             <LinearLayout
@@ -67,100 +92,134 @@
 
                 <Button
                     android:id="@+id/scanButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    style="@style/PrimaryButton"
                     android:layout_weight="1"
-                    android:text="扫描设备"
-                    android:layout_marginEnd="8dp" />
+                    android:text="扫描设备" />
 
                 <Button
                     android:id="@+id/disconnectButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    style="@style/SecondaryButton"
                     android:layout_weight="1"
                     android:text="断开连接"
                     android:enabled="false" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 文本输入区域 -->
+        <!-- 设备列表卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="发现的设备"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <ListView
+                android:id="@+id/deviceList"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/bg_list"
+                android:divider="@color/card_stroke"
+                android:dividerHeight="1dp"
+                android:padding="4dp"
+                android:scrollbarStyle="outsideOverlay" />
+        </LinearLayout>
+
+        <!-- 文本输入卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="输入文本"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
-
-            <EditText
-                android:id="@+id/textInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="在此输入文字..."
-                android:inputType="text"
-                android:enabled="false"
-                android:minLines="3"
-                android:gravity="top"
-                android:layout_marginBottom="8dp"
-                android:padding="12dp"
-                android:background="@drawable/edit_background" />
-
-            <Button
-                android:id="@+id/sendButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="发送"
-                android:enabled="false" />
-        </LinearLayout>
-
-        <!-- 功能键区域 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/card_background"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="功能键"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/textInput"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:hint="输入文字（支持中文/英文/数字）"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textColorHighlight="#334FC3F7"
+                    android:textSize="15sp"
+                    android:singleLine="true"
+                    android:inputType="text"
+                    android:imeOptions="actionSend"
+                    android:importantForAutofill="no" />
 
                 <Button
-                    android:id="@+id/btnEnter"
-                    style="@style/KeyButton"
-                    android:text="Enter"
-                    android:layout_weight="1" />
+                    android:id="@+id/sendButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="0.45"
+                    android:text="发送" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 中文输入模式卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="中文输入模式"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnBackspace"
+                    android:id="@+id/btnModeAltX"
                     style="@style/KeyButton"
-                    android:text="Back"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Alt+X" />
 
                 <Button
-                    android:id="@+id/btnTab"
+                    android:id="@+id/btnModeHex"
                     style="@style/KeyButton"
-                    android:text="Tab"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="十六进制" />
             </LinearLayout>
 
             <LinearLayout
@@ -169,77 +228,154 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnEscape"
+                    android:id="@+id/btnModeDecimal"
                     style="@style/KeyButton"
-                    android:text="Esc"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="十进制" />
 
                 <Button
-                    android:id="@+id/btnDelete"
+                    android:id="@+id/btnModeGbk"
                     style="@style/KeyButton"
-                    android:text="Del"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="GBK" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="默认 Alt+X（输入十六进制码后按 Alt+X，记事本/Word 等 RichEdit 可用，无需注册表/NumLock）。十六进制=Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效；GBK 仅中文版 Windows。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="8dp" />
         </LinearLayout>
 
-        <!-- 光标控制区域 -->
+        <!-- 功能键卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功能键"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEnter"
+                    style="@style/EnterButton"
+                    android:layout_weight="1"
+                    android:text="回车" />
+
+                <Button
+                    android:id="@+id/btnBackspace"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="退格" />
+
+                <Button
+                    android:id="@+id/btnDelete"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="删除" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnTab"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Tab" />
+
+                <Button
+                    android:id="@+id/btnEscape"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Esc" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 光标控制卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="光标控制"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
+                android:textColor="@color/text_primary"
                 android:layout_marginBottom="8dp" />
 
             <!-- 方向键 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:layout_marginBottom="8dp">
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginBottom="6dp">
 
                 <Button
                     android:id="@+id/btnUp"
                     style="@style/KeyButton"
-                    android:text="↑"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_width="56dp"
+                    android:layout_height="46dp"
+                    android:text="↑" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnLeft"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="←" />
+
+                    <Button
+                        android:id="@+id/btnDown"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="↓" />
+
+                    <Button
+                        android:id="@+id/btnRight"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="→" />
+                </LinearLayout>
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:layout_marginBottom="8dp">
-
-                <Button
-                    android:id="@+id/btnLeft"
-                    style="@style/KeyButton"
-                    android:text="←"
-                    android:layout_marginEnd="8dp" />
-
-                <Button
-                    android:id="@+id/btnDown"
-                    style="@style/KeyButton"
-                    android:text="↓"
-                    android:layout_marginEnd="8dp" />
-
-                <Button
-                    android:id="@+id/btnRight"
-                    style="@style/KeyButton"
-                    android:text="→" />
-            </LinearLayout>
-
-            <!-- Home/End -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -248,70 +384,69 @@
                 <Button
                     android:id="@+id/btnHome"
                     style="@style/KeyButton"
-                    android:text="Home"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Home" />
 
                 <Button
                     android:id="@+id/btnEnd"
                     style="@style/KeyButton"
-                    android:text="End"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="End" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 组合键区域 -->
+        <!-- 组合键卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="组合键"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
+                android:textColor="@color/text_primary"
                 android:layout_marginBottom="8dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:orientation="horizontal">
 
                 <Button
                     android:id="@+id/btnCtrlC"
                     style="@style/KeyButton"
-                    android:text="Ctrl+C"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+C" />
 
                 <Button
                     android:id="@+id/btnCtrlV"
                     style="@style/KeyButton"
-                    android:text="Ctrl+V"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+V" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:orientation="horizontal">
 
                 <Button
                     android:id="@+id/btnCtrlX"
                     style="@style/KeyButton"
-                    android:text="Ctrl+X"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+X" />
 
                 <Button
                     android:id="@+id/btnCtrlA"
                     style="@style/KeyButton"
-                    android:text="Ctrl+A"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+A" />
             </LinearLayout>
 
             <LinearLayout
@@ -322,37 +457,39 @@
                 <Button
                     android:id="@+id/btnCtrlZ"
                     style="@style/KeyButton"
-                    android:text="Ctrl+Z"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+Z" />
 
                 <Button
                     android:id="@+id/btnCtrlS"
                     style="@style/KeyButton"
-                    android:text="Ctrl+S"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="Ctrl+S" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 命令日志区域 -->
+        <!-- 命令日志卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="20dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="命令日志"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
 
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="150dp">
+                android:layout_height="160dp"
+                android:scrollbars="vertical">
 
                 <TextView
                     android:id="@+id/commandLog"
@@ -360,9 +497,11 @@
                     android:layout_height="wrap_content"
                     android:text="等待连接..."
                     android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
                     android:fontFamily="monospace"
-                    android:background="#f5f5f5"
-                    android:padding="8dp" />
+                    android:background="@drawable/bg_log"
+                    android:padding="10dp"
+                    android:lineSpacingExtra="2dp" />
             </ScrollView>
         </LinearLayout>
 

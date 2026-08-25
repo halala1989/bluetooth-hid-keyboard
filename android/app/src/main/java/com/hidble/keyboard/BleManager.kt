@@ -1,283 +1,287 @@
 package com.hidble.keyboard
 
-import android.bluetooth.*
-import android.bluetooth.le.*
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.util.*
+import java.util.UUID
 
-/**
- * BLE 管理器 - 负责 BLE 扫描、连接和数据传输
- */
+@SuppressLint("MissingPermission")
 class BleManager(private val context: Context) {
-    
+
     companion object {
         private const val TAG = "BleManager"
-        
-        // 自定义服务 UUID（与 Pico W 固件匹配）
-        val SERVICE_UUID: UUID = UUID.fromString("12345678-1234-5678-1234-56789abcdef0")
-        val CMD_CHAR_UUID: UUID = UUID.fromString("12345678-1234-5678-1234-56789abcdef1")
-        val NOTIFY_CHAR_UUID: UUID = UUID.fromString("12345678-1234-5678-1234-56789abcdef2")
-        
-        private const val SCAN_TIMEOUT_MS = 10000L
+        private const val SCAN_TIMEOUT_MS = 30_000L
+
+        @JvmField
+        val SERVICE_UUID: UUID = UUID.fromString("00001234-0000-1000-8000-00805f9b34fb")
+        @JvmField
+        val CMD_CHAR_UUID: UUID = UUID.fromString("00001235-0000-1000-8000-00805f9b34fb")
+        @JvmField
+        val NOTIFY_CHAR_UUID: UUID = UUID.fromString("00001236-0000-1000-8000-00805f9b34fb")
+        private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
-    
-    // BLE 相关
+
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter = bluetoothManager.adapter
     private val bleScanner = bluetoothAdapter?.bluetoothLeScanner
-    
-    private var bluetoothGatt: BluetoothGatt? = null
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var gatt: BluetoothGatt? = null
     private var cmdCharacteristic: BluetoothGattCharacteristic? = null
     private var notifyCharacteristic: BluetoothGattCharacteristic? = null
-    
-    // 回调
+
+    private var scanning = false
+    private var ready = false
+    private var mtu = 20
+    private var writing = false
+    private val writeQueue = ArrayDeque<ByteArray>()
+
     var onConnectionStateChanged: ((Boolean) -> Unit)? = null
-    var onDeviceFound: ((BluetoothDevice, Int) -> Unit)? = null
+    var onDeviceFound: ((BluetoothDevice, Int, String?) -> Unit)? = null
     var onDataReceived: ((String) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
-    
-    private val handler = Handler(Looper.getMainLooper())
-    private var isScanning = false
-    
-    /**
-     * 检查 BLE 是否可用
-     */
-    fun isBleAvailable(): Boolean {
-        return bluetoothAdapter != null && bluetoothAdapter.isEnabled
-    }
-    
-    /**
-     * 开始扫描 BLE 设备
-     */
+
+    fun isBleAvailable(): Boolean = bluetoothAdapter != null && bluetoothAdapter.isEnabled
+
     fun startScan() {
         if (!isBleAvailable()) {
             onError?.invoke("蓝牙不可用或未开启")
             return
         }
-        
-        if (isScanning) return
-        
-        isScanning = true
-        bleScanner?.startScan(scanCallback)
-        
-        // 设置扫描超时
-        handler.postDelayed({
-            stopScan()
-        }, SCAN_TIMEOUT_MS)
-        
-        Log.d(TAG, "BLE 扫描已开始")
+        if (scanning) return
+        scanning = true
+
+        // Scan all BLE devices: some phones fail to match the 16-bit service UUID filter.
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0)
+            .build()
+
+        try {
+            bleScanner?.startScan(null, settings, scanCallback)
+        } catch (e: SecurityException) {
+            onError?.invoke("蓝牙权限被拒绝: ${e.message}")
+            scanning = false
+            return
+        }
+
+        handler.postDelayed({ stopScan() }, SCAN_TIMEOUT_MS)
+        Log.d(TAG, "BLE scan started")
     }
-    
-    /**
-     * 停止扫描
-     */
+
     fun stopScan() {
-        if (!isScanning) return
-        
-        isScanning = false
-        bleScanner?.stopScan(scanCallback)
+        if (!scanning) return
+        scanning = false
+        try {
+            bleScanner?.stopScan(scanCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "stopScan failed", e)
+        }
         handler.removeCallbacksAndMessages(null)
-        
-        Log.d(TAG, "BLE 扫描已停止")
+        Log.d(TAG, "BLE scan stopped")
     }
-    
-    /**
-     * 连接到设备
-     */
+
     fun connect(device: BluetoothDevice) {
         stopScan()
-        
+        ready = false
+        mtu = 20
         try {
-            bluetoothGatt = device.connectGatt(context, false, gattCallback)
-            Log.d(TAG, "正在连接到 ${device.name}")
+            gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+            Log.d(TAG, "Connecting to ${device.name}")
         } catch (e: SecurityException) {
             onError?.invoke("蓝牙权限被拒绝: ${e.message}")
         }
     }
-    
-    /**
-     * 断开连接
-     */
+
     fun disconnect() {
+        writeQueue.clear()
+        writing = false
+        ready = false
         try {
-            bluetoothGatt?.disconnect()
-            bluetoothGatt?.close()
-            bluetoothGatt = null
-            cmdCharacteristic = null
-            notifyCharacteristic = null
-            Log.d(TAG, "已断开连接")
+            gatt?.disconnect()
+            gatt?.close()
         } catch (e: Exception) {
-            Log.e(TAG, "断开连接时出错", e)
+            Log.e(TAG, "disconnect error", e)
         }
+        gatt = null
+        cmdCharacteristic = null
+        notifyCharacteristic = null
     }
-    
-    /**
-     * 发送命令
-     */
+
+    @Synchronized
     fun sendCommand(command: String) {
-        val gatt = bluetoothGatt ?: run {
+        val characteristic = cmdCharacteristic ?: run {
             onError?.invoke("未连接到设备")
             return
         }
-        
-        val characteristic = cmdCharacteristic ?: run {
-            onError?.invoke("命令特征值不可用")
-            return
+        val payload = (command + "\n").toByteArray(Charsets.UTF_8)
+        val chunkSize = (mtu - 3).coerceIn(20, 244)
+        var offset = 0
+        while (offset < payload.size) {
+            val end = minOf(offset + chunkSize, payload.size)
+            writeQueue.addLast(payload.copyOfRange(offset, end))
+            offset = end
         }
-        
+        writeNext(characteristic)
+    }
+
+    @Synchronized
+    private fun writeNext(characteristic: BluetoothGattCharacteristic) {
+        if (writing || writeQueue.isEmpty()) return
+        val chunk = writeQueue.removeFirst()
+        writing = true
         try {
-            val data = (command + "\n").toByteArray(Charsets.UTF_8)
-            characteristic.value = data
             characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            
-            val result = gatt.writeCharacteristic(characteristic)
-            if (!result) {
+            @Suppress("DEPRECATION")
+            characteristic.value = chunk
+            val ok = gatt?.writeCharacteristic(characteristic) == true
+            if (!ok) {
+                writing = false
                 onError?.invoke("发送命令失败")
             } else {
-                Log.d(TAG, "命令已发送: $command")
+                Log.d(TAG, "Write ${chunk.size} bytes")
             }
-        } catch (e: SecurityException) {
-            onError?.invoke("蓝牙权限被拒绝: ${e.message}")
         } catch (e: Exception) {
+            writing = false
             onError?.invoke("发送命令出错: ${e.message}")
         }
     }
-    
-    /**
-     * 发送文本
-     */
-    fun sendText(text: String) {
-        sendCommand("TEXT:$text")
+
+    private fun writeNextIfReady() {
+        val characteristic = cmdCharacteristic ?: return
+        writeNext(characteristic)
     }
-    
-    /**
-     * 发送按键
-     */
-    fun sendKey(key: String) {
-        sendCommand("KEY:$key")
-    }
-    
-    /**
-     * 发送组合键
-     */
-    fun sendCombo(modifiers: List<String>, key: String) {
-        val modStr = modifiers.joinToString("+")
-        sendCommand("MOD:$modStr+$key")
-    }
-    
-    /**
-     * 发送 Unicode 字符
-     */
-    fun sendUnicode(codepoint: Int) {
-        sendCommand("UNI:$codepoint")
-    }
-    
-    /**
-     * 检查是否已连接
-     */
-    fun isConnected(): Boolean {
-        return bluetoothGatt != null && cmdCharacteristic != null
-    }
-    
-    /**
-     * 清理资源
-     */
+
+    fun sendText(text: String) = sendCommand("TEXT:$text")
+    fun sendKey(key: String) = sendCommand("KEY:$key")
+    fun sendCombo(modifiers: List<String>, key: String) =
+        sendCommand("MOD:${modifiers.joinToString("+")}+$key")
+    fun sendUnicode(codepoint: Int) = sendCommand("UNI:$codepoint")
+
+    fun isConnected(): Boolean = ready
+
     fun cleanup() {
         stopScan()
         disconnect()
     }
-    
-    // BLE 扫描回调
-    private val scanCallback = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
+
+    private val scanCallback = object : android.bluetooth.le.ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult) {
             val device = result.device
-            val rssi = result.rssi
-            
-            Log.d(TAG, "发现设备: ${device.name} (${device.address}) RSSI: $rssi")
-            
-            // 过滤 Pico HID Keyboard 设备
-            if (device.name?.contains("Pico HID Keyboard") == true) {
-                onDeviceFound?.invoke(device, rssi)
-            }
+            val name = try { device.name } catch (_: SecurityException) { null }
+            handler.post { onDeviceFound?.invoke(device, result.rssi, name) }
         }
-        
+
         override fun onScanFailed(errorCode: Int) {
-            isScanning = false
-            onError?.invoke("扫描失败，错误码: $errorCode")
+            scanning = false
+            handler.post { onError?.invoke("扫描失败，错误码: $errorCode") }
         }
     }
-    
-    // GATT 回调
+
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> {
-                    Log.d(TAG, "已连接，正在发现服务...")
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d(TAG, "Connected, requesting MTU and services")
+                val requested = gatt.requestMtu(247)
+                if (!requested) {
                     gatt.discoverServices()
                 }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.d(TAG, "已断开连接")
-                    handler.post {
-                        onConnectionStateChanged?.invoke(false)
-                    }
-                    cleanup()
-                }
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                ready = false
+                writeQueue.clear()
+                writing = false
+                this@BleManager.gatt = null
+                cmdCharacteristic = null
+                notifyCharacteristic = null
+                handler.post { onConnectionStateChanged?.invoke(false) }
             }
         }
-        
+
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            this@BleManager.mtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 20
+            gatt.discoverServices()
+        }
+
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                val service = gatt.getService(SERVICE_UUID)
-                if (service != null) {
-                    cmdCharacteristic = service.getCharacteristic(CMD_CHAR_UUID)
-                    notifyCharacteristic = service.getCharacteristic(NOTIFY_CHAR_UUID)
-                    
-                    // 启用通知
-                    if (notifyCharacteristic != null) {
-                        gatt.setCharacteristicNotification(notifyCharacteristic, true)
-                        
-                        val descriptor = notifyCharacteristic?.getDescriptor(
-                            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
-                        )
-                        if (descriptor != null) {
-                            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                            gatt.writeDescriptor(descriptor)
-                        }
-                    }
-                    
-                    Log.d(TAG, "服务发现完成")
-                    handler.post {
-                        onConnectionStateChanged?.invoke(true)
-                    }
-                } else {
-                    onError?.invoke("未找到 HID 服务")
-                }
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                handler.post { onError?.invoke("服务发现失败: $status") }
+                return
+            }
+            val service = gatt.getService(SERVICE_UUID)
+            if (service == null) {
+                handler.post { onError?.invoke("未找到 HID BLE 服务") }
+                return
+            }
+            cmdCharacteristic = service.getCharacteristic(CMD_CHAR_UUID)
+            notifyCharacteristic = service.getCharacteristic(NOTIFY_CHAR_UUID)
+
+            if (cmdCharacteristic == null) {
+                handler.post { onError?.invoke("未找到写入特征值") }
+                return
+            }
+
+            val notify = notifyCharacteristic
+            if (notify == null) {
+                ready = true
+                handler.post { onConnectionStateChanged?.invoke(true) }
+                return
+            }
+
+            gatt.setCharacteristicNotification(notify, true)
+            val descriptor = notify.getDescriptor(CCCD_UUID)
+            if (descriptor == null) {
+                ready = true
+                handler.post { onConnectionStateChanged?.invoke(true) }
             } else {
-                onError?.invoke("服务发现失败: $status")
+                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                gatt.writeDescriptor(descriptor)
             }
         }
-        
-        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+
+        @Deprecated("Deprecated in Java")
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic
+        ) {
             if (characteristic.uuid == NOTIFY_CHAR_UUID) {
-                val data = characteristic.value?.toString(Charsets.UTF_8)
-                if (data != null) {
-                    Log.d(TAG, "收到数据: $data")
-                    handler.post {
-                        onDataReceived?.invoke(data)
-                    }
+                @Suppress("DEPRECATION")
+                val data = characteristic.value?.toString(Charsets.UTF_8).orEmpty()
+                if (data.isNotEmpty()) {
+                    handler.post { onDataReceived?.invoke(data) }
                 }
             }
         }
-        
-        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d(TAG, "特征值写入成功")
-            } else {
-                onError?.invoke("特征值写入失败: $status")
+
+        @Deprecated("Deprecated in Java")
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            writing = false
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                handler.post { onError?.invoke("特征值写入失败: $status") }
             }
+            writeNextIfReady()
+        }
+
+        override fun onDescriptorWrite(
+            gatt: BluetoothGatt,
+            descriptor: android.bluetooth.BluetoothGattDescriptor,
+            status: Int
+        ) {
+            ready = true
+            handler.post { onConnectionStateChanged?.invoke(true) }
         }
     }
 }

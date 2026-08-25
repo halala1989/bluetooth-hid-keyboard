@@ -39,6 +39,16 @@ class HidProtocol(private val bleManager: BleManager) {
     fun sendUnicode(codepoint: Int) {
         bleManager.sendUnicode(codepoint)
     }
+
+    /**
+     * 设置中文/Unicode 输入模式（发送 UMOD 命令到固件）
+     * 0 = 十进制 Unicode 码点（默认，记事本/写字板/Word 等 RichEdit 应用）
+     * 1 = 十六进制（需目标机已开启 EnableHexNumpad 注册表项）
+     * 2 = GBK 机内码（中文 Windows 下浏览器/聊天等绝大多数应用）
+     */
+    fun setUnicodeMode(mode: Int) {
+        bleManager.sendCommand("UMOD:$mode")
+    }
     
     // 常用组合键快捷方法
     
