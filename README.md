@@ -41,7 +41,7 @@ pico_firmware/          # Pico SDK C 固件（推荐，已可编译）
   ├─ tusb_config.h / btstack_config.h / hid_keyboard.gatt
 firmware/
   └─ pico_ble_hid_keyboard.uf2  # 预编译固件
-android/                # Android Kotlin 客户端（深色 UI，含中文输入模式切换）
+android/                # Android Kotlin 客户端（深色 UI，含中文输入模式切换、输入速度调速、常用语句保存）
 docs/                   # 协议、设置、工作进度
 tools/
   ├─ elf2uf2.py        # ELF→UF2 脚本（512 字节/块，魔术值已校验）
@@ -80,6 +80,8 @@ android/app/build/outputs/apk/debug/app-debug.apk
 2. 手机打开蓝牙和本应用。
 3. 点“扫描设备”，选择 `Pico HID Keyboard`。
 4. 在文本框输入汉字/英文/数字，点发送；中文输入模式默认 Alt+X（记事本/Word 等用），浏览器等切“十六进制”。
+5. **输入速度**：输入框下方“速度”文本框填 `1-10`（数字越大越快，默认 5），点“应用”立即生效并自动保存；连接设备后会自动应用已保存的速度（需先刷入含 SPEED 命令的固件）。
+6. **常用语句**：点“常用语”可添加/编辑/删除常用语句（自动保存），点选一条即可插入到输入框，再点发送。
 
 未连接时 Pico W LED 慢闪，BLE 连接后常亮。
 

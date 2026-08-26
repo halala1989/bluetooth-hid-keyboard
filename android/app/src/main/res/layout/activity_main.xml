@@ -42,99 +42,7 @@
                 android:textColor="@color/text_secondary" />
         </LinearLayout>
 
-        <!-- 连接状态卡片 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="6dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="● "
-                    android:textSize="16sp"
-                    android:textColor="@color/disconnected"
-                    android:id="@+id/statusDot" />
-
-                <TextView
-                    android:id="@+id/statusText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="未连接"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/disconnected" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/deviceNameText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="请扫描并连接设备"
-                android:textSize="13sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginBottom="12dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/scanButton"
-                    style="@style/PrimaryButton"
-                    android:layout_weight="1"
-                    android:text="扫描设备" />
-
-                <Button
-                    android:id="@+id/disconnectButton"
-                    style="@style/SecondaryButton"
-                    android:layout_weight="1"
-                    android:text="断开连接"
-                    android:enabled="false" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- 设备列表卡片 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="发现的设备"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="10dp" />
-
-            <ListView
-                android:id="@+id/deviceList"
-                android:layout_width="match_parent"
-                android:layout_height="160dp"
-                android:background="@drawable/bg_list"
-                android:divider="@color/card_stroke"
-                android:dividerHeight="1dp"
-                android:padding="4dp"
-                android:scrollbarStyle="outsideOverlay" />
-        </LinearLayout>
-
-        <!-- 文本输入卡片 -->
+        <!-- 文本输入卡片（置顶：输入 + 发送 + 输入速度 + 常用语） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -184,6 +92,58 @@
                     android:layout_weight="0.45"
                     android:text="发送" />
             </LinearLayout>
+
+            <!-- 常用语 + 输入速度 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/phraseButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1.2"
+                    android:text="常用语" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+
+                <EditText
+                    android:id="@+id/speedInput"
+                    android:layout_width="58dp"
+                    android:layout_height="46dp"
+                    android:background="@drawable/bg_input"
+                    android:gravity="center"
+                    android:hint="5"
+                    android:inputType="number"
+                    android:maxLength="2"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="15sp"
+                    android:importantForAutofill="no" />
+
+                <Button
+                    android:id="@+id/applySpeedButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1.2"
+                    android:text="应用" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="输入速度 1-10（数字越大越快，默认 5，连接后自动生效）；常用语可保存常用语句，点选插入输入框。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <!-- 中文输入模式卡片 -->
@@ -475,7 +435,7 @@
             android:orientation="vertical"
             android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -503,6 +463,98 @@
                     android:padding="10dp"
                     android:lineSpacingExtra="2dp" />
             </ScrollView>
+        </LinearLayout>
+
+        <!-- 连接状态卡片（移至底部） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="● "
+                    android:textSize="16sp"
+                    android:textColor="@color/disconnected"
+                    android:id="@+id/statusDot" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未连接"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/disconnected" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/deviceNameText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="请扫描并连接设备"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/scanButton"
+                    style="@style/PrimaryButton"
+                    android:layout_weight="1"
+                    android:text="扫描设备" />
+
+                <Button
+                    android:id="@+id/disconnectButton"
+                    style="@style/SecondaryButton"
+                    android:layout_weight="1"
+                    android:text="断开连接"
+                    android:enabled="false" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 设备列表卡片（移至最底部） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="发现的设备"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <ListView
+                android:id="@+id/deviceList"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/bg_list"
+                android:divider="@color/card_stroke"
+                android:dividerHeight="1dp"
+                android:padding="4dp"
+                android:scrollbarStyle="outsideOverlay" />
         </LinearLayout>
 
     </LinearLayout>

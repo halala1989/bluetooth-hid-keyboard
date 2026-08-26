@@ -190,6 +190,13 @@ static void start_command(uint8_t *data, uint16_t len) {
         if (end == params || *end != '\0' || !usb_hid_set_unicode_mode((int)mode)) {
             command_result = "ERR:INVALID_MODE";
         }
+    } else if (strcmp(cmd, "SPEED") == 0) {
+        // Typing speed: 1=slowest .. 10=fastest (default 5)
+        char *end = NULL;
+        long level = strtol(params, &end, 10);
+        if (end == params || *end != '\0' || !usb_hid_set_speed((int)level)) {
+            command_result = "ERR:INVALID_SPEED";
+        }
     } else {
         command_result = "ERR:INVALID_CMD";
     }

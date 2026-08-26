@@ -2,6 +2,7 @@ package com.hidble.keyboard
 
 import android.Manifest
 import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -13,13 +14,20 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
-    
+
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
+        private const val PREFS_NAME = "hidble_prefs"
+        private const val KEY_SPEED_LEVEL = "speed_level"
+        private const val KEY_PHRASES = "phrases"
+        private const val DEFAULT_SPEED_LEVEL = 5
+        private const val SPEED_MIN = 1
+        private const val SPEED_MAX = 10
     }
-    
+
     private lateinit var statusText: TextView
     private lateinit var statusDot: TextView
     private lateinit var deviceNameText: TextView
@@ -27,26 +35,33 @@ class MainActivity : AppCompatActivity() {
     private lateinit var disconnectButton: Button
     private lateinit var textInput: EditText
     private lateinit var sendButton: Button
+    private lateinit var speedInput: EditText
+    private lateinit var applySpeedButton: Button
+    private lateinit var phraseButton: Button
     private lateinit var commandLog: TextView
     private lateinit var deviceList: ListView
-    
+
     private lateinit var bleManager: BleManager
     private lateinit var hidProtocol: HidProtocol
-    
+
     private val discoveredDevices = mutableListOf<BluetoothDevice>()
     private val deviceNames = mutableListOf<String>()
     private lateinit var deviceListAdapter: ArrayAdapter<String>
-    
+
+    private var savedSpeedLevel = DEFAULT_SPEED_LEVEL
+    private val phrases = mutableListOf<String>()
+    private lateinit var prefs: android.content.SharedPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
         initViews()
         initBle()
         setupListeners()
         requestPermissions()
     }
-    
+
     private fun initViews() {
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
@@ -55,26 +70,35 @@ class MainActivity : AppCompatActivity() {
         disconnectButton = findViewById(R.id.disconnectButton)
         textInput = findViewById(R.id.textInput)
         sendButton = findViewById(R.id.sendButton)
+        speedInput = findViewById(R.id.speedInput)
+        applySpeedButton = findViewById(R.id.applySpeedButton)
+        phraseButton = findViewById(R.id.phraseButton)
         commandLog = findViewById(R.id.commandLog)
-        
+
         // 设备列表
         deviceList = findViewById(R.id.deviceList)
         deviceListAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceNames)
         deviceList.adapter = deviceListAdapter
-        
+
+        // 输入速度 / 常用语（SharedPreferences）
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        savedSpeedLevel = prefs.getInt(KEY_SPEED_LEVEL, DEFAULT_SPEED_LEVEL)
+        speedInput.setText(savedSpeedLevel.toString())
+        loadPhrases()
+
         updateConnectionState(false)
     }
-    
+
     private fun initBle() {
         bleManager = BleManager(this)
         hidProtocol = HidProtocol(bleManager)
-        
+
         bleManager.onConnectionStateChanged = { connected ->
             runOnUiThread {
                 updateConnectionState(connected)
             }
         }
-        
+
         bleManager.onDeviceFound = { device, rssi, name ->
             runOnUiThread {
                 // 添加到设备列表
@@ -88,13 +112,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         bleManager.onDataReceived = { data ->
             runOnUiThread {
                 appendLog("收到: $data")
             }
         }
-        
+
         bleManager.onError = { error ->
             runOnUiThread {
                 appendLog("错误: $error")
@@ -102,38 +126,45 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun setupListeners() {
         scanButton.setOnClickListener {
             if (!bleManager.isBleAvailable()) {
                 Toast.makeText(this, "蓝牙不可用", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            
+
             // 清空设备列表
             discoveredDevices.clear()
             deviceNames.clear()
             deviceListAdapter.notifyDataSetChanged()
-            
+
             appendLog("开始扫描...")
             bleManager.startScan()
         }
-        
+
         disconnectButton.setOnClickListener {
             bleManager.disconnect()
             appendLog("已断开连接")
         }
-        
-        sendButton.setOnClickListener {
-            val text = textInput.text.toString()
-            if (text.isNotEmpty()) {
-                lifecycleScope.launch {
-                    hidProtocol.typeText(text)
-                    appendLog("发送文本: $text")
-                    textInput.text.clear()
-                }
+
+        sendButton.setOnClickListener { sendText() }
+
+        // 输入框软键盘“发送”键
+        textInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
+                sendText()
+                true
+            } else {
+                false
             }
         }
+
+        // 输入速度
+        applySpeedButton.setOnClickListener { applySpeedFromInput() }
+
+        // 常用语
+        phraseButton.setOnClickListener { showPhraseDialog() }
 
         // 中文输入模式
         findViewById<Button>(R.id.btnModeAltX).setOnClickListener {
@@ -152,13 +183,13 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch { hidProtocol.setUnicodeMode(2) }
             appendLog("中文输入模式: GBK 机内码（仅中文版 Windows）")
         }
-        
+
         // 设备列表点击事件
         deviceList.setOnItemClickListener { _, _, position, _ ->
             if (position < discoveredDevices.size) {
                 val device = discoveredDevices[position]
                 val name = deviceNames[position]
-                
+
                 AlertDialog.Builder(this)
                     .setTitle("连接设备")
                     .setMessage("确定要连接到 $name 吗？")
@@ -170,65 +201,225 @@ class MainActivity : AppCompatActivity() {
                     .show()
             }
         }
-        
+
         // 功能按钮
-        findViewById<Button>(R.id.btnEnter).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.enter(); appendLog("Enter") } 
+        findViewById<Button>(R.id.btnEnter).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.enter(); appendLog("Enter") }
         }
-        findViewById<Button>(R.id.btnBackspace).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.backspace(); appendLog("Backspace") } 
+        findViewById<Button>(R.id.btnBackspace).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.backspace(); appendLog("Backspace") }
         }
-        findViewById<Button>(R.id.btnTab).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.tab(); appendLog("Tab") } 
+        findViewById<Button>(R.id.btnTab).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.tab(); appendLog("Tab") }
         }
-        findViewById<Button>(R.id.btnEscape).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.escape(); appendLog("Escape") } 
+        findViewById<Button>(R.id.btnEscape).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.escape(); appendLog("Escape") }
         }
-        findViewById<Button>(R.id.btnDelete).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.delete(); appendLog("Delete") } 
+        findViewById<Button>(R.id.btnDelete).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.delete(); appendLog("Delete") }
         }
-        
+
         // 光标控制
-        findViewById<Button>(R.id.btnUp).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.arrowUp(); appendLog("↑") } 
+        findViewById<Button>(R.id.btnUp).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.arrowUp(); appendLog("↑") }
         }
-        findViewById<Button>(R.id.btnDown).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.arrowDown(); appendLog("↓") } 
+        findViewById<Button>(R.id.btnDown).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.arrowDown(); appendLog("↓") }
         }
-        findViewById<Button>(R.id.btnLeft).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.arrowLeft(); appendLog("←") } 
+        findViewById<Button>(R.id.btnLeft).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.arrowLeft(); appendLog("←") }
         }
-        findViewById<Button>(R.id.btnRight).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.arrowRight(); appendLog("→") } 
+        findViewById<Button>(R.id.btnRight).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.arrowRight(); appendLog("→") }
         }
-        findViewById<Button>(R.id.btnHome).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.home(); appendLog("Home") } 
+        findViewById<Button>(R.id.btnHome).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.home(); appendLog("Home") }
         }
-        findViewById<Button>(R.id.btnEnd).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.end(); appendLog("End") } 
+        findViewById<Button>(R.id.btnEnd).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.end(); appendLog("End") }
         }
-        
+
         // 组合键
-        findViewById<Button>(R.id.btnCtrlC).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.copy(); appendLog("Ctrl+C") } 
+        findViewById<Button>(R.id.btnCtrlC).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.copy(); appendLog("Ctrl+C") }
         }
-        findViewById<Button>(R.id.btnCtrlV).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.paste(); appendLog("Ctrl+V") } 
+        findViewById<Button>(R.id.btnCtrlV).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.paste(); appendLog("Ctrl+V") }
         }
-        findViewById<Button>(R.id.btnCtrlX).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.cut(); appendLog("Ctrl+X") } 
+        findViewById<Button>(R.id.btnCtrlX).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.cut(); appendLog("Ctrl+X") }
         }
-        findViewById<Button>(R.id.btnCtrlA).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.selectAll(); appendLog("Ctrl+A") } 
+        findViewById<Button>(R.id.btnCtrlA).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.selectAll(); appendLog("Ctrl+A") }
         }
-        findViewById<Button>(R.id.btnCtrlZ).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.undo(); appendLog("Ctrl+Z") } 
+        findViewById<Button>(R.id.btnCtrlZ).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.undo(); appendLog("Ctrl+Z") }
         }
-        findViewById<Button>(R.id.btnCtrlS).setOnClickListener { 
-            lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") } 
+        findViewById<Button>(R.id.btnCtrlS).setOnClickListener {
+            lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") }
         }
     }
-    
+
+    private fun sendText() {
+        val text = textInput.text.toString()
+        if (text.isNotEmpty()) {
+            lifecycleScope.launch {
+                hidProtocol.typeText(text)
+                appendLog("发送文本: $text")
+                textInput.text.clear()
+            }
+        }
+    }
+
+    // ===== 输入速度 =====
+
+    private fun applySpeedFromInput() {
+        val text = speedInput.text.toString().trim()
+        val level = text.toIntOrNull()
+        if (level == null || level < SPEED_MIN || level > SPEED_MAX) {
+            Toast.makeText(this, "请输入 $SPEED_MIN-$SPEED_MAX 之间的数字", Toast.LENGTH_SHORT).show()
+            speedInput.setText(savedSpeedLevel.toString())
+            return
+        }
+        savedSpeedLevel = level
+        prefs.edit().putInt(KEY_SPEED_LEVEL, level).apply()
+        if (bleManager.isConnected()) {
+            lifecycleScope.launch { hidProtocol.setSpeed(level) }
+            appendLog("输入速度已设为 $level（1-10）")
+        } else {
+            appendLog("输入速度已保存为 $level，连接后自动生效")
+        }
+    }
+
+    // ===== 常用语句 =====
+
+    private fun loadPhrases() {
+        phrases.clear()
+        val raw = prefs.getString(KEY_PHRASES, null) ?: return
+        try {
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                phrases.add(arr.getString(i))
+            }
+        } catch (e: Exception) {
+            // 数据损坏时忽略，重新开始
+        }
+    }
+
+    private fun savePhrases() {
+        val arr = JSONArray()
+        phrases.forEach { arr.put(it) }
+        prefs.edit().putString(KEY_PHRASES, arr.toString()).apply()
+    }
+
+    private fun showPhraseDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_phrases, null)
+        val listView = dialogView.findViewById<ListView>(R.id.phraseList)
+        val addButton = dialogView.findViewById<Button>(R.id.phraseAddButton)
+        val closeButton = dialogView.findViewById<Button>(R.id.phraseCloseButton)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("常用语句")
+            .setView(dialogView)
+            .create()
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, phrases)
+        listView.adapter = adapter
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            if (position in phrases.indices) {
+                insertPhrase(phrases[position])
+                dialog.dismiss()
+            }
+        }
+
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            if (position in phrases.indices) {
+                showPhraseActions(phrases[position], position) {
+                    adapter.notifyDataSetChanged()
+                }
+            }
+            true
+        }
+
+        addButton.setOnClickListener {
+            showPhraseEditDialog(null) { newPhrase ->
+                phrases.add(newPhrase)
+                savePhrases()
+                adapter.notifyDataSetChanged()
+            }
+        }
+
+        closeButton.setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
+
+    private fun showPhraseActions(phrase: String, index: Int, onChanged: () -> Unit) {
+        val options = arrayOf("编辑", "删除")
+        AlertDialog.Builder(this)
+            .setTitle("常用语句操作")
+            .setMessage(phrase)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showPhraseEditDialog(phrase) { newPhrase ->
+                        phrases[index] = newPhrase
+                        savePhrases()
+                        onChanged()
+                    }
+                    1 -> {
+                        phrases.removeAt(index)
+                        savePhrases()
+                        onChanged()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showPhraseEditDialog(initial: String?, onSaved: (String) -> Unit) {
+        val input = EditText(this)
+        input.hint = "输入常用语句"
+        input.setText(initial ?: "")
+        input.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
+        input.setBackgroundResource(R.drawable.bg_input)
+        input.setPadding(dp(14), dp(10), dp(14), dp(10))
+
+        val container = FrameLayout(this)
+        container.setPadding(dp(20), dp(8), dp(20), 0)
+        container.addView(input, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        AlertDialog.Builder(this)
+            .setTitle(if (initial == null) "添加常用语句" else "编辑常用语句")
+            .setView(container)
+            .setPositiveButton("保存") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    onSaved(text)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun insertPhrase(phrase: String) {
+        val editable = textInput.text
+        val start = textInput.selectionStart.coerceAtLeast(0)
+        val end = textInput.selectionEnd.coerceAtLeast(start)
+        val prefix = if (start > 0 && editable[start - 1] != ' ' && editable[start - 1] != '\n') " " else ""
+        val suffix = if (end < editable.length && editable[end] != ' ' && editable[end] != '\n') " " else ""
+        editable.replace(start, end, prefix + phrase + suffix)
+        textInput.setSelection(start + prefix.length + phrase.length)
+        textInput.requestFocus()
+        appendLog("插入常用语: $phrase")
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
     private fun updateConnectionState(connected: Boolean) {
         if (connected) {
             statusText.text = "已连接"
@@ -237,6 +428,9 @@ class MainActivity : AppCompatActivity() {
             scanButton.isEnabled = false
             disconnectButton.isEnabled = true
             deviceNameText.text = "Pico HID Keyboard"
+            // 连接后自动应用已保存的输入速度
+            lifecycleScope.launch { hidProtocol.setSpeed(savedSpeedLevel) }
+            appendLog("已连接，输入速度 $savedSpeedLevel")
         } else {
             statusText.text = "未连接"
             statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
@@ -246,25 +440,25 @@ class MainActivity : AppCompatActivity() {
             deviceNameText.text = "请扫描并连接设备"
         }
     }
-    
+
     private fun appendLog(message: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
             .format(java.util.Date())
         val logEntry = "[$timestamp] $message\n"
-        
+
         commandLog.append(logEntry)
-        
+
         val lines = commandLog.text.lines()
         if (lines.size > 50) {
             commandLog.text = lines.takeLast(50).joinToString("\n")
         }
-        
+
         val scrollView = commandLog.parent as? ScrollView
         scrollView?.post {
             scrollView.fullScroll(View.FOCUS_DOWN)
         }
     }
-    
+
     private fun requestPermissions() {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
@@ -279,19 +473,19 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.ACCESS_FINE_LOCATION
             )
         }
-        
+
         val deniedPermissions = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        
+
         if (deniedPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, deniedPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         }
     }
-    
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
+
         if (requestCode == PERMISSION_REQUEST_CODE) {
             val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             if (!allGranted) {
@@ -299,7 +493,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         bleManager.cleanup()

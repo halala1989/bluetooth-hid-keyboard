@@ -94,6 +94,20 @@ UMOD:2        # Alt + 小键盘十进制 GBK 机内码（仅中文版 Windows）
 
 切换模式后对后续 TEXT/UNI 命令生效。
 
+### SPEED
+
+设置输入速度（1=最慢，10=最快，默认 5）。数字越大，每个按键/字符之间的延迟越短。
+
+```text
+SPEED:10    # 最快
+SPEED:5     # 默认
+SPEED:1     # 最慢
+```
+
+- 速度等级会整体缩放固件中按键按下/释放/字符间隔/Alt 输入等延迟。
+- 切换后对后续所有 TEXT/KEY/UNI 命令生效。
+- Android App 连接成功后会自动把本地保存的速度发送给固件。
+
 ## 响应
 
 状态特征值会发送：
@@ -104,6 +118,7 @@ ERR:INVALID_CMD
 ERR:INVALID_KEY
 ERR:INVALID_MOD
 ERR:INVALID_CODEPOINT
+ERR:INVALID_SPEED
 ERR:TEXT_TOO_LARGE
 ERR:OVERFLOW
 STATUS:READY

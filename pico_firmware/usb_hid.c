@@ -49,6 +49,12 @@ static const uint8_t numpad_digit_keys[10] = {
 #define ALT_FINAL_MS 80u
 #define TEXT_BUFFER_SIZE 1024u
 
+/* 输入速度：1(最慢) .. 10(最快)，默认 5。所有按键间隔按比例缩放。 */
+#define SPEED_MIN_LEVEL 1
+#define SPEED_MAX_LEVEL 10
+#define SPEED_DEFAULT_LEVEL 5
+#define MIN_DELAY_MS 2u
+
 typedef enum {
     HID_IDLE = 0,
     HID_SEND_REPORT,
@@ -102,11 +108,16 @@ static uint8_t unicode_index;
 static uint8_t keyboard_leds = 0;
 static bool mounted = false;
 
+/* 输入速度（SPEED 命令设置）：speed_scale_permille 为按键延迟缩放(千分比)。 */
+static uint8_t speed_level = SPEED_DEFAULT_LEVEL;
+static uint32_t speed_scale_permille = 1000u;
+
 static void queue_report(uint8_t modifier, uint8_t keycode, uint32_t delay_ms, hid_state_t after) {
     memset(pending_report, 0, sizeof(pending_report));
     pending_report[0] = modifier;
     pending_report[2] = keycode;
-    report_delay_ms = delay_ms;
+    report_delay_ms = (delay_ms * speed_scale_permille) / 1000u;
+    if (report_delay_ms < MIN_DELAY_MS) report_delay_ms = MIN_DELAY_MS;
     next_state = after;
     state = HID_SEND_REPORT;
     next_action = get_absolute_time();
@@ -505,6 +516,16 @@ bool usb_hid_set_unicode_mode(int mode) {
     if (usb_hid_busy()) return false;
     if (mode < (int)UNICODE_MODE_DECIMAL || mode > (int)UNICODE_MODE_ALTX) return false;
     unicode_mode = (unicode_mode_t)mode;
+    return true;
+}
+
+bool usb_hid_set_speed(int level) {
+    if (level < SPEED_MIN_LEVEL || level > SPEED_MAX_LEVEL) return false;
+    static const uint32_t scales[SPEED_MAX_LEVEL] = {
+        2500u, 2000u, 1600u, 1200u, 1000u, 800u, 650u, 500u, 400u, 300u
+    };
+    speed_level = (uint8_t)level;
+    speed_scale_permille = scales[level - 1];
     return true;
 }
 

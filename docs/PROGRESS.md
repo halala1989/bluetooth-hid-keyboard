@@ -4,6 +4,12 @@
 
 ## 当前状态：可用
 
+### 2026-08-26 新增
+
+- **输入速度调速**：新增 `SPEED` 命令（1=最慢 … 10=最快，默认 5），固件按等级整体缩放按键/字符/Alt 输入延迟；Android 输入框旁新增“速度”文本框 + “应用”按钮，可立即生效并自动保存，连接后自动下发。
+- **常用语句**：Android 输入区新增“常用语”按钮，支持添加/编辑/删除常用语句（SharedPreferences 持久化），点选插入输入框。
+- **界面重排**：文本输入（含发送）移到最顶部；扫描设备/断开连接/发现设备移到最底部。
+
 - Pico W 固件（Pico SDK C）+ BLE GATT + USB HID 键盘：可编译、可烧录（UF2 512B/块校验通过）。
 - Android 客户端：深色 UI、扫描/连接/输入、中文输入模式切换，可编译出 APK。
 - **Win11 自带记事本输入中文已可用**：默认 Alt+X 模式（输入十六进制码后按 Alt+X 转换），无需注册表、无需 NumLock。
@@ -35,14 +41,15 @@
 - [ ] **Android 客户端增强**（用户已提，后续开发）：
   - 增加上述 Shift/IME 设置。
   - 更完善的输入体验、模式提示、历史等。
+  - **大模型润色**（规划中）：输入文本框连接自建 LLM API，把一段长话自动分段、去口水词、整理成书面语言后再发送。
 
 ## 构建产物（最新）
 
-- 固件：firmware/pico_ble_hid_keyboard.uf2
-  - SHA256: 1F0A29CF088F714B6195C50518AB0F32DF10EC1F1CEBBFE8A61A361724CA5051
-  - UF2：2172 块 × 512B，魔术值通过
-- APK：PicoBleHidKeyboard-debug.apk
-  - SHA256: B6E9A74E289D68FD31BB2190670BFBC77E7A8B4452643D6761020EEA91E6E16B
+- 固件：firmware/pico_ble_hid_keyboard.uf2（含 SPEED 命令）
+  - SHA256: D62411A43DA300302725F74045888ED3D7BFC458B88E10823A10B8FC8D0743DC
+  - UF2：2174 块 × 512B，魔术值通过
+- APK：PicoBleHidKeyboard-debug.apk（输入速度 + 常用语句 + 界面重排）
+  - SHA256: F08D386789FA1DA24A4CAB7EFD537C346329637A0C95C079D477147D7EB08C02
 
 ## 构建方法
 

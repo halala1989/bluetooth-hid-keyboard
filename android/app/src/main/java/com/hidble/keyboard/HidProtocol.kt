@@ -49,6 +49,14 @@ class HidProtocol(private val bleManager: BleManager) {
     fun setUnicodeMode(mode: Int) {
         bleManager.sendCommand("UMOD:$mode")
     }
+
+    /**
+     * 设置输入速度（发送 SPEED 命令到固件）
+     * 1 = 最慢，10 = 最快，5 = 默认
+     */
+    fun setSpeed(level: Int) {
+        bleManager.sendCommand("SPEED:$level")
+    }
     
     // 常用组合键快捷方法
     
