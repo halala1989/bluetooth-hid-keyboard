@@ -1,4 +1,4 @@
-package com.hidble.keyboard
+package com.hidble.phonekeyboard
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice

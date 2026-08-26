@@ -2,16 +2,18 @@
 
 最后更新：2026-08-26
 
-## 当前状态：可用
+## 当前状态：可用（独立产品线 phone-keyboard，v1.0）
 
-### v12（2026-08-26 晚）手机直接模拟蓝牙键盘
+### v1.0（2026-08-26）手机直接模拟蓝牙键盘（独立产品线）
 
+- 从主线拆出独立分支 `phone-keyboard`，版本从 **1.0** 开始编号（不与 Pico W 的 v10/v11 混用）。
 - **不再需要 Pico W**：改用 Android 9+ 的 `BluetoothHidDevice` API，手机注册成标准蓝牙键盘，电脑蓝牙直接配对打字。
-- 中文输入 4 种模式（Alt+X/十六进制/十进制/GBK）与 SPEED 调速逻辑 1:1 移植到手机端（`TypingEngine.kt`）。
-- 界面完全参照 v11：输入置顶（含速度/常用语），连接区改在底部（启动键盘/断开/已配对设备）。
-- 删除 BLE 扫描与固件通信（`BleManager.kt` 移除）；minSdk 28；versionCode 12 / versionName "12.0"。
+- 应用重命名：包名 `com.hidble.phonekeyboard`（旧版 `com.hidble.keyboard`，可同时安装）、应用名“手机蓝牙键盘”、versionCode 1 / versionName "1.0"。
+- 中文输入 4 种模式（Alt+X/十六进制/十进制/GBK）与速度调速逻辑 1:1 移植到手机端（`TypingEngine.kt`）。
+- 界面沿袭旧版：输入置顶（含速度/常用语），连接区在底部（启动键盘/断开/已配对设备）。
+- 删除 BLE 扫描与固件通信（`BleManager.kt` 移除）；minSdk 28。
 
-### 2026-08-26 新增（v11，Pico W 方案）
+### 2026-08-26 新增（v11，Pico W 方案，主线 master）
 
 - **输入速度调速**：新增 `SPEED` 命令（1=最慢 … 10=最快，默认 5），固件按等级整体缩放按键/字符/Alt 输入延迟；Android 输入框旁新增“速度”文本框 + “应用”按钮，可立即生效并自动保存，连接后自动下发。
 - **常用语句**：Android 输入区新增“常用语”按钮，支持添加/编辑/删除常用语句（SharedPreferences 持久化），点选插入输入框。
@@ -50,17 +52,16 @@
   - 更完善的输入体验、模式提示、历史等。
   - **大模型润色**（规划中）：输入文本框连接自建 LLM API，把一段长话自动分段、去口水词、整理成书面语言后再发送。
 
-## 构建产物（最新）
+## 构建产物（最新，本产品线）
 
-- APK：PicoBleHidKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 12 / versionName "12.0"，minSdk 28）
-  - SHA256: 1CF0F01E9A3159018D56F8D4F5E9265E55E2C9687032C2900B930D74A6FC908B
-- 固件：v12 起不再需要（历史 UF2 见 releases/v10、v11）
+- APK：PhoneBluetoothKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 1 / versionName "1.0"，minSdk 28）
+  - SHA256: 5489DC37988B9F9062B50983C0007BE27A36C80846D07FA33E891B67AC2A66F6
+- 固件：本产品线不需要（历史 Pico W UF2 在 master 分支 releases/v10、v11）
 
-## 版本发布（按版本号归档，便于回滚）
+## 版本发布（本产品线按 1.0 开始递增，便于回滚）
 
-- `releases/v10/`：Pico W 方案（Alt+X 中文输入模式），git tag `v10`
-- `releases/v11/`：Pico W 方案（输入速度 + 常用语句 + 界面重排），git tag `v11`
-- `releases/v12/`：手机直接模拟蓝牙键盘（无 Pico W），git tag `v12`
+- `releases/v1.0/`：手机直接模拟蓝牙键盘（独立产品线），git tag `v1.0`
+- Pico W 产品线在 `master` 分支（v10/v11），与本品互不影响
 - 约定详见 `releases/README.md`
 
 ## 构建方法
@@ -70,5 +71,5 @@
 
 ## 相关文档
 
-- docs/PROTOCOL.md（历史 BLE 协议；v12 手机方案无协议命令，中文模式直接映射为 Alt 码按键序列）
+- docs/PROTOCOL.md（历史 BLE 协议；v1.0 手机方案无协议命令，中文模式直接映射为 Alt 码按键序列）
 - docs/SETUP.md

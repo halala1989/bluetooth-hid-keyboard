@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace 'com.hidble.keyboard'
+    namespace 'com.hidble.phonekeyboard'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.hidble.keyboard"
+        applicationId "com.hidble.phonekeyboard"
         minSdk 28
         targetSdk 34
-        versionCode 12
-        versionName "12.0"
+        versionCode 1
+        versionName "1.0"
     }
 
     buildTypes {

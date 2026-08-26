@@ -1,7 +1,8 @@
 # 手机蓝牙键盘（Android → 蓝牙 HID → 电脑）
 
-**v12 起不再需要 Pico W**：手机直接把自己注册成标准蓝牙键盘（Android 9+ 系统的 `BluetoothHidDevice`），
-电脑蓝牙里添加“手机蓝牙键盘”配对后即可打字。App 里的中文输入、速度、常用语等体验与 v11 完全一致。
+**独立产品线 v1.0**（分支 `phone-keyboard`）：手机直接把自己注册成标准蓝牙键盘
+（Android 9+ 系统的 `BluetoothHidDevice`），电脑蓝牙里添加“手机蓝牙键盘”配对后即可打字，**不依赖 Pico W**。
+App 里的中文输入、速度、常用语等体验沿袭旧版。
 
 ```
 Android App  --Bluetooth HID Keyboard-->  Windows PC
@@ -9,7 +10,8 @@ Android App  --Bluetooth HID Keyboard-->  Windows PC
 
 目标电脑端**不需要安装任何程序、驱动或服务**，也不读取/监控屏幕。
 
-> 历史方案（v10/v11）：Pico W BLE → USB HID 键盘，固件源码保留在 `pico_firmware/` 与 `releases/v10|v11/`，仅作参考/回滚。
+> 本应用与旧版互不覆盖：包名 `com.hidble.phonekeyboard`、应用名“手机蓝牙键盘”，可和旧 Pico W 版（`com.hidble.keyboard`）同时安装。
+> 旧 Pico W 产品线在 `master` 分支（v10/v11），固件源码保留在 `pico_firmware/`，仅作参考。
 
 ## 中文/Unicode 输入方式（重要）
 
@@ -43,7 +45,7 @@ android/                # Android Kotlin 客户端（本版本主体）
   └─ HidProtocol.kt     # 上层封装
 pico_firmware/          # 历史 Pico W 固件（v10/v11 方案，已不再需要）
 firmware/               # 历史预编译固件 UF2（已不再需要）
-releases/               # 版本化发布归档（v10/v11/v12...）
+releases/               # 版本化发布归档（本产品线 v1.0, v1.1, ...）
 docs/                   # 协议、设置、工作进度
 tools/                  # 构建/校验脚本
 ```
@@ -52,7 +54,7 @@ tools/                  # 构建/校验脚本
 
 ### 1. 安装 Android App
 
-用 Android Studio 打开 `android/` 连接手机编译安装；或直接用 `releases/v12/PicoBleHidKeyboard-v12.apk`（要求 Android 9+）：
+用 Android Studio 打开 `android/` 连接手机编译安装；或直接用 `releases/v1.0/PhoneBluetoothKeyboard-v1.0.apk`（要求 Android 9+）：
 
 ```powershell
 cd android
@@ -85,11 +87,11 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 ## 版本与回滚
 
-每次发布按版本号递增归档（当前 v12）：
+本产品线从 **v1.0** 开始递增归档（当前 v1.0）：
 
-- 产物：`releases/vNN/`（APK + 发布说明），最新版另存于仓库根目录 `PicoBleHidKeyboard-debug.apk`。
-- 代码：每次发布打同名 git tag（`git tag v10`、`git tag v11`、`git tag v12` …）。
-- 回滚：`git checkout v10` 回到旧代码；或直接用 `releases/vNN/` 里的产物装回去。
+- 产物：`releases/vNN/`（APK + 发布说明），最新版另存于仓库根目录 `PhoneBluetoothKeyboard-debug.apk`。
+- 代码：每次发布打同名 git tag（`git tag v1.0`、`git tag v1.1` …）。
+- 回滚：`git checkout v1.0` 回到本产品线旧版；切 `git checkout master` 回到 Pico W 产品线（v10/v11）。
 - 详细约定见 `releases/README.md`。
 
 ## License

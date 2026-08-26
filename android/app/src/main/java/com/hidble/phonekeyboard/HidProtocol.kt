@@ -1,4 +1,4 @@
-package com.hidble.keyboard
+package com.hidble.phonekeyboard
 
 /**
  * HID 协议封装 - 基于手机端打字引擎（不再需要 Pico W / BLE）

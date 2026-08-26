@@ -1,4 +1,4 @@
-package com.hidble.keyboard
+package com.hidble.phonekeyboard
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex

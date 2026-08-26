@@ -1,4 +1,4 @@
-package com.hidble.keyboard
+package com.hidble.phonekeyboard
 
 import android.Manifest
 import android.bluetooth.BluetoothDevice
