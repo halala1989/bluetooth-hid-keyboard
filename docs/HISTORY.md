@@ -1,0 +1,83 @@
+# 项目开发历史（对话记录整理）
+
+> 本文档由 2026-08-25 ~ 2026-08-26 的开发对话整理而成，方便换电脑后快速了解来龙去脉。
+> 托管仓库：https://github.com/halala1989/bluetooth-hid-keyboard
+
+## 一、项目简介（两条产品线）
+
+| 产品线 | 分支 | 版本 | 说明 |
+|---|---|---|---|
+| 手机蓝牙键盘（当前） | `phone-keyboard`（默认分支） | v1.0 / v1.1 / v1.2 | Android 手机直接模拟成蓝牙键盘，**不需要 Pico W**；包名 `com.hidble.phonekeyboard` |
+| Pico W 键盘（旧） | `master` | v10 / v11 | Pico W BLE → USB HID 键盘，需要 Pico W 固件 |
+
+目标电脑端都不需要安装任何软件、驱动，也不读取屏幕。
+
+## 二、开发时间线
+
+### 2026-08-25 · v10（Pico W 方案起步）
+- 在 Pico W 上实现 BLE GATT + USB HID 键盘：手机 App 通过 BLE 发文本/按键，Pico W 转成 USB HID 报告打到电脑。
+- 中文输入 4 种模式（`UMOD`）：
+  - Alt+X（默认）：输入十六进制码后按 Alt+X（Win11 记事本/Word 等 RichEdit 应用，无需注册表/NumLock）
+  - 十六进制：Alt+小键盘+十六进制码（需 EnableHexNumpad 注册表+NumLock；Win11 记事本无效）
+  - 十进制：Alt+0+十进制码点（RichEdit 应用）
+  - GBK：Alt+小键盘十进制 GBK 机内码（仅中文版 Windows）
+- 验证结论：Win11 记事本 + Alt+X 可输入中文；**GBK 模式测试成功**。
+
+### 2026-08-26 · v11（Pico W 方案增强）
+- 输入速度调速：固件新增 `SPEED` 命令（1=最慢…10=最快，默认 5），整体缩放按键/字符/Alt 输入延迟；App 输入框旁新增“速度”文本框 + “应用”，自动保存、连接后自动下发。
+- 常用语句：App 输入区新增“常用语”按钮，可添加/编辑/删除并自动保存，点选插入输入框。
+- 界面重排：文本输入（含发送）移到最顶部；扫描设备/断开连接/发现设备移到最底部。
+- 建立版本化发布约定：`releases/vNN/` 归档 + git tag（v10、v11…）。
+
+### 2026-08-26 · 拆分独立产品线 phone-keyboard v1.0
+- 用户提出新想法：不再需要 Pico W，让手机直接模拟成蓝牙键盘。
+- 实现：改用 Android 9+ 的 `BluetoothHidDevice` API，手机注册成标准蓝牙键盘，电脑蓝牙直接配对打字。
+- 中文输入 4 模式与速度逻辑 1:1 移植到手机端（`TypingEngine.kt`），体验与 v11 一致。
+- **独立分支** `phone-keyboard`，版本从 **1.0** 开始编号（不与 Pico W 的 v10/v11 混用）；
+  应用重命名（包名 `com.hidble.phonekeyboard`、应用名“手机蓝牙键盘”），与手机上已装的旧版互不覆盖、可同时安装。
+
+### 2026-08-26 · v1.1（一键开关）
+- 底部改为「模拟蓝牙键盘」大开关：打开即自动请求开启蓝牙并自动注册成蓝牙键盘；关闭即停止。
+- 已配对设备列表保留在开关下方，可手动重连。
+
+### 2026-08-26 · v1.2（修复电脑搜不到）
+- 现象（真机测试）：开关关闭时电脑能搜到手机（普通手机），打开后电脑完全搜不到。
+- 原因：安卓注册成 HID 键盘后会关闭蓝牙“可见性”。
+- 修复：注册成功后自动触发系统 `ACTION_REQUEST_DISCOVERABLE`（“对附近设备可见”授权，默认 5 分钟），点允许后电脑即可搜到“手机蓝牙键盘”并配对。
+
+## 三、关键技术点 / 踩坑记录
+
+1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
+2. 十六进制模式的字母 A-F 用主键盘字母键（不带 Shift）。
+3. Win11 记事本会拦截 `Alt+小键盘+`（弹链接编辑器），所以十六进制模式在记事本无效；记事本支持 Alt+X。
+4. 自动开关 NumLock 有副作用（会把 NumLock 关掉、导致输入翻倍），已移除。
+5. 目标机是英文版 Windows 时 GBK 机内码无效；十进制仅在 RichEdit 应用有效。
+6. **Android 13+ 不允许 App 静默打开蓝牙**，只能弹系统授权（`ACTION_REQUEST_ENABLE`）由用户确认。
+7. **注册 HID 后蓝牙可见性会被关闭**，必须再请求“对附近设备可见”，否则电脑搜不到。
+8. 中文输入依赖 Windows 内置 Alt 码输入：记事本/Word 用 Alt+X，浏览器聊天框切“十六进制”或“GBK”。
+
+## 四、测试反馈与已知限制
+
+- 手机键盘方案需要 **Android 9+（API 28）** 且手机支持蓝牙键盘（HID Device）功能（大多数手机支持，个别 ROM 可能限制）。
+- 若某手机 ROM 把 HID 可见性限制死，需要在系统蓝牙设置里手动开“对附近设备可见”。
+- 中文输入在浏览器对话框（非 RichEdit）不支持 Alt+X，需切“十六进制”（需注册表+NumLock）或 GBK。
+
+## 五、发布与版本约定
+
+- 每次发布：版本号 +1 → 产物归档 `releases/vNN/`（APK + RELEASE_NOTES.md）→ 打 git tag `vNN` → 更新 `releases/LATEST`。
+- 手机键盘产品线从 1.0 开始（v1.0、v1.1、v1.2…）；Pico W 产品线用 v10、v11…。
+- 详见 `releases/README.md`。
+
+## 六、待办 / 未来规划（对话中已提出）
+
+- **大模型润色**：输入文本框连接自建 LLM API，把一段长话自动分段、去口水词、整理成书面语言后再发送。
+- 微软拼音 `vuc` 方案（任意应用输入 Unicode）；一键 Shift 切换中英文输入法。
+
+## 七、如何继续开发（换电脑）
+
+```powershell
+git clone https://github.com/halala1989/bluetooth-hid-keyboard.git
+cd bluetooth-hid-keyboard
+git checkout phone-keyboard        # 当前产品线
+```
+环境（CC Switch / ChatGPT 配置、构建工具链）迁移见 `docs/MIGRATION.md`。
