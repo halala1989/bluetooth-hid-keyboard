@@ -1,6 +1,7 @@
 import struct, hashlib
 
-path = 'firmware/pico_ble_hid_keyboard.uf2'
+import sys
+path = sys.argv[1] if len(sys.argv) > 1 else 'firmware/pico_ble_hid_keyboard.uf2'
 data = open(path, 'rb').read()
 print("file size: %d bytes" % len(data))
 

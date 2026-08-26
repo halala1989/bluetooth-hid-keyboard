@@ -48,8 +48,14 @@
 - 固件：firmware/pico_ble_hid_keyboard.uf2（含 SPEED 命令）
   - SHA256: D62411A43DA300302725F74045888ED3D7BFC458B88E10823A10B8FC8D0743DC
   - UF2：2174 块 × 512B，魔术值通过
-- APK：PicoBleHidKeyboard-debug.apk（输入速度 + 常用语句 + 界面重排）
-  - SHA256: F08D386789FA1DA24A4CAB7EFD537C346329637A0C95C079D477147D7EB08C02
+- APK：PicoBleHidKeyboard-debug.apk（输入速度 + 常用语句 + 界面重排，versionCode 11 / versionName "11.0"）
+  - SHA256: 69307354C4229BFDA3B126FB6D2F52C4307D8AAEAB7263EE5C0D7A7836041DD3
+
+## 版本发布（按版本号归档，便于回滚）
+
+- `releases/v10/`：昨日版本（Alt+X 中文输入模式），git tag `v10`
+- `releases/v11/`：今日版本（输入速度 + 常用语句 + 界面重排），git tag `v11`
+- 约定详见 `releases/README.md`
 
 ## 构建方法
 

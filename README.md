@@ -110,6 +110,15 @@ firmware/pico_ble_hid_keyboard.uf2
 
 详见 [docs/PROTOCOL.md](docs/PROTOCOL.md)。
 
+## 版本与回滚
+
+每次发布按版本号递增归档（当前 v11），方便随时回滚：
+
+- 产物：`releases/vNN/`（APK + UF2 + RELEASE_NOTES.md），最新版另存于仓库根目录。
+- 代码：每次发布打同名 git tag（`git tag v10`、`git tag v11` …）。
+- 回滚：`git checkout v10` 回到旧代码；或直接用 `releases/v10/` 里的产物装回去。
+- 详细约定见 `releases/README.md`。
+
 ## License
 
 MIT
