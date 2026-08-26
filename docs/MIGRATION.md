@@ -2,6 +2,9 @@
 
 > 目标：在新电脑上输入仓库地址 `git clone` 即可拿到全部代码、文档、发布归档，并继续开发。
 > 仓库：https://github.com/halala1989/bluetooth-hid-keyboard
+>
+> 💡 **不想自己敲命令？** 先把 `docs/ONBOARDING.md` 里那段现成指令复制给新电脑的 ChatGPT，
+> 它会按本指南自动克隆并检查环境。下面步骤供 ChatGPT 或手动执行时参考。
 
 ## 第一步：克隆代码（新电脑）
 

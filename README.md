@@ -5,6 +5,16 @@
 > 🔁 **换电脑迁移**：`git clone https://github.com/halala1989/bluetooth-hid-keyboard.git` 后见 `docs/MIGRATION.md`；
 > 📖 开发历史/对话记录整理见 `docs/HISTORY.md`
 
+## 🚀 零代码迁移（懒人专用：交给新电脑的 ChatGPT）
+
+不想自己敲命令？直接把仓库交给新电脑上的 ChatGPT，让它读指南、自己克隆：
+
+1. 复制 `docs/ONBOARDING.md` 里那段现成指令，粘贴给新电脑的 ChatGPT；
+2. ChatGPT 会自动克隆本仓库、读 `docs/MIGRATION.md`、跑 `tools/setup_check.ps1` 检查环境；
+3. 涉及密钥的部分（CC Switch 配置）它只负责提示你从旧电脑拷贝。
+
+> 完整执行细节见 `docs/MIGRATION.md`；给 ChatGPT 的现成话术见 `docs/ONBOARDING.md`。
+
 **独立产品线 v1.2**（分支 `phone-keyboard`）：手机直接把自己注册成标准蓝牙键盘
 （Android 9+ 系统的 `BluetoothHidDevice`），电脑蓝牙里添加“手机蓝牙键盘”配对后即可打字，**不依赖 Pico W**。
 App 里的中文输入、速度、常用语等体验沿袭旧版。
