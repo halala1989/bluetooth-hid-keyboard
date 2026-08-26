@@ -4,6 +4,11 @@
 
 ## 当前状态：可用（独立产品线 phone-keyboard，v1.0）
 
+### v1.1（2026-08-26）底部一键开关
+
+- 底部改为「模拟蓝牙键盘」开关：打开即自动请求开启蓝牙并自动注册成蓝牙键盘，电脑端搜索“手机蓝牙键盘”配对即可。
+- 关闭开关 = 停止模拟键盘并断开连接；已配对设备列表保留在开关下方。
+
 ### v1.0（2026-08-26）手机直接模拟蓝牙键盘（独立产品线）
 
 - 从主线拆出独立分支 `phone-keyboard`，版本从 **1.0** 开始编号（不与 Pico W 的 v10/v11 混用）。
@@ -54,13 +59,14 @@
 
 ## 构建产物（最新，本产品线）
 
-- APK：PhoneBluetoothKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 1 / versionName "1.0"，minSdk 28）
-  - SHA256: 5489DC37988B9F9062B50983C0007BE27A36C80846D07FA33E891B67AC2A66F6
+- APK：PhoneBluetoothKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 2 / versionName "1.1"，minSdk 28）
+  - SHA256: B17C65C3C8143AE1E0A3D68D530E943C98F0BD3852D48DF767CB162F9D678D2C
 - 固件：本产品线不需要（历史 Pico W UF2 在 master 分支 releases/v10、v11）
 
 ## 版本发布（本产品线按 1.0 开始递增，便于回滚）
 
 - `releases/v1.0/`：手机直接模拟蓝牙键盘（独立产品线），git tag `v1.0`
+- `releases/v1.1/`：底部一键开关（自动开蓝牙+模拟键盘），git tag `v1.1`
 - Pico W 产品线在 `master` 分支（v10/v11），与本品互不影响
 - 约定详见 `releases/README.md`
 

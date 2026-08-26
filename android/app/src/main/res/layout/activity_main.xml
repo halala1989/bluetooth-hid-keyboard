@@ -465,7 +465,7 @@
             </ScrollView>
         </LinearLayout>
 
-        <!-- 连接状态卡片（移至底部） -->
+        <!-- 蓝牙键盘开关卡片（置底） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -478,8 +478,31 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="模拟蓝牙键盘"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/keyboardSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textOn=""
+                    android:textOff="" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="6dp">
+                android:layout_marginTop="10dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -503,29 +526,10 @@
                 android:id="@+id/deviceNameText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="点“启动键盘”把手机变成蓝牙键盘，再到电脑上添加并配对"
+                android:text="打开开关后，手机会自动开启蓝牙并模拟成蓝牙键盘；然后到电脑上 设置 → 蓝牙 → 添加设备，搜索“手机蓝牙键盘”并配对。"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
-                android:layout_marginBottom="12dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/registerButton"
-                    style="@style/PrimaryButton"
-                    android:layout_weight="1"
-                    android:text="启动键盘" />
-
-                <Button
-                    android:id="@+id/disconnectButton"
-                    style="@style/SecondaryButton"
-                    android:layout_weight="1"
-                    android:text="断开连接"
-                    android:enabled="false" />
-            </LinearLayout>
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <!-- 设备列表卡片（移至最底部） -->
