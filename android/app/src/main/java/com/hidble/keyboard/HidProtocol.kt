@@ -1,101 +1,93 @@
 package com.hidble.keyboard
 
 /**
- * HID 协议封装 - 提供便捷的键盘操作方法
+ * HID 协议封装 - 基于手机端打字引擎（不再需要 Pico W / BLE）
  */
-class HidProtocol(private val bleManager: BleManager) {
-    
-    /**
-     * 输入文本
-     */
-    fun typeText(text: String) {
-        bleManager.sendText(text)
-    }
-    
-    /**
-     * 按下按键
-     */
-    fun pressKey(key: SpecialKey) {
-        bleManager.sendKey(key.name)
-    }
-    
-    /**
-     * 按下组合键
-     */
-    fun pressCombo(modifier: Modifier, key: SpecialKey) {
-        bleManager.sendCombo(listOf(modifier.name), key.name)
-    }
-    
-    /**
-     * 按下组合键
-     */
-    fun pressCombo(modifiers: List<Modifier>, key: SpecialKey) {
-        bleManager.sendCombo(modifiers.map { it.name }, key.name)
-    }
-    
-    /**
-     * 发送 Unicode 字符
-     */
-    fun sendUnicode(codepoint: Int) {
-        bleManager.sendUnicode(codepoint)
+class HidProtocol(private val engine: TypingEngine) {
+
+    /** 由 HID 输出报告（LED）更新键盘状态（CapsLock 等） */
+    fun onLedReport(led: Int) {
+        engine.onLedReport(led)
     }
 
-    /**
-     * 设置中文/Unicode 输入模式（发送 UMOD 命令到固件）
-     * 0 = 十进制 Unicode 码点（默认，记事本/写字板/Word 等 RichEdit 应用）
-     * 1 = 十六进制（需目标机已开启 EnableHexNumpad 注册表项）
-     * 2 = GBK 机内码（中文 Windows 下浏览器/聊天等绝大多数应用）
-     */
+    /** 输入文本 */
+    suspend fun typeText(text: String) {
+        engine.typeText(text)
+    }
+
+    /** 按下按键 */
+    suspend fun pressKey(key: SpecialKey) {
+        val code = HidKeys.specialKeyCode(key.name) ?: return
+        engine.pressKey(code)
+    }
+
+    /** 按下组合键 */
+    suspend fun pressCombo(modifier: Modifier, key: SpecialKey) {
+        pressCombo(listOf(modifier), key)
+    }
+
+    /** 按下组合键 */
+    suspend fun pressCombo(modifiers: List<Modifier>, key: SpecialKey) {
+        var mask = 0
+        for (m in modifiers) {
+            mask = mask or (HidKeys.modifierMask(m.name) ?: 0)
+        }
+        val code = HidKeys.specialKeyCode(key.name) ?: return
+        engine.pressKey(code, mask)
+    }
+
+    /** 发送 Unicode 字符（走当前中文模式） */
+    suspend fun sendUnicode(codepoint: Int) {
+        engine.sendUnicode(codepoint)
+    }
+
+    /** 设置中文/Unicode 输入模式（与固件 UMOD 一致） */
     fun setUnicodeMode(mode: Int) {
-        bleManager.sendCommand("UMOD:$mode")
+        engine.unicodeMode = mode
     }
 
-    /**
-     * 设置输入速度（发送 SPEED 命令到固件）
-     * 1 = 最慢，10 = 最快，5 = 默认
-     */
+    /** 设置输入速度 1=最慢 .. 10=最快（默认 5） */
     fun setSpeed(level: Int) {
-        bleManager.sendCommand("SPEED:$level")
+        engine.speedLevel = level
     }
-    
+
     // 常用组合键快捷方法
-    
-    fun copy() = pressCombo(Modifier.CTRL, SpecialKey.C)
-    fun paste() = pressCombo(Modifier.CTRL, SpecialKey.V)
-    fun cut() = pressCombo(Modifier.CTRL, SpecialKey.X)
-    fun selectAll() = pressCombo(Modifier.CTRL, SpecialKey.A)
-    fun undo() = pressCombo(Modifier.CTRL, SpecialKey.Z)
-    fun redo() = pressCombo(Modifier.CTRL, SpecialKey.Y)
-    fun save() = pressCombo(Modifier.CTRL, SpecialKey.S)
-    fun find() = pressCombo(Modifier.CTRL, SpecialKey.F)
-    fun tab() = pressKey(SpecialKey.TAB)
-    fun enter() = pressKey(SpecialKey.ENTER)
-    fun backspace() = pressKey(SpecialKey.BACKSPACE)
-    fun delete() = pressKey(SpecialKey.DELETE)
-    fun escape() = pressKey(SpecialKey.ESCAPE)
-    fun space() = pressKey(SpecialKey.SPACE)
-    
+    suspend fun copy() = pressCombo(Modifier.CTRL, SpecialKey.C)
+    suspend fun paste() = pressCombo(Modifier.CTRL, SpecialKey.V)
+    suspend fun cut() = pressCombo(Modifier.CTRL, SpecialKey.X)
+    suspend fun selectAll() = pressCombo(Modifier.CTRL, SpecialKey.A)
+    suspend fun undo() = pressCombo(Modifier.CTRL, SpecialKey.Z)
+    suspend fun redo() = pressCombo(Modifier.CTRL, SpecialKey.Y)
+    suspend fun save() = pressCombo(Modifier.CTRL, SpecialKey.S)
+    suspend fun find() = pressCombo(Modifier.CTRL, SpecialKey.F)
+    suspend fun tab() = pressKey(SpecialKey.TAB)
+    suspend fun enter() = pressKey(SpecialKey.ENTER)
+    suspend fun backspace() = pressKey(SpecialKey.BACKSPACE)
+    suspend fun delete() = pressKey(SpecialKey.DELETE)
+    suspend fun escape() = pressKey(SpecialKey.ESCAPE)
+    suspend fun space() = pressKey(SpecialKey.SPACE)
+
     // 光标控制
-    fun arrowUp() = pressKey(SpecialKey.UP)
-    fun arrowDown() = pressKey(SpecialKey.DOWN)
-    fun arrowLeft() = pressKey(SpecialKey.LEFT)
-    fun arrowRight() = pressKey(SpecialKey.RIGHT)
-    fun home() = pressKey(SpecialKey.HOME)
-    fun end() = pressKey(SpecialKey.END)
-    fun pageUp() = pressKey(SpecialKey.PAGEUP)
-    fun pageDown() = pressKey(SpecialKey.PAGEDOWN)
-    
+    suspend fun arrowUp() = pressKey(SpecialKey.UP)
+    suspend fun arrowDown() = pressKey(SpecialKey.DOWN)
+    suspend fun arrowLeft() = pressKey(SpecialKey.LEFT)
+    suspend fun arrowRight() = pressKey(SpecialKey.RIGHT)
+    suspend fun home() = pressKey(SpecialKey.HOME)
+    suspend fun end() = pressKey(SpecialKey.END)
+    suspend fun pageUp() = pressKey(SpecialKey.PAGEUP)
+    suspend fun pageDown() = pressKey(SpecialKey.PAGEDOWN)
+
     // 文本选择
-    fun selectUp() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.UP)
-    fun selectDown() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.DOWN)
-    fun selectLeft() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.LEFT)
-    fun selectRight() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.RIGHT)
-    fun selectHome() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.HOME)
-    fun selectEnd() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.END)
-    
+    suspend fun selectUp() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.UP)
+    suspend fun selectDown() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.DOWN)
+    suspend fun selectLeft() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.LEFT)
+    suspend fun selectRight() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.RIGHT)
+    suspend fun selectHome() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.HOME)
+    suspend fun selectEnd() = pressCombo(listOf(Modifier.SHIFT), SpecialKey.END)
+
     // Word 选择
-    fun selectWordLeft() = pressCombo(listOf(Modifier.CTRL, Modifier.SHIFT), SpecialKey.LEFT)
-    fun selectWordRight() = pressCombo(listOf(Modifier.CTRL, Modifier.SHIFT), SpecialKey.RIGHT)
+    suspend fun selectWordLeft() = pressCombo(listOf(Modifier.CTRL, Modifier.SHIFT), SpecialKey.LEFT)
+    suspend fun selectWordRight() = pressCombo(listOf(Modifier.CTRL, Modifier.SHIFT), SpecialKey.RIGHT)
 }
 
 /**
@@ -115,7 +107,7 @@ enum class SpecialKey {
     // 字母和符号
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
     NUM_1, NUM_2, NUM_3, NUM_4, NUM_5, NUM_6, NUM_7, NUM_8, NUM_9, NUM_0;
-    
+
     companion object {
         fun fromString(key: String): SpecialKey? {
             return try {
@@ -134,7 +126,7 @@ enum class Modifier {
     CTRL, SHIFT, ALT, GUI,
     LEFTCTRL, LEFTSHIFT, LEFTALT, LEFTGUI,
     RIGHTCTRL, RIGHTSHIFT, RIGHTALT, RIGHTGUI;
-    
+
     companion object {
         fun fromString(mod: String): Modifier? {
             return try {

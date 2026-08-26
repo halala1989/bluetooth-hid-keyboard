@@ -24,7 +24,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⌨ BLE HID 键盘"
+                android:text="⌨ 手机蓝牙键盘"
                 android:textSize="22sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
@@ -493,7 +493,7 @@
                     android:id="@+id/statusText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="未连接"
+                    android:text="未启动"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/disconnected" />
@@ -503,7 +503,7 @@
                 android:id="@+id/deviceNameText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="请扫描并连接设备"
+                android:text="点“启动键盘”把手机变成蓝牙键盘，再到电脑上添加并配对"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginBottom="12dp" />
@@ -514,10 +514,10 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/scanButton"
+                    android:id="@+id/registerButton"
                     style="@style/PrimaryButton"
                     android:layout_weight="1"
-                    android:text="扫描设备" />
+                    android:text="启动键盘" />
 
                 <Button
                     android:id="@+id/disconnectButton"
@@ -540,10 +540,18 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="发现的设备"
+                android:text="已配对设备"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="在电脑蓝牙中添加“手机蓝牙键盘”并完成配对后，这里会显示该电脑；点选即可连接。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
                 android:layout_marginBottom="10dp" />
 
             <ListView

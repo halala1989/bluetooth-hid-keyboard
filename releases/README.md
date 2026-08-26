@@ -4,10 +4,10 @@
 
 ## 规则（每次发布新版本时遵守）
 
-1. **版本号递增**：当前最新号 +1。今天最新是 `v11`，下次就是 `v12`。
-2. **产物归档**：把当次构建的 APK 和 UF2 复制到 `releases/vNN/` 下，命名带版本号：
-   - `releases/vNN/PicoBleHidKeyboard-vNN.apk`
-   - `releases/vNN/pico_ble_hid_keyboard-vNN.uf2`
+1. **版本号递增**：当前最新号 +1。今天最新是 `v12`，下次就是 `v13`。
+2. **产物归档**：把当次构建的产物复制到 `releases/vNN/` 下，命名带版本号：
+   - `releases/vNN/PicoBleHidKeyboard-vNN.apk`（必有）
+   - `releases/vNN/pico_ble_hid_keyboard-vNN.uf2`（仅 Pico W 固件方案需要；v12 起手机方案不再需要固件）
 3. **发布说明**：每个版本目录写 `RELEASE_NOTES.md`，记录日期、功能变化、产物 SHA256、回滚方法。
 4. **代码打 tag**：发布完成后打同名 git tag：
    ```powershell
@@ -30,5 +30,6 @@
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| v10 | 2026-08-25 | Alt+X 中文输入模式（默认）+ 完整文档与构建产物 |
-| v11 | 2026-08-26 | 输入速度调速 + 常用语句 + 界面重排（输入置顶/扫描置底） |
+| v10 | 2026-08-25 | Alt+X 中文输入模式（默认）+ 完整文档与构建产物（Pico W） |
+| v11 | 2026-08-26 | 输入速度调速 + 常用语句 + 界面重排（Pico W） |
+| v12 | 2026-08-26 | 手机直接模拟蓝牙键盘，不再需要 Pico W 固件 |

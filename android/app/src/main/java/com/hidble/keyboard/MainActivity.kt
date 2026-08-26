@@ -2,6 +2,7 @@ package com.hidble.keyboard
 
 import android.Manifest
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -31,7 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: TextView
     private lateinit var deviceNameText: TextView
-    private lateinit var scanButton: Button
+    private lateinit var registerButton: Button
     private lateinit var disconnectButton: Button
     private lateinit var textInput: EditText
     private lateinit var sendButton: Button
@@ -41,13 +42,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var commandLog: TextView
     private lateinit var deviceList: ListView
 
-    private lateinit var bleManager: BleManager
+    private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
 
-    private val discoveredDevices = mutableListOf<BluetoothDevice>()
+    private val bondedDevices = mutableListOf<BluetoothDevice>()
     private val deviceNames = mutableListOf<String>()
     private lateinit var deviceListAdapter: ArrayAdapter<String>
 
+    private var registered = false
+    private var connected = false
     private var savedSpeedLevel = DEFAULT_SPEED_LEVEL
     private val phrases = mutableListOf<String>()
     private lateinit var prefs: android.content.SharedPreferences
@@ -57,16 +60,25 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         initViews()
-        initBle()
+        initHid()
         setupListeners()
         requestPermissions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 蓝牙可能在此前未开启，重新获取 HID profile
+        hidManager.init()
+        if (registered) {
+            loadBondedDevices()
+        }
     }
 
     private fun initViews() {
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
         deviceNameText = findViewById(R.id.deviceNameText)
-        scanButton = findViewById(R.id.scanButton)
+        registerButton = findViewById(R.id.registerButton)
         disconnectButton = findViewById(R.id.disconnectButton)
         textInput = findViewById(R.id.textInput)
         sendButton = findViewById(R.id.sendButton)
@@ -75,7 +87,7 @@ class MainActivity : AppCompatActivity() {
         phraseButton = findViewById(R.id.phraseButton)
         commandLog = findViewById(R.id.commandLog)
 
-        // 设备列表
+        // 已配对设备列表
         deviceList = findViewById(R.id.deviceList)
         deviceListAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceNames)
         deviceList.adapter = deviceListAdapter
@@ -86,65 +98,74 @@ class MainActivity : AppCompatActivity() {
         speedInput.setText(savedSpeedLevel.toString())
         loadPhrases()
 
-        updateConnectionState(false)
+        updateConnectionState()
     }
 
-    private fun initBle() {
-        bleManager = BleManager(this)
-        hidProtocol = HidProtocol(bleManager)
+    private fun initHid() {
+        hidManager = HidDeviceManager(this)
+        hidManager.init()
+        hidProtocol = HidProtocol(TypingEngine { data -> hidManager.sendReport(data) })
 
-        bleManager.onConnectionStateChanged = { connected ->
+        hidManager.onAppStatusChanged = { reg ->
             runOnUiThread {
-                updateConnectionState(connected)
-            }
-        }
-
-        bleManager.onDeviceFound = { device, rssi, name ->
-            runOnUiThread {
-                // 添加到设备列表
-                if (!discoveredDevices.contains(device)) {
-                    discoveredDevices.add(device)
-                    val displayName = name ?: "未知设备"
-                    val entry = "$displayName (${device.address}) RSSI: $rssi"
-                    deviceNames.add(entry)
-                    deviceListAdapter.notifyDataSetChanged()
-                    appendLog("发现: $entry")
+                registered = reg
+                if (reg) {
+                    appendLog("蓝牙键盘已启动：请到电脑蓝牙中添加“${HidDeviceManager.KEYBOARD_NAME}”并配对")
+                    loadBondedDevices()
+                } else {
+                    appendLog("蓝牙键盘已停止")
                 }
+                updateConnectionState()
             }
         }
 
-        bleManager.onDataReceived = { data ->
+        hidManager.onConnectionStateChanged = { device, state ->
             runOnUiThread {
-                appendLog("收到: $data")
+                when (state) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        connected = true
+                        hidProtocol.setSpeed(savedSpeedLevel)
+                        appendLog("已连接：${device?.name ?: "电脑"}（输入速度 $savedSpeedLevel）")
+                    }
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        connected = false
+                        appendLog("连接已断开")
+                    }
+                }
+                updateConnectionState()
             }
         }
 
-        bleManager.onError = { error ->
+        hidManager.onError = { error ->
             runOnUiThread {
                 appendLog("错误: $error")
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
             }
         }
+
+        hidManager.onLedState = { led ->
+            hidProtocol.onLedReport(led)
+        }
     }
 
     private fun setupListeners() {
-        scanButton.setOnClickListener {
-            if (!bleManager.isBleAvailable()) {
-                Toast.makeText(this, "蓝牙不可用", Toast.LENGTH_SHORT).show()
+        registerButton.setOnClickListener {
+            if (!hidManager.isBluetoothOn()) {
+                Toast.makeText(this, "请先开启手机蓝牙", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            // 清空设备列表
-            discoveredDevices.clear()
-            deviceNames.clear()
-            deviceListAdapter.notifyDataSetChanged()
-
-            appendLog("开始扫描...")
-            bleManager.startScan()
+            if (registered) {
+                hidManager.unregister()
+                connected = false
+                updateConnectionState()
+            } else {
+                appendLog("正在启动蓝牙键盘...")
+                hidManager.register()
+            }
         }
 
         disconnectButton.setOnClickListener {
-            bleManager.disconnect()
+            hidManager.disconnect()
             appendLog("已断开连接")
         }
 
@@ -168,34 +189,34 @@ class MainActivity : AppCompatActivity() {
 
         // 中文输入模式
         findViewById<Button>(R.id.btnModeAltX).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.setUnicodeMode(3) }
+            hidProtocol.setUnicodeMode(TypingEngine.MODE_ALTX)
             appendLog("中文输入模式: Alt+X（默认，记事本/Word 等，无需注册表）")
         }
         findViewById<Button>(R.id.btnModeHex).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.setUnicodeMode(1) }
+            hidProtocol.setUnicodeMode(TypingEngine.MODE_HEX)
             appendLog("中文输入模式: 十六进制（Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效）")
         }
         findViewById<Button>(R.id.btnModeDecimal).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.setUnicodeMode(0) }
+            hidProtocol.setUnicodeMode(TypingEngine.MODE_DECIMAL)
             appendLog("中文输入模式: 十进制（Alt+0+码点，记事本/Word 等）")
         }
         findViewById<Button>(R.id.btnModeGbk).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.setUnicodeMode(2) }
+            hidProtocol.setUnicodeMode(TypingEngine.MODE_GBK)
             appendLog("中文输入模式: GBK 机内码（仅中文版 Windows）")
         }
 
-        // 设备列表点击事件
+        // 已配对设备点击连接
         deviceList.setOnItemClickListener { _, _, position, _ ->
-            if (position < discoveredDevices.size) {
-                val device = discoveredDevices[position]
+            if (position < bondedDevices.size) {
+                val device = bondedDevices[position]
                 val name = deviceNames[position]
 
                 AlertDialog.Builder(this)
                     .setTitle("连接设备")
                     .setMessage("确定要连接到 $name 吗？")
                     .setPositiveButton("连接") { _, _ ->
-                        appendLog("正在连接到 $name...")
-                        bleManager.connect(device)
+                        appendLog("正在连接 $name...")
+                        hidManager.connect(device)
                     }
                     .setNegativeButton("取消", null)
                     .show()
@@ -263,6 +284,10 @@ class MainActivity : AppCompatActivity() {
     private fun sendText() {
         val text = textInput.text.toString()
         if (text.isNotEmpty()) {
+            if (!connected) {
+                Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
+                return
+            }
             lifecycleScope.launch {
                 hidProtocol.typeText(text)
                 appendLog("发送文本: $text")
@@ -283,12 +308,8 @@ class MainActivity : AppCompatActivity() {
         }
         savedSpeedLevel = level
         prefs.edit().putInt(KEY_SPEED_LEVEL, level).apply()
-        if (bleManager.isConnected()) {
-            lifecycleScope.launch { hidProtocol.setSpeed(level) }
-            appendLog("输入速度已设为 $level（1-10）")
-        } else {
-            appendLog("输入速度已保存为 $level，连接后自动生效")
-        }
+        hidProtocol.setSpeed(level)
+        appendLog("输入速度已设为 $level（1-10）")
     }
 
     // ===== 常用语句 =====
@@ -420,24 +441,44 @@ class MainActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun updateConnectionState(connected: Boolean) {
+    private fun loadBondedDevices() {
+        bondedDevices.clear()
+        deviceNames.clear()
+        hidManager.bondedDevices()?.forEach { d ->
+            bondedDevices.add(d)
+            val name = d.name ?: "未知设备"
+            deviceNames.add("$name (${d.address})")
+        }
+        deviceListAdapter.notifyDataSetChanged()
+        if (deviceNames.isEmpty()) {
+            appendLog("暂无已配对设备，请先在电脑蓝牙中添加“${HidDeviceManager.KEYBOARD_NAME}”并配对")
+        }
+    }
+
+    private fun updateConnectionState() {
         if (connected) {
             statusText.text = "已连接"
             statusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
             statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
-            scanButton.isEnabled = false
+            registerButton.isEnabled = false
             disconnectButton.isEnabled = true
-            deviceNameText.text = "Pico HID Keyboard"
-            // 连接后自动应用已保存的输入速度
-            lifecycleScope.launch { hidProtocol.setSpeed(savedSpeedLevel) }
-            appendLog("已连接，输入速度 $savedSpeedLevel")
+            deviceNameText.text = hidManager.connectedDeviceName() ?: "已连接到电脑"
+        } else if (registered) {
+            statusText.text = "键盘已启动"
+            statusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
+            statusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
+            registerButton.text = "停止键盘"
+            registerButton.isEnabled = true
+            disconnectButton.isEnabled = false
+            deviceNameText.text = "在电脑蓝牙中添加“${HidDeviceManager.KEYBOARD_NAME}”并配对，然后点下方已配对设备连接"
         } else {
-            statusText.text = "未连接"
+            statusText.text = "未启动"
             statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
             statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            scanButton.isEnabled = true
+            registerButton.text = "启动键盘"
+            registerButton.isEnabled = true
             disconnectButton.isEnabled = false
-            deviceNameText.text = "请扫描并连接设备"
+            deviceNameText.text = "点“启动键盘”把手机变成蓝牙键盘，再到电脑上添加并配对"
         }
     }
 
@@ -463,14 +504,12 @@ class MainActivity : AppCompatActivity() {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.BLUETOOTH_CONNECT
             )
         } else {
             arrayOf(
                 Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.BLUETOOTH_ADMIN
             )
         }
 
@@ -496,6 +535,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        bleManager.cleanup()
+        hidManager.cleanup()
     }
 }

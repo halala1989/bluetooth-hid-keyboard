@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">HID BLE 键盘</string>
+    <string name="app_name">手机蓝牙键盘</string>
     <string name="scan_button">扫描设备</string>
     <string name="disconnect_button">断开连接</string>
     <string name="send_button">发送</string>
