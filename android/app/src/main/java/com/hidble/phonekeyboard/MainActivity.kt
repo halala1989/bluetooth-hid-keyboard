@@ -61,6 +61,17 @@ class MainActivity : AppCompatActivity() {
     // 开关状态由回调刷新时抑制监听器，避免死循环
     private var suppressSwitchEvent = false
 
+    // 请求“对附近设备可见”（ACTION_REQUEST_DISCOVERABLE），否则电脑搜不到模拟的键盘
+    private val discoverableLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            appendLog("手机已对附近设备可见：请到电脑上 设置 → 蓝牙 → 添加设备，搜索“${HidDeviceManager.KEYBOARD_NAME}”并配对")
+        } else {
+            appendLog("未开启可见性：电脑可能搜不到手机，请在系统蓝牙设置中开启“对附近设备可见”后再试")
+        }
+    }
+
     private val enableBtLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -142,8 +153,9 @@ class MainActivity : AppCompatActivity() {
                 keyboardSwitch.isChecked = reg
                 suppressSwitchEvent = false
                 if (reg) {
-                    appendLog("蓝牙键盘已启动：到电脑上 设置 → 蓝牙 → 添加设备，搜索“${HidDeviceManager.KEYBOARD_NAME}”并配对")
+                    appendLog("蓝牙键盘已启动：请确认“对附近设备可见”，然后到电脑上搜索并配对")
                     loadBondedDevices()
+                    requestDiscoverable()
                 } else {
                     appendLog("蓝牙键盘已停止")
                 }
@@ -324,6 +336,19 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnCtrlS).setOnClickListener {
             lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") }
+        }
+    }
+
+    /** 请求系统开启“对附近设备可见”，电脑才能搜索到本机 */
+    private fun requestDiscoverable() {
+        try {
+            discoverableLauncher.launch(
+                Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                }
+            )
+        } catch (e: Exception) {
+            appendLog("无法弹出可见性设置，请到系统蓝牙设置中开启“对附近设备可见”")
         }
     }
 

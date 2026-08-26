@@ -526,7 +526,7 @@
                 android:id="@+id/deviceNameText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="打开开关后，手机会自动开启蓝牙并模拟成蓝牙键盘；然后到电脑上 设置 → 蓝牙 → 添加设备，搜索“手机蓝牙键盘”并配对。"
+                android:text="打开开关后自动开启蓝牙并模拟成蓝牙键盘；弹出“对附近设备可见”时请点允许，然后到电脑上 设置 → 蓝牙 → 添加设备，搜索“手机蓝牙键盘”并配对。"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="6dp" />

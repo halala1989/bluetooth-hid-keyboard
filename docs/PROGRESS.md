@@ -4,6 +4,11 @@
 
 ## 当前状态：可用（独立产品线 phone-keyboard，v1.0）
 
+### v1.2（2026-08-26）修复电脑搜不到
+
+- 现象：打开开关（注册 HID 后）电脑完全搜不到手机——安卓注册成 HID 键盘后会关闭蓝牙“可见性”。
+- 修复：注册成功后自动触发 `ACTION_REQUEST_DISCOVERABLE`（系统“对附近设备可见”授权，默认 5 分钟），点允许后电脑即可搜索到“手机蓝牙键盘”。
+
 ### v1.1（2026-08-26）底部一键开关
 
 - 底部改为「模拟蓝牙键盘」开关：打开即自动请求开启蓝牙并自动注册成蓝牙键盘，电脑端搜索“手机蓝牙键盘”配对即可。
@@ -59,14 +64,15 @@
 
 ## 构建产物（最新，本产品线）
 
-- APK：PhoneBluetoothKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 2 / versionName "1.1"，minSdk 28）
-  - SHA256: B17C65C3C8143AE1E0A3D68D530E943C98F0BD3852D48DF767CB162F9D678D2C
+- APK：PhoneBluetoothKeyboard-debug.apk（手机蓝牙键盘，无 Pico W；versionCode 3 / versionName "1.2"，minSdk 28）
+  - SHA256: 258710EFC61E37B6BAF078FC1FF6C7D7632AB540FF4C02B545EC0F76A87EBAF4
 - 固件：本产品线不需要（历史 Pico W UF2 在 master 分支 releases/v10、v11）
 
 ## 版本发布（本产品线按 1.0 开始递增，便于回滚）
 
 - `releases/v1.0/`：手机直接模拟蓝牙键盘（独立产品线），git tag `v1.0`
 - `releases/v1.1/`：底部一键开关（自动开蓝牙+模拟键盘），git tag `v1.1`
+- `releases/v1.2/`：修复电脑搜不到（注册后自动请求可见性），git tag `v1.2`
 - Pico W 产品线在 `master` 分支（v10/v11），与本品互不影响
 - 约定详见 `releases/README.md`
 
