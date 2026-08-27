@@ -104,45 +104,35 @@
                 android:textColor="@color/text_primary"
                 android:layout_marginBottom="10dp" />
 
-            <LinearLayout
+            <com.hidble.phonekeyboard.ScrollableEditText
+                android:id="@+id/textInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:minHeight="110dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:hint="输入文字（支持中文/英文/数字，可多行）"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textColorHighlight="#334FC3F7"
+                android:textSize="15sp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:lines="4"
+                android:minLines="4"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:importantForAutofill="no" />
 
-                <com.hidble.phonekeyboard.ScrollableEditText
-                    android:id="@+id/textInput"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:minHeight="110dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_input"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:hint="输入文字（支持中文/英文/数字，可多行）"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_hint"
-                    android:textColorHighlight="#334FC3F7"
-                    android:textSize="15sp"
-                    android:gravity="top|start"
-                    android:inputType="textMultiLine"
-                    android:lines="4"
-                    android:minLines="4"
-                    android:scrollbars="vertical"
-                    android:scrollbarStyle="outsideOverlay"
-                    android:fadeScrollbars="false"
-                    android:importantForAutofill="no" />
-
-                <Button
-                    android:id="@+id/sendButton"
-                    style="@style/PrimaryButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="0.45"
-                    android:layout_gravity="bottom"
-                    android:layout_marginStart="8dp"
-                    android:text="发送" />
-            </LinearLayout>
+            <Button
+                android:id="@+id/sendButton"
+                style="@style/PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="发送到键盘" />
 
             <Button
                 android:id="@+id/phraseButton"

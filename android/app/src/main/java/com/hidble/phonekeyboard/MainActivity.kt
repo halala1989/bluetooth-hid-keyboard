@@ -34,6 +34,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
@@ -108,6 +109,10 @@ class MainActivity : AppCompatActivity() {
     // AI 思考动画（类 ChatGPT 的“正在思考…”点号动画）
     private val thinkingHandler = Handler(Looper.getMainLooper())
     private var thinkingRunnable: Runnable? = null
+
+    // 正在发送的协程（用于“停止”中止）
+    private var sendJob: Job? = null
+    private var llmSendJob: Job? = null
 
     // 请求“对附近设备可见”（ACTION_REQUEST_DISCOVERABLE），否则电脑搜不到模拟的键盘
     private val discoverableLauncher = registerForActivityResult(
@@ -487,6 +492,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendText() {
+        // 正在发送：再次点击 = 中止发送
+        if (sendJob?.isActive == true) {
+            sendJob?.cancel()
+            sendJob = null
+            sendButton.text = "发送到键盘"
+            appendLog("已停止发送文本")
+            return
+        }
         val text = textInput.text.toString()
         if (text.isNotEmpty()) {
             if (!connected) {
@@ -494,7 +507,8 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             setKeepScreenOn(true)
-            lifecycleScope.launch {
+            sendButton.text = "停止"
+            sendJob = lifecycleScope.launch {
                 try {
                     if (text.length > TypingEngine.CHUNK_SIZE) {
                         appendLog("文本较长（${text.length} 字），已自动分段发送")
@@ -502,8 +516,13 @@ class MainActivity : AppCompatActivity() {
                     hidProtocol.typeText(text)
                     appendLog("发送文本: $text")
                     textInput.text.clear()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    appendLog("文本发送已中止")
+                    throw e
                 } finally {
                     setKeepScreenOn(false)
+                    sendJob = null
+                    sendButton.text = "发送到键盘"
                 }
             }
         }
@@ -635,6 +654,14 @@ class MainActivity : AppCompatActivity() {
      * 默认不发送“我：”的发言（只发 AI 回复）；勾选“包含我的发言”后才全部发送。
      */
     private fun sendOutputToKeyboard() {
+        // 正在发送：再次点击 = 中止发送
+        if (llmSendJob?.isActive == true) {
+            llmSendJob?.cancel()
+            llmSendJob = null
+            llmSendToKeyboardButton.text = "发送到键盘"
+            appendLog("已停止发送对话内容")
+            return
+        }
         val full = llmOutput.text.toString().trim()
         if (full.isEmpty()) {
             Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
@@ -656,15 +683,21 @@ class MainActivity : AppCompatActivity() {
             return
         }
         setKeepScreenOn(true)
-        lifecycleScope.launch {
+        llmSendToKeyboardButton.text = "停止"
+        llmSendJob = lifecycleScope.launch {
             try {
                 if (text.length > TypingEngine.CHUNK_SIZE) {
                     appendLog("对话内容较长（${text.length} 字），已自动分段发送")
                 }
                 hidProtocol.typeText(text)
                 appendLog("已把对话内容发送到电脑")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                appendLog("对话发送已中止")
+                throw e
             } finally {
                 setKeepScreenOn(false)
+                llmSendJob = null
+                llmSendToKeyboardButton.text = "发送到键盘"
             }
         }
     }
