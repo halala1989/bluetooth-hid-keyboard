@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.Spannable
 import android.text.TextWatcher
@@ -66,6 +68,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmSendToKeyboardButton: Button
     private lateinit var llmClearButton: Button
     private lateinit var llmIncludeMeCheck: CheckBox
+    private lateinit var llmThinkingRow: android.view.View
+    private lateinit var llmThinkingText: TextView
     private lateinit var llmSettingsButton: Button
     private lateinit var llmSettingsTopButton: Button
     private lateinit var unicodeModeSpinner: Spinner
@@ -100,6 +104,10 @@ class MainActivity : AppCompatActivity() {
         TypingEngine.MODE_GBK
     )
     private var suppressModeEvent = false
+
+    // AI 思考动画（类 ChatGPT 的“正在思考…”点号动画）
+    private val thinkingHandler = Handler(Looper.getMainLooper())
+    private var thinkingRunnable: Runnable? = null
 
     // 请求“对附近设备可见”（ACTION_REQUEST_DISCOVERABLE），否则电脑搜不到模拟的键盘
     private val discoverableLauncher = registerForActivityResult(
@@ -177,6 +185,8 @@ class MainActivity : AppCompatActivity() {
         llmSendToKeyboardButton = findViewById(R.id.llmSendToKeyboardButton)
         llmClearButton = findViewById(R.id.llmClearButton)
         llmIncludeMeCheck = findViewById(R.id.llmIncludeMeCheck)
+        llmThinkingRow = findViewById(R.id.llmThinkingRow)
+        llmThinkingText = findViewById(R.id.llmThinkingText)
         llmSettingsButton = findViewById(R.id.llmSettingsButton)
         llmSettingsTopButton = findViewById(R.id.llmSettingsTopButton)
         unicodeModeSpinner = findViewById(R.id.unicodeModeSpinner)
@@ -564,6 +574,7 @@ class MainActivity : AppCompatActivity() {
 
         llmBusy = true
         llmSendButton.isEnabled = false
+        startThinking()
         appendOutput("我：$text")
         llmHistory.add("user" to text)
         llmInput.text.clear()
@@ -590,7 +601,29 @@ class MainActivity : AppCompatActivity() {
             }
             llmBusy = false
             llmSendButton.isEnabled = true
+            stopThinking()
         }
+    }
+
+    /** 显示“AI 正在思考…”动画（类 ChatGPT），请求发出后开始，回复/失败后停止 */
+    private fun startThinking() {
+        llmThinkingRow.visibility = View.VISIBLE
+        val runnable = object : Runnable {
+            private var dots = 0
+            override fun run() {
+                dots = (dots % 3) + 1
+                llmThinkingText.text = "AI 正在思考" + ".".repeat(dots)
+                thinkingHandler.postDelayed(this, 400)
+            }
+        }
+        thinkingRunnable = runnable
+        runnable.run()
+    }
+
+    private fun stopThinking() {
+        thinkingRunnable?.let { thinkingHandler.removeCallbacks(it) }
+        thinkingRunnable = null
+        llmThinkingRow.visibility = View.GONE
     }
 
     /**

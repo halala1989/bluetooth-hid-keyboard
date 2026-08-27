@@ -264,8 +264,8 @@
                 android:textColor="@color/text_secondary"
                 android:layout_marginBottom="8dp" />
 
-            <!-- 提问输入框：4 行，右侧可上下滚动查看长文本 -->
-            <EditText
+            <!-- 提问输入框：4 行，右侧可上下滚动查看长文本（内容溢出时优先内部滚动） -->
+            <com.hidble.phonekeyboard.ScrollableEditText
                 android:id="@+id/llmInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -294,8 +294,33 @@
                 android:layout_marginTop="8dp"
                 android:text="发送给模型" />
 
-            <!-- 对话输出框：右侧上下滑块可查看长文本 -->
-            <EditText
+            <!-- AI 思考状态（请求中显示，回复后隐藏） -->
+            <LinearLayout
+                android:id="@+id/llmThinkingRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone"
+                android:layout_marginTop="8dp">
+
+                <ProgressBar
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:indeterminateTint="@color/primary" />
+
+                <TextView
+                    android:id="@+id/llmThinkingText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AI 正在思考"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <!-- 对话输出框：右侧上下滑块可查看长文本（内容溢出时优先内部滚动） -->
+            <com.hidble.phonekeyboard.ScrollableEditText
                 android:id="@+id/llmOutput"
                 android:layout_width="match_parent"
                 android:layout_height="190dp"
