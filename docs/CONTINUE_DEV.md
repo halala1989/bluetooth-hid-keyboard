@@ -7,9 +7,9 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v1.3**（versionCode 4 / versionName "1.3"，尚未走正式发布归档流程）
+- 版本：**v1.4**（versionCode 5 / versionName "1.4"；v1.3、v1.4 均尚未走正式发布归档流程）
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
-- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-27 最新编译产物
+- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-27 v1.4（UI 美化版）最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 
 ### 开发机构建环境（已自检通过）
@@ -64,11 +64,31 @@
 
 - 版本号递增到 v1.3（versionCode 4 / versionName "1.3"）。
 - 修复 `tools/setup_check.ps1` 编码问题（加 UTF-8 BOM），Windows PowerShell 5.1 也能运行。
-- `README.md` 当前版本描述更新为 v1.3。
+- `README.md` 当前版本描述更新为 v1.4。
+
+
+### 5. 界面美化（v1.4，2026-08-27）
+
+- 新应用图标（自适应图标矢量重绘）：手机 → 蓝牙 → 键盘，深色渐变背景 + 青色点缀，
+  与 App 暗色主题一致（`ic_launcher_foreground.xml` + `ic_launcher_background.xml`）。
+- **发送 HID 时阻止锁屏**：`sendText` / `sendOutputToKeyboard` / 按键页 HID 动作执行期间
+  设置 `FLAG_KEEP_SCREEN_ON`，发送完自动释放（清单已加 `WAKE_LOCK` 权限）。
+- 主界面大瘦身：
+  - 光标控制、组合键、功能键 → 新二级页「更多按键」（`KeysActivity`，经 `MainActivity.performHid` 转发）；
+  - 模拟蓝牙键盘开关 + 已配对设备 + 状态 → 新二级页「连接管理」（`ConnectionActivity`，状态实时同步）；
+  - 命令日志 → 新二级页「命令日志」（`LogActivity` + 共享 `LogStore`，最多保留 200 条）；
+  - 主界面只留：输入/发送、常用语、速度滑块、中文模式下拉、大模型对话、二级页入口。
+- 中文输入模式改为**下拉菜单**（`Spinner`）：选中项左侧显示绿色 “✓”（自定义 adapter）。
+- 输入速度改为**横向滑块**（`SeekBar` 1-10 独占一行）：拖动即生效，取消“应用”按钮，自动保存。
+- 大模型对话：
+  - 提问输入框放大到 4 行，右侧上下滑块可看长文本；
+  - 输出框右侧滚动条常显（`fadeScrollbars=false`）；
+  - “我：”发言默认绿色、“AI：”回复默认白色（`Spannable` 着色，编辑后自动重刷）；
+  - “发送到键盘”默认**不发送“我：”的发言**，可勾选“包含我的发言”后全部发送。
 
 ## 三、已知限制 / 待办
 
-- [ ] 正式发布 v1.3：按 `releases/README.md` 归档 `releases/v1.3/`（APK + RELEASE_NOTES.md）、
+- [ ] 正式发布 v1.3 / v1.4：按 `releases/README.md` 归档 `releases/v1.3/`、`releases/v1.4/`（APK + RELEASE_NOTES.md）、
       更新 `releases/LATEST`、打 git tag `v1.3`（根目录最新副本已更新）。
 - [ ] 真机验证提速后的正确率：GBK 模式 8-10 档在个别手机/Windows 组合上可能丢位，需实测；
       优先推荐支持 Alt+X 的应用（记事本/Word）。
@@ -81,3 +101,4 @@
 2. 克隆后运行 `tools/setup_check.ps1` 检查环境（Windows PowerShell 5.1 / 7 均可）。
 3. 编译 APK 需要 JDK 17 + Android SDK；CC Switch 配置从旧电脑拷贝（见 `MIGRATION.md`）。
 4. 开始前先 `git pull`，确认在 `phone-keyboard` 分支。
+

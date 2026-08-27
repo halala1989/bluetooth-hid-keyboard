@@ -10,10 +10,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
-    
+    <!-- 发送 HID 期间保持屏幕常亮 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- BLE 功能声明 -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
-    
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -22,7 +24,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HIDBLEKeyboard"
         tools:targetApi="31">
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,6 +38,21 @@
 
         <activity
             android:name=".LlmSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".ConnectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".KeysActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".LogActivity"
             android:exported="false"
             android:theme="@style/Theme.HIDBLEKeyboard" />
     </application>

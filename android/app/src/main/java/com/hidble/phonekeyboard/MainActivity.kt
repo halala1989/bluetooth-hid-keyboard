@@ -10,14 +10,25 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
+import android.text.Spannable
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
-import android.widget.*
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.SeekBar
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -31,41 +42,44 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "hidble_prefs"
         private const val KEY_SPEED_LEVEL = "speed_level"
         private const val KEY_PHRASES = "phrases"
+        private const val KEY_UNICODE_MODE = "unicode_mode"
         private const val DEFAULT_SPEED_LEVEL = 5
         private const val SPEED_MIN = 1
         private const val SPEED_MAX = 10
+
+        /** 供二级页面（连接管理/更多按键）访问本 Activity 的 HID 引擎 */
+        @Volatile
+        var instance: MainActivity? = null
     }
 
-    private lateinit var statusText: TextView
-    private lateinit var statusDot: TextView
-    private lateinit var deviceNameText: TextView
-    private lateinit var keyboardSwitch: SwitchCompat
+    private lateinit var headerStatusDot: TextView
+    private lateinit var headerStatusText: TextView
     private lateinit var textInput: EditText
     private lateinit var sendButton: Button
-    private lateinit var speedInput: EditText
-    private lateinit var applySpeedButton: Button
+    private lateinit var speedSeekBar: SeekBar
+    private lateinit var speedValueText: TextView
     private lateinit var phraseButton: Button
-    private lateinit var commandLog: TextView
-    private lateinit var deviceList: ListView
 
     private lateinit var llmInput: EditText
     private lateinit var llmOutput: EditText
     private lateinit var llmSendButton: Button
     private lateinit var llmSendToKeyboardButton: Button
     private lateinit var llmClearButton: Button
+    private lateinit var llmIncludeMeCheck: CheckBox
     private lateinit var llmSettingsButton: Button
     private lateinit var llmSettingsTopButton: Button
+    private lateinit var unicodeModeSpinner: Spinner
 
     private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
 
-    private val bondedDevices = mutableListOf<BluetoothDevice>()
-    private val deviceNames = mutableListOf<String>()
-    private lateinit var deviceListAdapter: ArrayAdapter<String>
+    /** 连接管理二级页（未打开时为 null）；由 ConnectionActivity 在 onResume/onPause 时挂接 */
+    var connectionActivity: ConnectionActivity? = null
 
     private var registered = false
     private var connected = false
     private var savedSpeedLevel = DEFAULT_SPEED_LEVEL
+    private var savedUnicodeMode = TypingEngine.MODE_ALTX
     private val phrases = mutableListOf<String>()
     private lateinit var prefs: android.content.SharedPreferences
 
@@ -76,8 +90,16 @@ class MainActivity : AppCompatActivity() {
     private val llmHistory = mutableListOf<Pair<String, String>>()
     private var llmBusy = false
 
-    // 开关状态由回调刷新时抑制监听器，避免死循环
-    private var suppressSwitchEvent = false
+    // 中文输入模式下拉（含绿色 √ 选中态）
+    private lateinit var unicodeModeAdapter: UnicodeModeAdapter
+    private val unicodeModeItems = listOf("Alt+X（默认）", "十六进制", "十进制", "GBK")
+    private val unicodeModeValues = listOf(
+        TypingEngine.MODE_ALTX,
+        TypingEngine.MODE_HEX,
+        TypingEngine.MODE_DECIMAL,
+        TypingEngine.MODE_GBK
+    )
+    private var suppressModeEvent = false
 
     // 请求“对附近设备可见”（ACTION_REQUEST_DISCOVERABLE），否则电脑搜不到模拟的键盘
     private val discoverableLauncher = registerForActivityResult(
@@ -97,16 +119,14 @@ class MainActivity : AppCompatActivity() {
             appendLog("蓝牙已开启，正在启动蓝牙键盘...")
             registerKeyboard()
         } else {
-            suppressSwitchEvent = true
-            keyboardSwitch.isChecked = false
-            suppressSwitchEvent = false
             Toast.makeText(this, "未开启蓝牙，键盘未启动", Toast.LENGTH_SHORT).show()
-            updateConnectionState()
+            refreshAllState()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         setContentView(R.layout.activity_main)
 
         initViews()
@@ -122,30 +142,33 @@ class MainActivity : AppCompatActivity() {
         // 蓝牙可能在此前未开启，重新获取 HID profile
         hidManager.init()
         if (registered) {
-            loadBondedDevices()
+            refreshConnectionPage()
         }
-        // 蓝牙被系统关闭时，把开关复位
-        if (!hidManager.isBluetoothOn() && keyboardSwitch.isChecked) {
-            suppressSwitchEvent = true
-            keyboardSwitch.isChecked = false
-            suppressSwitchEvent = false
-            connected = false
-            registered = false
-            updateConnectionState()
+        // 蓝牙被系统关闭时，复位键盘状态
+        if (!hidManager.isBluetoothOn()) {
+            if (registered || connected) {
+                registered = false
+                connected = false
+                appendLog("蓝牙已被系统关闭，键盘已停止")
+            }
         }
+        refreshAllState()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instance === this) instance = null
+        hidManager.cleanup()
     }
 
     private fun initViews() {
-        statusText = findViewById(R.id.statusText)
-        statusDot = findViewById(R.id.statusDot)
-        deviceNameText = findViewById(R.id.deviceNameText)
-        keyboardSwitch = findViewById(R.id.keyboardSwitch)
+        headerStatusDot = findViewById(R.id.headerStatusDot)
+        headerStatusText = findViewById(R.id.headerStatusText)
         textInput = findViewById(R.id.textInput)
         sendButton = findViewById(R.id.sendButton)
-        speedInput = findViewById(R.id.speedInput)
-        applySpeedButton = findViewById(R.id.applySpeedButton)
+        speedSeekBar = findViewById(R.id.speedSeekBar)
+        speedValueText = findViewById(R.id.speedValueText)
         phraseButton = findViewById(R.id.phraseButton)
-        commandLog = findViewById(R.id.commandLog)
 
         // 大模型对话
         llmInput = findViewById(R.id.llmInput)
@@ -153,31 +176,42 @@ class MainActivity : AppCompatActivity() {
         llmSendButton = findViewById(R.id.llmSendButton)
         llmSendToKeyboardButton = findViewById(R.id.llmSendToKeyboardButton)
         llmClearButton = findViewById(R.id.llmClearButton)
+        llmIncludeMeCheck = findViewById(R.id.llmIncludeMeCheck)
         llmSettingsButton = findViewById(R.id.llmSettingsButton)
         llmSettingsTopButton = findViewById(R.id.llmSettingsTopButton)
+        unicodeModeSpinner = findViewById(R.id.unicodeModeSpinner)
 
-        // 已配对设备列表
-        deviceList = findViewById(R.id.deviceList)
-        deviceListAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceNames)
-        deviceList.adapter = deviceListAdapter
-
-        // 输入速度 / 常用语（SharedPreferences）
+        // SharedPreferences
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // 输入速度：滑块位置直接决定速度（1-10，默认 5）
         savedSpeedLevel = prefs.getInt(KEY_SPEED_LEVEL, DEFAULT_SPEED_LEVEL)
-        speedInput.setText(savedSpeedLevel.toString())
+        speedSeekBar.progress = savedSpeedLevel
+        speedValueText.text = savedSpeedLevel.toString()
+
+        // 中文输入模式下拉
+        savedUnicodeMode = prefs.getInt(KEY_UNICODE_MODE, TypingEngine.MODE_ALTX)
+        // 设置 adapter 时可能同步触发 onItemSelected（此时 hidProtocol 尚未初始化），用抑制标志包住
+        suppressModeEvent = true
+        unicodeModeAdapter = UnicodeModeAdapter(this, unicodeModeItems)
+        unicodeModeSpinner.adapter = unicodeModeAdapter
+        val initIndex = unicodeModeValues.indexOf(savedUnicodeMode).coerceAtLeast(0)
+        unicodeModeSpinner.setSelection(initIndex, false)
+        unicodeModeAdapter.setSelected(initIndex)
+        suppressModeEvent = false
+
         loadPhrases()
         loadLlmPrefs()
 
-        // 对话输出框可编辑，改动自动保存（重启 App 后仍在）
+        // 对话输出框可编辑：改动自动保存 + 重新着色（“我”绿色 / AI 白色）
         llmOutput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 prefs.edit().putString(LlmPrefs.KEY_OUTPUT, s?.toString() ?: "").apply()
+                applyLlmColors()
             }
         })
-
-        updateConnectionState()
     }
 
     private fun initHid() {
@@ -191,21 +225,19 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         )
+        hidProtocol.setSpeed(savedSpeedLevel)
+        hidProtocol.setUnicodeMode(savedUnicodeMode)
 
         hidManager.onAppStatusChanged = { reg ->
             runOnUiThread {
                 registered = reg
-                suppressSwitchEvent = true
-                keyboardSwitch.isChecked = reg
-                suppressSwitchEvent = false
                 if (reg) {
                     appendLog("蓝牙键盘已启动：请确认“对附近设备可见”，然后到电脑上搜索并配对")
-                    loadBondedDevices()
                     requestDiscoverable()
                 } else {
                     appendLog("蓝牙键盘已停止")
                 }
-                updateConnectionState()
+                refreshAllState()
             }
         }
 
@@ -222,7 +254,7 @@ class MainActivity : AppCompatActivity() {
                         appendLog("连接已断开")
                     }
                 }
-                updateConnectionState()
+                refreshAllState()
             }
         }
 
@@ -230,12 +262,10 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 appendLog("错误: $error")
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
-                // 注册失败时把开关复位
+                // 注册失败时复位
                 if (!hidManager.isRegistered()) {
-                    suppressSwitchEvent = true
-                    keyboardSwitch.isChecked = false
-                    suppressSwitchEvent = false
-                    updateConnectionState()
+                    registered = false
+                    refreshAllState()
                 }
             }
         }
@@ -246,38 +276,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        // 底部开关：打开 = 自动开蓝牙 + 模拟蓝牙键盘；关闭 = 停止
-        keyboardSwitch.setOnCheckedChangeListener { _, checked ->
-            if (suppressSwitchEvent) return@setOnCheckedChangeListener
-            if (checked) {
-                if (!hidManager.isBluetoothOn()) {
-                    appendLog("正在请求开启蓝牙...")
-                    try {
-                        enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-                    } catch (e: Exception) {
-                        suppressSwitchEvent = true
-                        keyboardSwitch.isChecked = false
-                        suppressSwitchEvent = false
-                        Toast.makeText(this, "无法自动开启蓝牙，请到系统设置中打开", Toast.LENGTH_LONG).show()
-                    }
-                } else {
-                    registerKeyboard()
-                }
-            } else {
-                hidManager.unregister()
-                hidManager.disconnect()
-                connected = false
-                registered = false
-                appendLog("蓝牙键盘已关闭")
-                updateConnectionState()
-            }
-        }
-
         sendButton.setOnClickListener { sendText() }
 
         // 输入框软键盘“发送”键
         textInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
                 sendText()
                 true
             } else {
@@ -285,103 +288,56 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 输入速度
-        applySpeedButton.setOnClickListener { applySpeedFromInput() }
+        // 输入速度滑块：拖动即生效（无需“应用”按钮）
+        speedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val level = progress.coerceIn(SPEED_MIN, SPEED_MAX)
+                speedValueText.text = level.toString()
+                savedSpeedLevel = level
+                prefs.edit().putInt(KEY_SPEED_LEVEL, level).apply()
+                hidProtocol.setSpeed(level)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                appendLog("输入速度已设为 $savedSpeedLevel（1-10）")
+            }
+        })
 
         // 常用语
         phraseButton.setOnClickListener { showPhraseDialog() }
 
-        // 中文输入模式
-        findViewById<Button>(R.id.btnModeAltX).setOnClickListener {
-            hidProtocol.setUnicodeMode(TypingEngine.MODE_ALTX)
-            appendLog("中文输入模式: Alt+X（默认，记事本/Word 等，无需注册表）")
-        }
-        findViewById<Button>(R.id.btnModeHex).setOnClickListener {
-            hidProtocol.setUnicodeMode(TypingEngine.MODE_HEX)
-            appendLog("中文输入模式: 十六进制（Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效）")
-        }
-        findViewById<Button>(R.id.btnModeDecimal).setOnClickListener {
-            hidProtocol.setUnicodeMode(TypingEngine.MODE_DECIMAL)
-            appendLog("中文输入模式: 十进制（Alt+0+码点，记事本/Word 等）")
-        }
-        findViewById<Button>(R.id.btnModeGbk).setOnClickListener {
-            hidProtocol.setUnicodeMode(TypingEngine.MODE_GBK)
-            appendLog("中文输入模式: GBK 机内码（仅中文版 Windows）")
-        }
-
-        // 已配对设备点击连接（首次在电脑上配对后，若未自动连接可点这里）
-        deviceList.setOnItemClickListener { _, _, position, _ ->
-            if (position < bondedDevices.size) {
-                val device = bondedDevices[position]
-                val name = deviceNames[position]
-
-                AlertDialog.Builder(this)
-                    .setTitle("连接设备")
-                    .setMessage("确定要连接到 $name 吗？")
-                    .setPositiveButton("连接") { _, _ ->
-                        appendLog("正在连接 $name...")
-                        hidManager.connect(device)
-                    }
-                    .setNegativeButton("取消", null)
-                    .show()
+        // 中文输入模式下拉（选中项左侧绿色 √）
+        unicodeModeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                unicodeModeAdapter.setSelected(position)
+                if (suppressModeEvent) return
+                val mode = unicodeModeValues.getOrElse(position) { TypingEngine.MODE_ALTX }
+                savedUnicodeMode = mode
+                prefs.edit().putInt(KEY_UNICODE_MODE, mode).apply()
+                hidProtocol.setUnicodeMode(mode)
+                val desc = when (mode) {
+                    TypingEngine.MODE_HEX -> "十六进制（Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效）"
+                    TypingEngine.MODE_DECIMAL -> "十进制（Alt+0+码点，记事本/Word 等）"
+                    TypingEngine.MODE_GBK -> "GBK 机内码（仅中文版 Windows）"
+                    else -> "Alt+X（默认，记事本/Word 等，无需注册表）"
+                }
+                appendLog("中文输入模式: $desc")
             }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // 功能按钮
-        findViewById<Button>(R.id.btnEnter).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.enter(); appendLog("Enter") }
+        // 二级页面入口
+        findViewById<Button>(R.id.connectionButton).setOnClickListener {
+            startActivity(Intent(this, ConnectionActivity::class.java))
         }
-        findViewById<Button>(R.id.btnBackspace).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.backspace(); appendLog("Backspace") }
+        findViewById<Button>(R.id.keysButton).setOnClickListener {
+            startActivity(Intent(this, KeysActivity::class.java))
         }
-        findViewById<Button>(R.id.btnTab).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.tab(); appendLog("Tab") }
-        }
-        findViewById<Button>(R.id.btnEscape).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.escape(); appendLog("Escape") }
-        }
-        findViewById<Button>(R.id.btnDelete).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.delete(); appendLog("Delete") }
-        }
-
-        // 光标控制
-        findViewById<Button>(R.id.btnUp).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.arrowUp(); appendLog("↑") }
-        }
-        findViewById<Button>(R.id.btnDown).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.arrowDown(); appendLog("↓") }
-        }
-        findViewById<Button>(R.id.btnLeft).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.arrowLeft(); appendLog("←") }
-        }
-        findViewById<Button>(R.id.btnRight).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.arrowRight(); appendLog("→") }
-        }
-        findViewById<Button>(R.id.btnHome).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.home(); appendLog("Home") }
-        }
-        findViewById<Button>(R.id.btnEnd).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.end(); appendLog("End") }
-        }
-
-        // 组合键
-        findViewById<Button>(R.id.btnCtrlC).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.copy(); appendLog("Ctrl+C") }
-        }
-        findViewById<Button>(R.id.btnCtrlV).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.paste(); appendLog("Ctrl+V") }
-        }
-        findViewById<Button>(R.id.btnCtrlX).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.cut(); appendLog("Ctrl+X") }
-        }
-        findViewById<Button>(R.id.btnCtrlA).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.selectAll(); appendLog("Ctrl+A") }
-        }
-        findViewById<Button>(R.id.btnCtrlZ).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.undo(); appendLog("Ctrl+Z") }
-        }
-        findViewById<Button>(R.id.btnCtrlS).setOnClickListener {
-            lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") }
+        findViewById<Button>(R.id.logButton).setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
         }
 
         // ===== 大模型对话 =====
@@ -390,18 +346,96 @@ class MainActivity : AppCompatActivity() {
 
         llmSendButton.setOnClickListener { sendToLlm() }
 
-        // 输入框软键盘“发送”键
-        llmInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEND) {
-                sendToLlm()
-                true
-            } else {
-                false
-            }
-        }
-
         llmSendToKeyboardButton.setOnClickListener { sendOutputToKeyboard() }
         llmClearButton.setOnClickListener { clearLlmConversation() }
+    }
+
+    // ===== 供二级页面调用的接口 =====
+
+    fun isRegistered(): Boolean = registered
+    fun isConnected(): Boolean = connected
+    fun connectedDeviceName(): String? = hidManager.connectedDeviceName()
+
+    /** 连接管理页：切换模拟蓝牙键盘开关 */
+    fun setKeyboardEnabled(enabled: Boolean) {
+        if (enabled) {
+            if (!hidManager.isBluetoothOn()) {
+                appendLog("正在请求开启蓝牙...")
+                try {
+                    enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                } catch (e: Exception) {
+                    Toast.makeText(this, "无法自动开启蓝牙，请到系统设置中打开", Toast.LENGTH_LONG).show()
+                    refreshAllState()
+                }
+            } else {
+                registerKeyboard()
+            }
+        } else {
+            hidManager.unregister()
+            hidManager.disconnect()
+            connected = false
+            registered = false
+            appendLog("蓝牙键盘已关闭")
+            refreshAllState()
+        }
+    }
+
+    /** 连接管理页：点选已配对设备连接 */
+    fun connectToDevice(device: BluetoothDevice) {
+        hidManager.connect(device)
+    }
+
+    /** 已配对设备快照：(名称+地址, device) 列表 */
+    fun getBondedDevices(): List<Pair<String, BluetoothDevice>> {
+        val result = mutableListOf<Pair<String, BluetoothDevice>>()
+        hidManager.bondedDevices()?.forEach { d ->
+            val name = d.name ?: "未知设备"
+            result.add("$name (${d.address})" to d)
+        }
+        return result
+    }
+
+    /** 更多按键页：在后台执行一个 HID 动作（发送期间保持屏幕常亮） */
+    fun performHid(action: suspend (HidProtocol) -> Unit) {
+        lifecycleScope.launch {
+            setKeepScreenOn(true)
+            try {
+                action(hidProtocol)
+            } finally {
+                setKeepScreenOn(false)
+            }
+        }
+    }
+
+    // ===== 状态刷新 =====
+
+    private fun refreshAllState() {
+        refreshHeaderStatus()
+        refreshConnectionPage()
+    }
+
+    private fun refreshHeaderStatus() {
+        when {
+            connected -> {
+                headerStatusText.text = "已连接"
+                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
+                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
+            }
+            registered -> {
+                headerStatusText.text = "键盘已启动"
+                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
+                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
+            }
+            else -> {
+                headerStatusText.text = "未启动"
+                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+            }
+        }
+    }
+
+    private fun refreshConnectionPage() {
+        connectionActivity?.refreshAll()
     }
 
     /** 请求系统开启“对附近设备可见”，电脑才能搜索到本机 */
@@ -419,15 +453,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun registerKeyboard() {
         if (!hidManager.isBluetoothOn()) {
-            suppressSwitchEvent = true
-            keyboardSwitch.isChecked = false
-            suppressSwitchEvent = false
             Toast.makeText(this, "请先开启手机蓝牙", Toast.LENGTH_SHORT).show()
+            refreshAllState()
             return
         }
         if (hidManager.isRegistered()) return
         appendLog("正在启动蓝牙键盘...")
         hidManager.register()
+    }
+
+    // ===== 发送 HID（发送期间阻止锁屏） =====
+
+    private fun setKeepScreenOn(on: Boolean) {
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     private fun sendText() {
@@ -437,31 +479,20 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
                 return
             }
+            setKeepScreenOn(true)
             lifecycleScope.launch {
-                if (text.length > TypingEngine.CHUNK_SIZE) {
-                    appendLog("文本较长（${text.length} 字），已自动分段发送")
+                try {
+                    if (text.length > TypingEngine.CHUNK_SIZE) {
+                        appendLog("文本较长（${text.length} 字），已自动分段发送")
+                    }
+                    hidProtocol.typeText(text)
+                    appendLog("发送文本: $text")
+                    textInput.text.clear()
+                } finally {
+                    setKeepScreenOn(false)
                 }
-                hidProtocol.typeText(text)
-                appendLog("发送文本: $text")
-                textInput.text.clear()
             }
         }
-    }
-
-    // ===== 输入速度 =====
-
-    private fun applySpeedFromInput() {
-        val text = speedInput.text.toString().trim()
-        val level = text.toIntOrNull()
-        if (level == null || level < SPEED_MIN || level > SPEED_MAX) {
-            Toast.makeText(this, "请输入 $SPEED_MIN-$SPEED_MAX 之间的数字", Toast.LENGTH_SHORT).show()
-            speedInput.setText(savedSpeedLevel.toString())
-            return
-        }
-        savedSpeedLevel = level
-        prefs.edit().putInt(KEY_SPEED_LEVEL, level).apply()
-        hidProtocol.setSpeed(level)
-        appendLog("输入速度已设为 $level（1-10）")
     }
 
     // ===== 大模型对话 =====
@@ -471,16 +502,41 @@ class MainActivity : AppCompatActivity() {
         llmApiKey = prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: ""
         llmModel = prefs.getString(LlmPrefs.KEY_MODEL, "") ?: ""
         llmOutput.setText(prefs.getString(LlmPrefs.KEY_OUTPUT, "") ?: "")
-    }
-
-    private fun saveLlmOutput() {
-        prefs.edit().putString(LlmPrefs.KEY_OUTPUT, llmOutput.text.toString()).apply()
+        applyLlmColors()
     }
 
     private fun appendOutput(text: String) {
         val current = llmOutput.text.toString()
         llmOutput.setText(if (current.isBlank()) text else "$current\n$text")
         llmOutput.setSelection(llmOutput.text.length)
+    }
+
+    /**
+     * 给对话输出框着色：“我：”开头为绿色，“AI：”开头为白色，其余用默认文字色。
+     * 只改颜色 span，不改文本，可安全在 TextWatcher 中调用。
+     */
+    private fun applyLlmColors() {
+        val editable = llmOutput.text
+        editable.getSpans(0, editable.length, ForegroundColorSpan::class.java)
+            .forEach { editable.removeSpan(it) }
+        val text = editable.toString()
+        if (text.isEmpty()) return
+        val meColor = ContextCompat.getColor(this, R.color.llm_me)
+        val aiColor = ContextCompat.getColor(this, R.color.llm_ai)
+        val normalColor = ContextCompat.getColor(this, R.color.text_primary)
+        var start = 0
+        for (line in text.split("\n")) {
+            val end = (start + line.length).coerceAtMost(editable.length)
+            val color = when {
+                line.startsWith("我：") -> meColor
+                line.startsWith("AI：") -> aiColor
+                else -> normalColor
+            }
+            if (start < end) {
+                editable.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            start = end + 1
+        }
     }
 
     /** 进入模型设置二级页面（选择提供方自动填预设模型，只填 Token 即可） */
@@ -537,10 +593,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 把对话输出框（可编辑）的内容整体发送到蓝牙键盘 */
+    /**
+     * 把对话输出框内容发送到蓝牙键盘。
+     * 默认不发送“我：”的发言（只发 AI 回复）；勾选“包含我的发言”后才全部发送。
+     */
     private fun sendOutputToKeyboard() {
-        val text = llmOutput.text.toString().trim()
-        if (text.isEmpty()) {
+        val full = llmOutput.text.toString().trim()
+        if (full.isEmpty()) {
             Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
             return
         }
@@ -548,19 +607,34 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
             return
         }
+        val text = if (llmIncludeMeCheck.isChecked) {
+            full
+        } else {
+            full.lines().filterNot { it.trimStart().startsWith("我：") }
+                .joinToString("\n")
+                .trim()
+        }
+        if (text.isEmpty()) {
+            Toast.makeText(this, "没有可发送的内容（已默认排除“我”的发言，可勾选“包含我的发言”）", Toast.LENGTH_SHORT).show()
+            return
+        }
+        setKeepScreenOn(true)
         lifecycleScope.launch {
-            if (text.length > TypingEngine.CHUNK_SIZE) {
-                appendLog("对话内容较长（${text.length} 字），已自动分段发送")
+            try {
+                if (text.length > TypingEngine.CHUNK_SIZE) {
+                    appendLog("对话内容较长（${text.length} 字），已自动分段发送")
+                }
+                hidProtocol.typeText(text)
+                appendLog("已把对话内容发送到电脑")
+            } finally {
+                setKeepScreenOn(false)
             }
-            hidProtocol.typeText(text)
-            appendLog("已把对话内容发送到电脑")
         }
     }
 
     private fun clearLlmConversation() {
         llmOutput.setText("")
         llmHistory.clear()
-        saveLlmOutput()
         appendLog("对话已清空")
     }
 
@@ -587,7 +661,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPhraseDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_phrases, null)
-        val listView = dialogView.findViewById<ListView>(R.id.phraseList)
+        val listView = dialogView.findViewById<android.widget.ListView>(R.id.phraseList)
         val addButton = dialogView.findViewById<Button>(R.id.phraseAddButton)
         val closeButton = dialogView.findViewById<Button>(R.id.phraseCloseButton)
 
@@ -659,11 +733,11 @@ class MainActivity : AppCompatActivity() {
         input.setBackgroundResource(R.drawable.bg_input)
         input.setPadding(dp(14), dp(10), dp(14), dp(10))
 
-        val container = FrameLayout(this)
+        val container = android.widget.FrameLayout(this)
         container.setPadding(dp(20), dp(8), dp(20), 0)
-        container.addView(input, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
+        container.addView(input, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
         ))
 
         AlertDialog.Builder(this)
@@ -693,56 +767,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun loadBondedDevices() {
-        bondedDevices.clear()
-        deviceNames.clear()
-        hidManager.bondedDevices()?.forEach { d ->
-            bondedDevices.add(d)
-            val name = d.name ?: "未知设备"
-            deviceNames.add("$name (${d.address})")
-        }
-        deviceListAdapter.notifyDataSetChanged()
-        if (deviceNames.isEmpty()) {
-            appendLog("暂无已配对设备，请先在电脑蓝牙中添加“${HidDeviceManager.KEYBOARD_NAME}”并配对")
-        }
-    }
-
-    private fun updateConnectionState() {
-        if (connected) {
-            statusText.text = "已连接"
-            statusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
-            statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
-            deviceNameText.text = "已连接到电脑：${hidManager.connectedDeviceName() ?: "电脑"}，可以直接输入文字发送；关闭开关可断开。"
-        } else if (registered) {
-            statusText.text = "键盘已启动"
-            statusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
-            statusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
-            deviceNameText.text = "手机已模拟为蓝牙键盘：到电脑上 设置 → 蓝牙 → 添加设备，搜索“${HidDeviceManager.KEYBOARD_NAME}”并配对。"
-        } else {
-            statusText.text = "未启动"
-            statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            deviceNameText.text = "打开下方开关后，手机会自动开启蓝牙并模拟成蓝牙键盘，到电脑上搜索即可。"
-        }
-    }
+    // ===== 日志 =====
 
     private fun appendLog(message: String) {
-        val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-            .format(java.util.Date())
-        val logEntry = "[$timestamp] $message\n"
-
-        commandLog.append(logEntry)
-
-        val lines = commandLog.text.lines()
-        if (lines.size > 50) {
-            commandLog.text = lines.takeLast(50).joinToString("\n")
-        }
-
-        val scrollView = commandLog.parent as? ScrollView
-        scrollView?.post {
-            scrollView.fullScroll(View.FOCUS_DOWN)
-        }
+        LogStore.append(message)
     }
+
+    // ===== 权限 =====
 
     private fun requestPermissions() {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -777,8 +808,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        hidManager.cleanup()
+    // ===== 中文输入模式下拉适配（选中项左侧绿色 √） =====
+
+    private inner class UnicodeModeAdapter(context: Context, items: List<String>) :
+        ArrayAdapter<String>(context, R.layout.item_unicode_mode, R.id.modeLabel, items) {
+
+        private var selected = 0
+
+        fun setSelected(position: Int) {
+            selected = position
+            notifyDataSetChanged()
+        }
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = super.getView(position, convertView, parent)
+            bind(view, position)
+            return view
+        }
+
+        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = super.getDropDownView(position, convertView, parent)
+            bind(view, position)
+            return view
+        }
+
+        private fun bind(view: View, position: Int) {
+            val check = view.findViewById<TextView>(R.id.modeCheck)
+            check.text = if (position == selected) "✓" else ""
+            check.visibility = if (position == selected) View.VISIBLE else View.INVISIBLE
+        }
     }
 }
+
+
+
+

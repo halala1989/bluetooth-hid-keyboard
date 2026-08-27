@@ -58,4 +58,10 @@
     <!-- 列表 / 日志 -->
     <color name="list_bg">#12151B</color>
     <color name="log_bg">#0C0E12</color>
+
+    <!-- 下拉选中 / 发言配色 -->
+    <color name="check_green">#4CAF50</color>
+    <color name="llm_me">#66BB6A</color>
+    <color name="llm_ai">#FFFFFF</color>
 </resources>
+
