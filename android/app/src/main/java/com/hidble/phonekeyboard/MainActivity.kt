@@ -340,6 +340,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 二级页面入口
+        // 顶部状态条：点击（含红色“未启动”文字）直达连接管理
+        findViewById<android.view.View>(R.id.statusCard).setOnClickListener {
+            startActivity(Intent(this, ConnectionActivity::class.java))
+        }
         findViewById<Button>(R.id.connectionButton).setOnClickListener {
             startActivity(Intent(this, ConnectionActivity::class.java))
         }
