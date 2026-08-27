@@ -12,12 +12,17 @@
 - 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-27 v1.4（UI 美化版）最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 
-### 开发机构建环境（已自检通过）
+### 开发机构建环境（2026-08-27 实测路径，注意在 D 盘）
 
-- JDK 17：`C:\Program Files\Java\jdk-17`（`JAVA_HOME` 已设置）
-- Android SDK：`C:\Android\Sdk`（`ANDROID_HOME` 已设置；build-tools 33.0.1 + 35.0.0）
-- Pico SDK：`C:\pico\pico-sdk`（仅旧 `master` 产品线编译固件需要）
-- 编译 APK：`cd android; .\gradlew.bat assembleDebug`
+- JDK 17：`D:\jdk17\jdk-17.0.20+8`（每次编译前设 `JAVA_HOME=D:\jdk17\jdk-17.0.20+8`）
+- Android SDK：`D:\Android`（设 `ANDROID_HOME=D:\Android`、`ANDROID_SDK_ROOT=D:\Android`；platforms=android-34，build-tools 33.0.1 + 34.0.0）
+- Pico SDK：`C:\pico\pico-sdk`（仅旧 `master` 产品线编译固件需要，本机未验证）
+- 编译 APK：
+  ```powershell
+  $env:JAVA_HOME="D:\jdk17\jdk-17.0.20+8"; $env:ANDROID_HOME="D:\Android"; $env:ANDROID_SDK_ROOT="D:\Android"
+  cd android; .\gradlew.bat assembleDebug
+  ```
+- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`，复制到仓库根 `PhoneBluetoothKeyboard-debug.apk`
 
 ### 签名注意事项（踩过坑）
 
@@ -116,3 +121,54 @@
 3. 编译 APK 需要 JDK 17 + Android SDK；CC Switch 配置从旧电脑拷贝（见 `MIGRATION.md`）。
 4. 开始前先 `git pull`，确认在 `phone-keyboard` 分支。
 
+## 五、给下一个 AI 的提示（2026-08-27 收尾时整理，重要）
+
+### 1. 代码架构速览（改代码前先看）
+
+- `MainActivity.kt` 是唯一持有 `HidDeviceManager` + `HidProtocol`（打字引擎）的地方；
+  三个二级页（`KeysActivity` 更多按键 / `ConnectionActivity` 连接管理 / `LogActivity` 命令日志）
+  都通过 `MainActivity.instance`（companion 单例，onCreate 赋值/onDestroy 清空）转发操作：
+  - `performHid { it.xxx() }`：按键页发按键（发送期间自动 `FLAG_KEEP_SCREEN_ON`）
+  - `setKeyboardEnabled(true/false)`、`connectToDevice(device)`、`getBondedDevices()`：连接页用
+  - `connectionActivity` 字段：连接页 onResume 挂接、onPause 摘除，主界面状态变化时 `refreshAllState()` 会同步刷新它
+- `LogStore.kt`：跨页面共享命令日志（最多 200 条），`LogActivity` 订阅 `listener` 实时刷新
+- `ScrollableEditText.kt`：内容溢出时优先内部滚动、不让外层 ScrollView 抢手势（用于主输入框和 LLM 两个文本框）
+- `TypingEngine.kt`：中文输入的四种模式都在这里；`Mutex` 串行发送，`send()` 返回 false 会自动重试 50 次
+
+### 2. Alt+X 中文输入机制（花了大半天踩坑，务必理解）
+
+- Word/记事本的 Alt+X 会把光标前**所有相邻的 0-9A-F 字符**连起来读成一个码点（不是固定 4 位），
+  前面有数字/字母时会合并成超长无效码点 → 不转换/乱码（这就是“日期后面中文必乱”的原因）。
+- 官方消歧办法：**`U+` 前缀**（如打 `U+5E74` 再 Alt+X → 年，`U+` 会被应用吃掉）；
+  本机 Win11 记事本已实测有效。**`x` 前缀是 ASCII 专用**（`x20`→空格），不要用来输中文。
+- 另一种官方办法是**先选中十六进制**再 Alt+X（实现复杂、慢，未采用）。
+- 随机乱码（`U+` 残留、丢数字）原因：最后一位数字抬起后仅 1ms 就按 Alt+X，宿主来不及写入文档；
+  蓝牙链路偶尔丢报告。已修复：`ALT_PRE_MS=100` 在按 Alt+X/松开 Alt 前停顿（随速度缩放）。
+- 速度档位 `SPEED_SCALES=[4000,3300,2700,2100,1600,1150,780,500,260,80]`（1 最慢最稳、10 最快）。
+- **目标电脑输入法最好处于英文模式**（中文输入法会拦截按键导致类似乱码）。
+
+### 3. 本机验证 Alt+X 的技巧（如果还要测）
+
+- 本机 Win11 有记事本。用 PowerShell `SendKeys` 模拟按键时，**必须先把微软拼音切到英文**：
+  ```powershell
+  Add-Type -AssemblyName System.Windows.Forms
+  # 用 keybd_event 发右侧 Shift（VK=0xA1）切换输入法
+  $sig='[DllImport("user32.dll")] public static extern void keybd_event(byte,byte,uint,UIntPtr);'
+  Add-Type -MemberDefinition $sig -Name W -Namespace N -PassThru
+  ```
+  然后开记事本 → 发按键 → `^a` `^c` 读剪贴板验证。
+- 真机验证建议：手机连电脑实际打字，1 档起逐步升档，确认各速度下中文无乱码。
+
+### 4. 待办（下次继续做的方向）
+
+- **正式发布 v1.3 + v1.4**（当前最大遗留项）：按 `releases/README.md` 建 `releases/v1.3/`、`releases/v1.4/`
+  （APK + RELEASE_NOTES.md）、更新 `releases/LATEST`、打 git tag `v1.3` `v1.4`。
+- 大模型：改流式输出；对话历史持久化；Token 换 EncryptedSharedPreferences；家用模型名可能更新。
+- 历史规划：微软拼音 `vuc` 方案、一键 Shift 切换中英文（见 `HISTORY.md`）。
+- 真机压测：GBK/十六进制模式 8-10 档正确率；长文本发送时中止按钮是否即时。
+
+### 5. Git 习惯
+
+- 直接在本分支 `phone-keyboard` 上提交并 `git push origin phone-keyboard`（与历史一致）。
+- 提交信息用中文、带 `feat(v1.x)` / `fix(v1.x)` 前缀；每次改完都重新编译 + 更新根目录 APK。
+- 版本号规则见 `releases/README.md`（每次 +0.1，当前 v1.4）。
