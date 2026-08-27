@@ -138,7 +138,10 @@ object HidKeys {
  * 逻辑 1:1 移植自 v11 固件 usb_hid.c（Alt+X/十六进制/十进制/GBK 四种中文输入 + SPEED 调速）。
  * 标准键盘报告：8 字节 [modifier, 0, key0..key5]。
  */
-class TypingEngine(private val send: (ByteArray) -> Unit) {
+class TypingEngine(
+    private val send: (ByteArray) -> Boolean,
+    private val onSendInterrupted: ((Int) -> Unit)? = null
+) {
 
     companion object {
         // 中文输入模式（与固件 UMOD 一致）
@@ -149,11 +152,19 @@ class TypingEngine(private val send: (ByteArray) -> Unit) {
 
         private const val KEY_DOWN_MS = 15
         private const val KEY_UP_MS = 15
-        private const val CHAR_GAP_MS = 8
-        private const val ALT_DOWN_MS = 40
-        private const val ALT_FINAL_MS = 80
-        private const val MIN_DELAY_MS = 2L
-        private val SPEED_SCALES = intArrayOf(2500, 2000, 1600, 1200, 1000, 800, 650, 500, 400, 300)
+        // 字符抬起后不再额外等待：下一键的按下延迟负责拉开间距
+        private const val CHAR_GAP_MS = 0
+        private const val ALT_FINAL_MS = 40
+        private const val MIN_DELAY_MS = 1L
+        /** 长文本自动分段：每段字符数 */
+        const val CHUNK_SIZE = 80
+        /** 段间暂停，让蓝牙发送缓冲消化，避免长文本高速发送时丢字 */
+        private const val CHUNK_FLUSH_MS = 20L
+        /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
+        private const val SEND_MAX_RETRIES = 50
+        private const val SEND_RETRY_WAIT_MS = 20L
+        // 1=最慢 .. 10=最快；高速度档只保留 1-2ms 最小间隔（余下由蓝牙链路节奏决定）
+        private val SPEED_SCALES = intArrayOf(2000, 1550, 1200, 900, 650, 450, 300, 180, 100, 60)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -174,38 +185,57 @@ class TypingEngine(private val send: (ByteArray) -> Unit) {
         capsLock = (led and 0x02) != 0
     }
 
-    /** 输入一段文本（自动按当前中文模式逐字输出） */
+    /**
+     * 输入一段文本（自动按当前中文模式逐字输出）。
+     * 长文本自动分段发送（每 CHUNK_SIZE 字暂停一下让蓝牙缓冲消化）；
+     * 报告发送失败自动重试，连接中断则停止并回调 onSendInterrupted。
+     */
     suspend fun typeText(text: String) = mutex.withLock {
         val cps = text.codePoints().toArray()
-        for (cp in cps) {
-            if (cp == '\r'.code) continue
-            if (cp == '\n'.code) {
-                queue(0, HidKeys.KEY_RETURN, KEY_DOWN_MS)
-                queue(0, 0, CHAR_GAP_MS)
-                continue
-            }
-            if (cp < 0x80) {
-                val hit = asciiToHid(cp.toChar())
-                if (hit != null) {
-                    queue(hit.first, hit.second, KEY_DOWN_MS)
+        var sent = 0
+        try {
+            for (cp in cps) {
+                if (cp == '\r'.code) continue
+                if (cp == '\n'.code) {
+                    queue(0, HidKeys.KEY_RETURN, KEY_DOWN_MS)
                     queue(0, 0, CHAR_GAP_MS)
+                } else if (cp < 0x80) {
+                    val hit = asciiToHid(cp.toChar())
+                    if (hit != null) {
+                        queue(hit.first, hit.second, KEY_DOWN_MS)
+                        queue(0, 0, CHAR_GAP_MS)
+                    } else {
+                        typeUnicodeLocked(cp)
+                    }
                 } else {
                     typeUnicodeLocked(cp)
                 }
-            } else {
-                typeUnicodeLocked(cp)
+                sent++
+                if (sent % CHUNK_SIZE == 0) delay(CHUNK_FLUSH_MS)
             }
+        } catch (e: HidSendInterruptedException) {
+            onSendInterrupted?.invoke(sent)
         }
     }
 
     /** 按一个键（可带修饰键） */
     suspend fun pressKey(key: Int, modifiers: Int = 0) = mutex.withLock {
-        queue(modifiers, key, KEY_DOWN_MS)
-        queue(0, 0, KEY_UP_MS)
+        try {
+            queue(modifiers, key, KEY_DOWN_MS)
+            queue(0, 0, KEY_UP_MS)
+        } catch (e: HidSendInterruptedException) {
+            // 发送失败（连接断开等）：忽略单键操作
+        }
     }
 
     /** 直接输入一个 Unicode 码点（走当前中文模式） */
-    suspend fun sendUnicode(codepoint: Int) = mutex.withLock { typeUnicodeLocked(codepoint) }
+    suspend fun sendUnicode(codepoint: Int) = mutex.withLock {
+        try {
+            typeUnicodeLocked(codepoint)
+        } catch (e: HidSendInterruptedException) {
+            // 发送失败（连接断开等）：忽略
+        }
+    }
 
     private suspend fun typeUnicodeLocked(cp: Int) {
         when (unicodeMode) {
@@ -222,32 +252,33 @@ class TypingEngine(private val send: (ByteArray) -> Unit) {
             }
             MODE_HEX -> {
                 val digits = Integer.toHexString(cp).uppercase(Locale.ROOT)
-                queue(HidKeys.MOD_LEFTALT, 0, ALT_DOWN_MS)
+                // Alt 与小键盘+ 合并进同一份报告，省 1 个报告/字
                 queue(HidKeys.MOD_LEFTALT, HidKeys.KEY_KP_PLUS, KEY_DOWN_MS)
-                queue(HidKeys.MOD_LEFTALT, 0, KEY_UP_MS)
+                queue(HidKeys.MOD_LEFTALT, 0, 0)
                 for (ch in digits) {
                     val key = if (ch in '0'..'9') HidKeys.KP_DIGITS[ch - '0'] else HidKeys.KEY_A + (ch - 'A')
                     queue(HidKeys.MOD_LEFTALT, key, KEY_DOWN_MS)
-                    queue(HidKeys.MOD_LEFTALT, 0, KEY_UP_MS)
+                    // 数字抬起不再额外等待：蓝牙链路本身有传输间隔，下一键的按下延迟负责拉开间距
+                    queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 queue(0, 0, ALT_FINAL_MS)
             }
             MODE_GBK -> {
                 val gbk = gbkValue(cp)
                 val digits = if (gbk != null) gbk.toString() else "0$cp"
-                queue(HidKeys.MOD_LEFTALT, 0, ALT_DOWN_MS)
+                // Alt 与第一位数字合并发送，省 1 个报告/字
                 for (ch in digits) {
                     queue(HidKeys.MOD_LEFTALT, HidKeys.KP_DIGITS[ch - '0'], KEY_DOWN_MS)
-                    queue(HidKeys.MOD_LEFTALT, 0, KEY_UP_MS)
+                    queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 queue(0, 0, ALT_FINAL_MS)
             }
             else -> { // MODE_DECIMAL：Alt+0+十进制（必须带前导 0，否则 Windows 按 ANSI 码页取模）
                 val digits = "0$cp"
-                queue(HidKeys.MOD_LEFTALT, 0, ALT_DOWN_MS)
+                // Alt 与第一位数字（前导 0）合并发送，省 1 个报告/字
                 for (ch in digits) {
                     queue(HidKeys.MOD_LEFTALT, HidKeys.KP_DIGITS[ch - '0'], KEY_DOWN_MS)
-                    queue(HidKeys.MOD_LEFTALT, 0, KEY_UP_MS)
+                    queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 queue(0, 0, ALT_FINAL_MS)
             }
@@ -329,13 +360,22 @@ class TypingEngine(private val send: (ByteArray) -> Unit) {
         return Pair(modifier, key)
     }
 
-    /** 发送一份 8 字节报告并等待（速度缩放） */
+    /** 发送一份 8 字节报告并等待（速度缩放）；发送失败自动重试，中断则抛异常终止本次输入 */
     private suspend fun queue(modifier: Int, key: Int, delayMs: Int) {
         val report = ByteArray(8)
         report[0] = modifier.toByte()
         report[2] = key.toByte()
-        send(report)
+        sendReportWithRetry(report)
         delay(scaled(delayMs))
+    }
+
+    private suspend fun sendReportWithRetry(report: ByteArray) {
+        var attempts = 0
+        while (!send(report)) {
+            attempts++
+            if (attempts >= SEND_MAX_RETRIES) throw HidSendInterruptedException()
+            delay(SEND_RETRY_WAIT_MS)
+        }
     }
 
     private fun scaled(ms: Int): Long {
@@ -343,4 +383,7 @@ class TypingEngine(private val send: (ByteArray) -> Unit) {
         val v = ms.toLong() * SPEED_SCALES[idx] / 1000L
         return if (v < MIN_DELAY_MS) MIN_DELAY_MS else v
     }
+
+    /** 发送彻底失败（连接中断）时抛出，用于终止长文本输入 */
+    private class HidSendInterruptedException : Exception()
 }

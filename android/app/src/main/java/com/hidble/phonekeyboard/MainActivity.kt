@@ -9,7 +9,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -45,6 +48,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var commandLog: TextView
     private lateinit var deviceList: ListView
 
+    private lateinit var llmInput: EditText
+    private lateinit var llmOutput: EditText
+    private lateinit var llmSendButton: Button
+    private lateinit var llmSendToKeyboardButton: Button
+    private lateinit var llmClearButton: Button
+    private lateinit var llmSettingsButton: Button
+    private lateinit var llmSettingsTopButton: Button
+
     private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
 
@@ -57,6 +68,13 @@ class MainActivity : AppCompatActivity() {
     private var savedSpeedLevel = DEFAULT_SPEED_LEVEL
     private val phrases = mutableListOf<String>()
     private lateinit var prefs: android.content.SharedPreferences
+
+    // 大模型配置与对话
+    private var llmProviderId = LlmProviders.list.first().id
+    private var llmApiKey = ""
+    private var llmModel = ""
+    private val llmHistory = mutableListOf<Pair<String, String>>()
+    private var llmBusy = false
 
     // 开关状态由回调刷新时抑制监听器，避免死循环
     private var suppressSwitchEvent = false
@@ -99,6 +117,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 从模型设置页返回后重新读取配置（Token/模型/提供方）
+        loadLlmPrefs()
         // 蓝牙可能在此前未开启，重新获取 HID profile
         hidManager.init()
         if (registered) {
@@ -127,6 +147,15 @@ class MainActivity : AppCompatActivity() {
         phraseButton = findViewById(R.id.phraseButton)
         commandLog = findViewById(R.id.commandLog)
 
+        // 大模型对话
+        llmInput = findViewById(R.id.llmInput)
+        llmOutput = findViewById(R.id.llmOutput)
+        llmSendButton = findViewById(R.id.llmSendButton)
+        llmSendToKeyboardButton = findViewById(R.id.llmSendToKeyboardButton)
+        llmClearButton = findViewById(R.id.llmClearButton)
+        llmSettingsButton = findViewById(R.id.llmSettingsButton)
+        llmSettingsTopButton = findViewById(R.id.llmSettingsTopButton)
+
         // 已配对设备列表
         deviceList = findViewById(R.id.deviceList)
         deviceListAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceNames)
@@ -137,6 +166,16 @@ class MainActivity : AppCompatActivity() {
         savedSpeedLevel = prefs.getInt(KEY_SPEED_LEVEL, DEFAULT_SPEED_LEVEL)
         speedInput.setText(savedSpeedLevel.toString())
         loadPhrases()
+        loadLlmPrefs()
+
+        // 对话输出框可编辑，改动自动保存（重启 App 后仍在）
+        llmOutput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                prefs.edit().putString(LlmPrefs.KEY_OUTPUT, s?.toString() ?: "").apply()
+            }
+        })
 
         updateConnectionState()
     }
@@ -144,7 +183,14 @@ class MainActivity : AppCompatActivity() {
     private fun initHid() {
         hidManager = HidDeviceManager(this)
         hidManager.init()
-        hidProtocol = HidProtocol(TypingEngine { data -> hidManager.sendReport(data) })
+        hidProtocol = HidProtocol(
+            TypingEngine(
+                send = { data -> hidManager.sendReport(data) },
+                onSendInterrupted = { sent ->
+                    appendLog("发送中断：蓝牙连接可能已断开（已发送 $sent 字），请检查连接后重试")
+                }
+            )
+        )
 
         hidManager.onAppStatusChanged = { reg ->
             runOnUiThread {
@@ -337,6 +383,25 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnCtrlS).setOnClickListener {
             lifecycleScope.launch { hidProtocol.save(); appendLog("Ctrl+S") }
         }
+
+        // ===== 大模型对话 =====
+        llmSettingsButton.setOnClickListener { openLlmSettings() }
+        llmSettingsTopButton.setOnClickListener { openLlmSettings() }
+
+        llmSendButton.setOnClickListener { sendToLlm() }
+
+        // 输入框软键盘“发送”键
+        llmInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendToLlm()
+                true
+            } else {
+                false
+            }
+        }
+
+        llmSendToKeyboardButton.setOnClickListener { sendOutputToKeyboard() }
+        llmClearButton.setOnClickListener { clearLlmConversation() }
     }
 
     /** 请求系统开启“对附近设备可见”，电脑才能搜索到本机 */
@@ -373,6 +438,9 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             lifecycleScope.launch {
+                if (text.length > TypingEngine.CHUNK_SIZE) {
+                    appendLog("文本较长（${text.length} 字），已自动分段发送")
+                }
                 hidProtocol.typeText(text)
                 appendLog("发送文本: $text")
                 textInput.text.clear()
@@ -394,6 +462,106 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putInt(KEY_SPEED_LEVEL, level).apply()
         hidProtocol.setSpeed(level)
         appendLog("输入速度已设为 $level（1-10）")
+    }
+
+    // ===== 大模型对话 =====
+
+    private fun loadLlmPrefs() {
+        llmProviderId = prefs.getString(LlmPrefs.KEY_PROVIDER, null) ?: LlmProviders.list.first().id
+        llmApiKey = prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: ""
+        llmModel = prefs.getString(LlmPrefs.KEY_MODEL, "") ?: ""
+        llmOutput.setText(prefs.getString(LlmPrefs.KEY_OUTPUT, "") ?: "")
+    }
+
+    private fun saveLlmOutput() {
+        prefs.edit().putString(LlmPrefs.KEY_OUTPUT, llmOutput.text.toString()).apply()
+    }
+
+    private fun appendOutput(text: String) {
+        val current = llmOutput.text.toString()
+        llmOutput.setText(if (current.isBlank()) text else "$current\n$text")
+        llmOutput.setSelection(llmOutput.text.length)
+    }
+
+    /** 进入模型设置二级页面（选择提供方自动填预设模型，只填 Token 即可） */
+    private fun openLlmSettings() {
+        startActivity(Intent(this, LlmSettingsActivity::class.java))
+    }
+
+    private fun sendToLlm() {
+        val text = llmInput.text.toString().trim()
+        if (text.isEmpty()) return
+        val provider = LlmProviders.byId(llmProviderId)
+        val model = llmModel.ifBlank { provider.defaultModel }
+        if (provider.needsKey && llmApiKey.isBlank()) {
+            Toast.makeText(this, "请先在“模型设置”里填写 API Token", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (model.isBlank()) {
+            Toast.makeText(this, "请先在“模型设置”里填写模型名", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (llmBusy) {
+            Toast.makeText(this, "正在等待模型回复，请稍候", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        llmBusy = true
+        llmSendButton.isEnabled = false
+        appendOutput("我：$text")
+        llmHistory.add("user" to text)
+        llmInput.text.clear()
+        appendLog("已发送给模型（${provider.displayName} / $model），等待回复...")
+
+        lifecycleScope.launch {
+            val reply = try {
+                LlmClient.chat(
+                    provider,
+                    llmApiKey,
+                    model,
+                    listOf("system" to "你是简洁的助手。") + llmHistory
+                )
+            } catch (e: Exception) {
+                appendLog("模型调用失败：${e.message}")
+                null
+            }
+            if (reply == null) {
+                Toast.makeText(this@MainActivity, "模型调用失败，详情见日志", Toast.LENGTH_SHORT).show()
+            } else {
+                llmHistory.add("assistant" to reply)
+                appendOutput("AI：$reply")
+                appendLog("模型已回复")
+            }
+            llmBusy = false
+            llmSendButton.isEnabled = true
+        }
+    }
+
+    /** 把对话输出框（可编辑）的内容整体发送到蓝牙键盘 */
+    private fun sendOutputToKeyboard() {
+        val text = llmOutput.text.toString().trim()
+        if (text.isEmpty()) {
+            Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!connected) {
+            Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            if (text.length > TypingEngine.CHUNK_SIZE) {
+                appendLog("对话内容较长（${text.length} 字），已自动分段发送")
+            }
+            hidProtocol.typeText(text)
+            appendLog("已把对话内容发送到电脑")
+        }
+    }
+
+    private fun clearLlmConversation() {
+        llmOutput.setText("")
+        llmHistory.clear()
+        saveLlmOutput()
+        appendLog("对话已清空")
     }
 
     // ===== 常用语句 =====

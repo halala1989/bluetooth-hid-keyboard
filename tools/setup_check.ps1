@@ -1,4 +1,4 @@
-# PowerShell 环境自检：克隆完仓库后让 ChatGPT/本人运行，确认环境是否齐全
+﻿# PowerShell 环境自检：克隆完仓库后让 ChatGPT/本人运行，确认环境是否齐全
 # 用法:  powershell -ExecutionPolicy Bypass -File tools\setup_check.ps1
 $ErrorActionPreference = "Continue"
 

@@ -34,6 +34,14 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <Button
+                android:id="@+id/llmSettingsTopButton"
+                style="@style/KeyButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:text="模型设置" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -207,6 +215,120 @@
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- 大模型对话卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="大模型对话"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <Button
+                    android:id="@+id/llmSettingsButton"
+                    style="@style/KeyButton"
+                    android:text="模型设置" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="选提供方 + 填 Token 后即可对话；对话显示在下框（可直接编辑），点“发送到键盘”把内容打到电脑。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/llmInput"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:hint="输入要问模型的话..."
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textColorHighlight="#334FC3F7"
+                    android:textSize="15sp"
+                    android:singleLine="true"
+                    android:inputType="text"
+                    android:imeOptions="actionSend"
+                    android:importantForAutofill="no" />
+
+                <Button
+                    android:id="@+id/llmSendButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="0.45"
+                    android:text="发送给模型" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/llmOutput"
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:background="@drawable/bg_log"
+                android:padding="10dp"
+                android:hint="对话内容会显示在这里，可直接编辑"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="13sp"
+                android:gravity="top|start"
+                android:scrollbars="vertical"
+                android:inputType="textMultiLine"
+                android:lineSpacingExtra="2dp"
+                android:layout_marginTop="8dp"
+                android:importantForAutofill="no" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/llmSendToKeyboardButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:text="发送到键盘" />
+
+                <Button
+                    android:id="@+id/llmClearButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="0.6"
+                    android:layout_marginStart="8dp"
+                    android:text="清空" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 功能键卡片 -->

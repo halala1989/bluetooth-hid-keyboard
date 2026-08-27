@@ -18,6 +18,7 @@
    - `README.md`（项目说明）
    - `docs/MIGRATION.md`（迁移指南）
    - `docs/HISTORY.md`（开发历史）
+   - `docs/CONTINUE_DEV.md`（当前开发状态与交接说明，最新）
 3. 确认当前在默认分支 `phone-keyboard`；运行 `git branch -a` 和 `git tag`，
    确认 `master` 分支和 `v1.0/v1.1/v1.2/v10/v11` 这些标签都在。
 4. 运行仓库里的 `tools/setup_check.ps1` 检查环境（git / JDK / Android SDK 等），
