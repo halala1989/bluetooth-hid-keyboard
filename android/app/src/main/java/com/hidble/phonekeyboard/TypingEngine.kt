@@ -241,6 +241,16 @@ class TypingEngine(
         when (unicodeMode) {
             MODE_ALTX -> {
                 val digits = Integer.toHexString(cp).uppercase(Locale.ROOT)
+                // 关键修复：先打 "U+" 前缀，再打十六进制码，最后 Alt+X。
+                // Word/记事本会把光标前所有相邻十六进制字符读成一个码点；前面有数字/字母时
+                // （如日期 "2025" 后面接 "5E74"）会被合并成超长无效码点导致不转换/乱码。
+                // "U+" 是微软官方给出的消除歧义写法，转换时会被应用本身吃掉，不留残余。
+                queue(0, 0, CHAR_GAP_MS)
+                val u = asciiToHid('U') ?: return
+                queue(u.first, u.second, KEY_DOWN_MS)
+                queue(0, 0, CHAR_GAP_MS)
+                val plus = asciiToHid('+') ?: return
+                queue(plus.first, plus.second, KEY_DOWN_MS)
                 queue(0, 0, CHAR_GAP_MS)
                 for (ch in digits) {
                     val hit = asciiToHid(ch) ?: return
