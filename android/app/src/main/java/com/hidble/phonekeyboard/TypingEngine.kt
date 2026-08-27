@@ -154,6 +154,9 @@ class TypingEngine(
         private const val KEY_UP_MS = 15
         // 字符抬起后不再额外等待：下一键的按下延迟负责拉开间距
         private const val CHAR_GAP_MS = 0
+        // Alt 组合收尾：按 Alt+X（或松开 Alt）前先停顿，让宿主应用把最后一位数字写进文档，
+        // 避免 Alt+X 来得太早导致不转换/丢字（此停顿随速度缩放，最慢档最稳）
+        private const val ALT_PRE_MS = 100
         private const val ALT_FINAL_MS = 40
         private const val MIN_DELAY_MS = 1L
         /** 长文本自动分段：每段字符数 */
@@ -163,8 +166,8 @@ class TypingEngine(
         /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
         private const val SEND_MAX_RETRIES = 50
         private const val SEND_RETRY_WAIT_MS = 20L
-        // 1=最慢 .. 10=最快；高速度档只保留 1-2ms 最小间隔（余下由蓝牙链路节奏决定）
-        private val SPEED_SCALES = intArrayOf(2000, 1550, 1200, 900, 650, 450, 300, 180, 100, 60)
+        // 1=最慢 .. 10=最快；最低档更慢、档间差值拉开，慢档更稳（降低随机丢字/转换失败）
+        private val SPEED_SCALES = intArrayOf(4000, 3300, 2700, 2100, 1600, 1150, 780, 500, 260, 80)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -257,6 +260,8 @@ class TypingEngine(
                     queue(hit.first, hit.second, KEY_DOWN_MS)
                     queue(0, 0, CHAR_GAP_MS)
                 }
+                // 停顿后再按 Alt+X：保证最后一位数字已被应用写入文档
+                delay(scaled(ALT_PRE_MS))
                 queue(HidKeys.MOD_LEFTALT, HidKeys.KEY_X, KEY_DOWN_MS)
                 queue(0, 0, ALT_FINAL_MS)
             }
@@ -271,6 +276,8 @@ class TypingEngine(
                     // 数字抬起不再额外等待：蓝牙链路本身有传输间隔，下一键的按下延迟负责拉开间距
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
+                // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
+                delay(scaled(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
             MODE_GBK -> {
@@ -281,6 +288,8 @@ class TypingEngine(
                     queue(HidKeys.MOD_LEFTALT, HidKeys.KP_DIGITS[ch - '0'], KEY_DOWN_MS)
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
+                // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
+                delay(scaled(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
             else -> { // MODE_DECIMAL：Alt+0+十进制（必须带前导 0，否则 Windows 按 ANSI 码页取模）
@@ -290,6 +299,8 @@ class TypingEngine(
                     queue(HidKeys.MOD_LEFTALT, HidKeys.KP_DIGITS[ch - '0'], KEY_DOWN_MS)
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
+                // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
+                delay(scaled(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
         }
