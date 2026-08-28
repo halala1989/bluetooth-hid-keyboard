@@ -158,11 +158,14 @@ class TypingEngine(
         // 避免 Alt+X 来得太早导致不转换/丢字（此停顿随速度缩放，最慢档最稳）
         private const val ALT_PRE_MS = 100
         private const val ALT_FINAL_MS = 40
-        private const val MIN_DELAY_MS = 1L
+        // 蓝牙 HID 报告传输间隔约 10ms：低于此值发送只是往缓冲里堆报告，
+        // 缓冲溢出会静默丢报告 -> 键位/修饰键残留 -> 目标机误操作（全选删除等）。
+        // 因此把所有报告的最小间隔设为 10ms，等于链路物理速率，宁可稳不可丢。
+        private const val MIN_DELAY_MS = 10L
         /** 长文本自动分段：每段字符数 */
-        const val CHUNK_SIZE = 80
+        const val CHUNK_SIZE = 40
         /** 段间暂停，让蓝牙发送缓冲消化，避免长文本高速发送时丢字 */
-        private const val CHUNK_FLUSH_MS = 20L
+        private const val CHUNK_FLUSH_MS = 40L
         /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
         private const val SEND_MAX_RETRIES = 50
         private const val SEND_RETRY_WAIT_MS = 20L
@@ -181,11 +184,19 @@ class TypingEngine(
     var speedLevel: Int = 5
 
     private var capsLock = false
+    private var numLock = false
+    private var ledKnown = false
+    private var gbkNumLockWarned = false
     private val mutex = Mutex()
 
-    /** 由 HID 输出报告（LED）更新键盘状态；bit1 = CapsLock */
+    /** GBK 模式需要目标机 NumLock 开启；未开启时回调（每次发送最多提示一次） */
+    var onGbkNumLockWarning: (() -> Unit)? = null
+
+    /** 由 HID 输出报告（LED）更新键盘状态；bit0 = NumLock，bit1 = CapsLock */
     fun onLedReport(led: Int) {
         capsLock = (led and 0x02) != 0
+        numLock = (led and 0x01) != 0
+        ledKnown = true
     }
 
     /**
@@ -197,6 +208,9 @@ class TypingEngine(
         val cps = text.codePoints().toArray()
         var sent = 0
         try {
+            gbkNumLockWarned = false
+            // 发送前先清掉目标端可能残留的按键/修饰键状态（避免误触全选/快捷键导致删光文本）
+            releaseAll()
             for (cp in cps) {
                 if (cp == '\r'.code) continue
                 if (cp == '\n'.code) {
@@ -217,7 +231,18 @@ class TypingEngine(
                 if (sent % CHUNK_SIZE == 0) delay(CHUNK_FLUSH_MS)
             }
         } catch (e: HidSendInterruptedException) {
+            releaseAll()
             onSendInterrupted?.invoke(sent)
+        }
+        releaseAll()
+    }
+
+    /** 发送全释放报告（尽力而为），清空目标端可能残留的按键/修饰键状态 */
+    fun releaseAll() {
+        try {
+            send(ByteArray(8))
+        } catch (e: Exception) {
+            // 忽略：尽力而为
         }
     }
 
@@ -283,6 +308,11 @@ class TypingEngine(
             MODE_GBK -> {
                 val gbk = gbkValue(cp)
                 val digits = if (gbk != null) gbk.toString() else "0$cp"
+                // NumLock 未开启时小键盘数字会变成方向键：提示用户，避免误全选/误删
+                if (ledKnown && !numLock && !gbkNumLockWarned) {
+                    gbkNumLockWarned = true
+                    onGbkNumLockWarning?.invoke()
+                }
                 // Alt 与第一位数字合并发送，省 1 个报告/字
                 for (ch in digits) {
                     queue(HidKeys.MOD_LEFTALT, HidKeys.KP_DIGITS[ch - '0'], KEY_DOWN_MS)

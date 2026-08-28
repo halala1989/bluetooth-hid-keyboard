@@ -186,7 +186,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="滑块位置直接决定输入速度：1=最慢（最稳，中文乱码更少），10=最快（默认 5）。拖动即生效。"
+                android:text="1=最慢最稳，10=最快（默认 5），拖动即生效；8-10 已接近蓝牙物理上限，过快会丢字，推荐 5-7 档稳定使用。GBK 模式需目标电脑开启 NumLock。"
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="2dp" />

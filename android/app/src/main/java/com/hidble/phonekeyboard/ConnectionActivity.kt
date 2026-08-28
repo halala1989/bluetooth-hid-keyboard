@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
@@ -56,7 +57,14 @@ class ConnectionActivity : AppCompatActivity() {
                     .setMessage("确定要连接到 $name 吗？")
                     .setPositiveButton("连接") { _, _ ->
                         LogStore.append("正在连接 $name...")
-                        MainActivity.instance?.connectToDevice(device)
+                        val main = MainActivity.instance
+                        if (main == null) {
+                            LogStore.append("主界面未运行，请先回到主界面")
+                            Toast.makeText(this, "主界面未运行，请先回到主界面", Toast.LENGTH_SHORT).show()
+                        } else {
+                            main.connectToDevice(device)
+                            Toast.makeText(this, "正在连接 $name...", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     .setNegativeButton("取消", null)
                     .show()

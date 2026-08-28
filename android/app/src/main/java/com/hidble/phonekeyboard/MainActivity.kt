@@ -154,6 +154,8 @@ class MainActivity : AppCompatActivity() {
         loadLlmPrefs()
         // 蓝牙可能在此前未开启，重新获取 HID profile
         hidManager.init()
+        // 键盘已注册但连接掉了：回到前台时尝试恢复
+        hidManager.reconnectIfNeeded()
         if (registered) {
             refreshConnectionPage()
         }
@@ -232,13 +234,17 @@ class MainActivity : AppCompatActivity() {
     private fun initHid() {
         hidManager = HidDeviceManager(this)
         hidManager.init()
+        val engine = TypingEngine(
+            send = { data -> hidManager.sendReport(data) },
+            onSendInterrupted = { sent ->
+                appendLog("发送中断：蓝牙连接可能已断开（已发送 $sent 字），请检查连接后重试")
+            }
+        )
+        engine.onGbkNumLockWarning = {
+            appendLog("提示：目标电脑 NumLock 未开启，GBK 输入会变成方向键并可能误选/误删文本；请先在电脑上按一次 NumLock 再发送")
+        }
         hidProtocol = HidProtocol(
-            TypingEngine(
-                send = { data -> hidManager.sendReport(data) },
-                onSendInterrupted = { sent ->
-                    appendLog("发送中断：蓝牙连接可能已断开（已发送 $sent 字），请检查连接后重试")
-                }
-            )
+            engine
         )
         hidProtocol.setSpeed(savedSpeedLevel)
         hidProtocol.setUnicodeMode(savedUnicodeMode)
@@ -335,7 +341,7 @@ class MainActivity : AppCompatActivity() {
                 val desc = when (mode) {
                     TypingEngine.MODE_HEX -> "十六进制（Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效）"
                     TypingEngine.MODE_DECIMAL -> "十进制（Alt+0+码点，记事本/Word 等）"
-                    TypingEngine.MODE_GBK -> "GBK 机内码（仅中文版 Windows）"
+                    TypingEngine.MODE_GBK -> "GBK 机内码（仅中文版 Windows，需 NumLock）"
                     else -> "Alt+X（默认，记事本/Word 等，无需注册表）"
                 }
                 appendLog("中文输入模式: $desc")
@@ -401,6 +407,10 @@ class MainActivity : AppCompatActivity() {
 
     /** 连接管理页：点选已配对设备连接 */
     fun connectToDevice(device: BluetoothDevice) {
+        if (!hidManager.isRegistered()) {
+            appendLog("键盘未启动，先启动蓝牙键盘再连接...")
+            registerKeyboard()
+        }
         hidManager.connect(device)
     }
 
@@ -421,6 +431,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 action(hidProtocol)
             } finally {
+                hidProtocol.releaseAll()
                 setKeepScreenOn(false)
             }
         }
@@ -520,6 +531,7 @@ class MainActivity : AppCompatActivity() {
                     appendLog("文本发送已中止")
                     throw e
                 } finally {
+                    hidProtocol.releaseAll()
                     setKeepScreenOn(false)
                     sendJob = null
                     sendButton.text = "发送到键盘"
@@ -695,6 +707,7 @@ class MainActivity : AppCompatActivity() {
                 appendLog("对话发送已中止")
                 throw e
             } finally {
+                hidProtocol.releaseAll()
                 setKeepScreenOn(false)
                 llmSendJob = null
                 llmSendToKeyboardButton.text = "发送到键盘"

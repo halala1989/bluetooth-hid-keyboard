@@ -30,6 +30,11 @@ class HidDeviceManager(private val context: Context) {
         private const val TAG = "HidDeviceManager"
         /** 电脑端显示的名称 */
         const val KEYBOARD_NAME = "手机蓝牙键盘"
+        /** 掉线后自动重连：最多尝试次数与间隔 */
+        private const val MAX_RECONNECT_ATTEMPTS = 3
+        private const val RECONNECT_DELAY_MS = 2000L
+        /** connect() 内部重试上限 */
+        private const val CONNECT_MAX_RETRY = 6
 
         /**
          * 标准键盘 HID Report Descriptor（8 字节报告：modifier, reserved, key0..key5）
@@ -78,6 +83,10 @@ class HidDeviceManager(private val context: Context) {
     private var hidDevice: BluetoothHidDevice? = null
     private var registered = false
     private var hostDevice: BluetoothDevice? = null
+    /** 最近一次成功连接过的主机（掉线后保留，用于自动重连） */
+    private var lastHost: BluetoothDevice? = null
+    private var reconnectAttempts = 0
+    private var connectRetry = 0
 
     var onAppStatusChanged: ((Boolean) -> Unit)? = null
     var onConnectionStateChanged: ((BluetoothDevice?, Int) -> Unit)? = null
@@ -94,8 +103,16 @@ class HidDeviceManager(private val context: Context) {
 
         override fun onServiceDisconnected(profile: Int) {
             if (profile == BluetoothProfile.HID_DEVICE) {
+                val wasRegistered = registered
                 hidDevice = null
                 Log.d(TAG, "HID_DEVICE service disconnected")
+                if (wasRegistered) {
+                    // 蓝牙 HID 服务重启后自动恢复注册，避免连接悄悄丢失
+                    mainHandler.postDelayed({
+                        init()
+                        if (!registered) register()
+                    }, 800)
+                }
             }
         }
     }
@@ -109,8 +126,17 @@ class HidDeviceManager(private val context: Context) {
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             if (state == BluetoothProfile.STATE_CONNECTED) {
                 hostDevice = device
+                lastHost = device
+                reconnectAttempts = 0
+                // 连接/重连成功后先清一次键盘状态，避免主机端残留上次的按键
+                try {
+                    hidDevice?.sendReport(device, 0, ByteArray(8))
+                } catch (e: Exception) {
+                    Log.e(TAG, "sendReport reset error", e)
+                }
             } else if (state == BluetoothProfile.STATE_DISCONNECTED && device == hostDevice) {
                 hostDevice = null
+                maybeReconnect()
             }
             mainHandler.post { onConnectionStateChanged?.invoke(device, state) }
         }
@@ -203,14 +229,59 @@ class HidDeviceManager(private val context: Context) {
         }
     }
 
-    /** 主动连接一个已配对主机（多数电脑配对后会自动连接，可不调用） */
+    /** 主动连接一个已配对主机；键盘未注册会自动先注册，服务未就绪会自动重试 */
     fun connect(device: BluetoothDevice) {
+        lastHost = device
+        if (hidDevice == null) {
+            if (connectRetry >= CONNECT_MAX_RETRY) {
+                connectRetry = 0
+                onError?.invoke("连接失败：蓝牙键盘服务未就绪")
+                return
+            }
+            connectRetry++
+            init()
+            mainHandler.postDelayed({ connect(device) }, 500)
+            return
+        }
+        if (!registered) {
+            if (connectRetry >= CONNECT_MAX_RETRY) {
+                connectRetry = 0
+                onError?.invoke("连接失败：请先开启模拟蓝牙键盘")
+                return
+            }
+            connectRetry++
+            register()
+            mainHandler.postDelayed({ connect(device) }, 600)
+            return
+        }
+        connectRetry = 0
         try {
             val ok = hidDevice?.connect(device) ?: false
-            if (!ok) onError?.invoke("连接失败，请确认电脑已配对")
+            if (!ok) onError?.invoke("连接失败，请确认电脑已开启蓝牙")
         } catch (e: SecurityException) {
             onError?.invoke("蓝牙权限被拒绝: ${e.message}")
         }
+    }
+
+    /** 回到前台或手动触发时：已注册但未连接且知道上次主机，尝试恢复连接 */
+    fun reconnectIfNeeded() {
+        val target = lastHost
+        if (registered && !isConnected() && target != null) {
+            connect(target)
+        }
+    }
+
+    /** 掉线后自动重连（最多 MAX_RECONNECT_ATTEMPTS 次，间隔 2 秒） */
+    private fun maybeReconnect() {
+        if (!registered || lastHost == null) return
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return
+        reconnectAttempts++
+        val target = lastHost
+        mainHandler.postDelayed({
+            if (registered && !isConnected() && target != null) {
+                connect(target)
+            }
+        }, RECONNECT_DELAY_MS)
     }
 
     fun disconnect() {

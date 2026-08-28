@@ -51,6 +51,11 @@ class HidProtocol(private val engine: TypingEngine) {
         engine.speedLevel = level
     }
 
+    /** 发送全释放报告，清空目标端可能残留的按键/修饰键状态 */
+    fun releaseAll() {
+        engine.releaseAll()
+    }
+
     // 常用组合键快捷方法
     suspend fun copy() = pressCombo(Modifier.CTRL, SpecialKey.C)
     suspend fun paste() = pressCombo(Modifier.CTRL, SpecialKey.V)
