@@ -7,8 +7,8 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v1.5**（versionCode 6 / versionName "1.5"；v1.3、v1.4 已于 2026-08-28 正式发布归档：
-  `releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4）
+- 版本：**v2.0 Beta（开发版）**（versionCode 7 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+  v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
 - 2026-08-28 晚新增 **v1.5**：大模型对话「提示词预设下拉」（详见下文“最新一轮”）
@@ -238,4 +238,4 @@
 
 - 直接在本分支 `phone-keyboard` 上提交并 `git push origin phone-keyboard`（与历史一致）。
 - 提交信息用中文、带 `feat(v1.x)` / `fix(v1.x)` 前缀；每次改完都重新编译 + 更新根目录 APK。
-- 版本号规则见 `releases/README.md`（每次 +0.1，当前 v1.5）。
+- 版本号规则见 `releases/README.md`（当前开发版定名 **v2.0 Beta**，versionName "2.0-beta"）。
