@@ -1,4 +1,4 @@
-# 继续开发交接（2026-08-27）
+# 继续开发交接（2026-08-28 更新）
 
 > 本文件是给“下一台电脑上的 ChatGPT/Codex”读的交接说明：
 > 克隆仓库后先读本文件 + `README.md` + `docs/HISTORY.md`，再按 `docs/ONBOARDING.md` 检查环境，即可接着开发。
@@ -7,11 +7,15 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v1.4**（versionCode 5 / versionName "1.4"；v1.3、v1.4 均尚未走正式发布归档流程）
+- 版本：**v1.5**（versionCode 6 / versionName "1.5"；v1.3、v1.4 已于 2026-08-28 正式发布归档：
+  `releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4）
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
-- 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号未变仍是 1.4
-- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-28 最新编译产物（含 Bug 修复）
+- 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
+- 2026-08-28 晚新增 **v1.5**：大模型对话「提示词预设下拉」（详见下文“最新一轮”）
+- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-28 晚 **v1.5** 编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
+- **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
+  另一台电脑（今早开发的那台）的目标机用 **GBK 模式**（必须 NumLock 开启）。两边代码相同，仅目标机模式/速度档位不同。
 
 ### 开发机构建环境（2026-08-27 实测路径，注意在 D 盘）
 
@@ -30,6 +34,22 @@
 - 手机上之前装的是“旧电脑调试签名”的包；新电脑重新编译后签名不同，安装会提示“签名不同”。
 - 已通过「卸载重装」解决；之后在同一台机器上继续编译安装不会再冲突。
 - 换新机器后若手机里已装别的签名包，需要卸载重装（或把旧机器 `~/.android/debug.keystore` 拷过来）。
+
+## 最新一轮（2026-08-28 晚 · v1.5：提示词预设下拉）
+
+需求：大模型对话卡片「发送给模型」按钮缩短，同一行右侧新增**提示词下拉菜单**；可新建/删除预设提示词，
+选中后发送前自动把提示词拼到输入前面（例如「书面化整理」：把与患者的交谈转成正式书面语言，去口语/语气词/多余符号制表符）。
+
+- 实现文件：`MainActivity.kt`（逻辑）、`activity_main.xml`（布局）、新增 `item_llm_prompt.xml` / `spinner_bg.xml` / `ic_arrow_down.xml`
+- 下拉项：`无提示词（直接发送）` / 已存预设（按名称显示） / `＋ 新建提示词…` / `✎ 删除提示词…`
+- 新建 = 弹窗填名称+内容；删除 = 点选删除；数据存 SharedPreferences（`llm_prompts`，JSON 数组），
+  当前选中存 `llm_selected_prompt`，重启保留
+- 发送逻辑：`text = 提示词内容 + "\n\n" + 用户输入`；对话框“我：”仍只显示用户原话；命令日志记录“已应用提示词「xxx」”
+- 内置示例预设「书面化整理」，默认不选中（保持“无提示词”）
+- 下拉带 ▼ 箭头指示（`spinner_bg`），避免看起来像普通输入框
+- 版本号升到 v1.5（versionCode 6）；根目录 APK 已更新并推送（commit `612253a`）
+
+> **给另一台电脑的 AI：本机（家用电脑）测试用 Alt+X 模式；另一台电脑（今早那台）目标机用 GBK 模式（NumLock 开启）。**
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 
@@ -138,8 +158,8 @@
 
 ## 三、已知限制 / 待办
 
-- [ ] 正式发布 v1.3 / v1.4：按 `releases/README.md` 归档 `releases/v1.3/`、`releases/v1.4/`（APK + RELEASE_NOTES.md）、
-      更新 `releases/LATEST`、打 git tag `v1.3`、`v1.4`（根目录最新副本已更新）。
+- [x] 正式发布 v1.3 / v1.4（2026-08-28 已完成：`releases/v1.3/`、`releases/v1.4/` + `releases/LATEST`=v1.4 + git tag `v1.3` `v1.4`）。
+- [ ] 正式发布 v1.5（若需要）：按 `releases/README.md` 归档 `releases/v1.5/`（APK + RELEASE_NOTES.md）、更新 `releases/LATEST`=v1.5、打 git tag `v1.5`。
 - [ ] 真机复测（2026-08-28 修复后）：GBK 模式在**目标机 NumLock 开启** + 速度 5-7 档下发长文本，
       确认不再出现“删除前面内容”；再逐步升档确认丢位情况。**不要为了“提速”再把 MIN_DELAY_MS 调回 10ms 以下**，
       那是丢报告/卡键/误全选删除的根源。
@@ -206,9 +226,9 @@
 
 ### 4. 待办（下次继续做的方向）
 
-- **正式发布 v1.3 + v1.4**（当前最大遗留项）：按 `releases/README.md` 建 `releases/v1.3/`、`releases/v1.4/`
-  （APK + RELEASE_NOTES.md）、更新 `releases/LATEST`、打 git tag `v1.3` `v1.4`。
-- 大模型：改流式输出；对话历史持久化；Token 换 EncryptedSharedPreferences；家用模型名可能更新。
+- ~~正式发布 v1.3 + v1.4~~（已完成，2026-08-28）。
+- 正式发布 v1.5（若需要）：归档 `releases/v1.5/` + 更新 `releases/LATEST` + 打 git tag `v1.5`。
+- 大模型：改流式输出；对话历史持久化；Token 换 EncryptedSharedPreferences（个人自用可暂缓）；家用模型名可能更新。
 - 历史规划：微软拼音 `vuc` 方案、一键 Shift 切换中英文（见 `HISTORY.md`）。
 - 真机压测：GBK/十六进制模式 8-10 档正确率；长文本发送时中止按钮是否即时。
 
@@ -216,4 +236,4 @@
 
 - 直接在本分支 `phone-keyboard` 上提交并 `git push origin phone-keyboard`（与历史一致）。
 - 提交信息用中文、带 `feat(v1.x)` / `fix(v1.x)` 前缀；每次改完都重新编译 + 更新根目录 APK。
-- 版本号规则见 `releases/README.md`（每次 +0.1，当前 v1.4）。
+- 版本号规则见 `releases/README.md`（每次 +0.1，当前 v1.5）。
