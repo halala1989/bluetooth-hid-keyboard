@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 提示词下拉背景：圆角输入框样式 + 右侧下拉箭头 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_input" />
+    <item
+        android:drawable="@drawable/ic_arrow_down"
+        android:gravity="right|center_vertical"
+        android:right="12dp" />
+</layer-list>

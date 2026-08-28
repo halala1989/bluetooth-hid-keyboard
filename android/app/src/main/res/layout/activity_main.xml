@@ -309,11 +309,12 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_input"
+                    android:background="@drawable/spinner_bg"
                     android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingEnd="34dp"
                     android:gravity="center_vertical"
-                    android:popupBackground="@color/card_background" />
+                    android:popupBackground="@color/card_background"
+                    android:contentDescription="提示词" />
             </LinearLayout>
 
             <!-- AI 思考状态（请求中显示，回复后隐藏） -->
