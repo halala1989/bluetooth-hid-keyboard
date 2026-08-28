@@ -288,13 +288,33 @@
                 android:fadeScrollbars="false"
                 android:importantForAutofill="no" />
 
-            <Button
-                android:id="@+id/llmSendButton"
-                style="@style/PrimaryButton"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:text="发送给模型" />
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/llmSendButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1.4"
+                    android:layout_marginEnd="4dp"
+                    android:text="发送给模型" />
+
+                <Spinner
+                    android:id="@+id/llmPromptSpinner"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:gravity="center_vertical"
+                    android:popupBackground="@color/card_background" />
+            </LinearLayout>
 
             <!-- AI 思考状态（请求中显示，回复后隐藏） -->
             <LinearLayout

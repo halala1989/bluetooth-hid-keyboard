@@ -37,6 +37,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -74,6 +75,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmSettingsButton: Button
     private lateinit var llmSettingsTopButton: Button
     private lateinit var unicodeModeSpinner: Spinner
+    private lateinit var llmPromptSpinner: Spinner
 
     private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
@@ -94,6 +96,14 @@ class MainActivity : AppCompatActivity() {
     private var llmModel = ""
     private val llmHistory = mutableListOf<Pair<String, String>>()
     private var llmBusy = false
+
+    // 提示词预设（名称 + 内容，发送前自动拼到用户输入前面）
+    private data class LlmPrompt(val name: String, val content: String)
+    private val llmPrompts = mutableListOf<LlmPrompt>()
+    private val llmPromptItems = mutableListOf<String>()
+    private var selectedPromptName: String? = null
+    private var suppressPromptEvent = false
+    private lateinit var llmPromptAdapter: ArrayAdapter<String>
 
     // 中文输入模式下拉（含绿色 √ 选中态）
     private lateinit var unicodeModeAdapter: UnicodeModeAdapter
@@ -197,6 +207,7 @@ class MainActivity : AppCompatActivity() {
         llmSettingsButton = findViewById(R.id.llmSettingsButton)
         llmSettingsTopButton = findViewById(R.id.llmSettingsTopButton)
         unicodeModeSpinner = findViewById(R.id.unicodeModeSpinner)
+        llmPromptSpinner = findViewById(R.id.llmPromptSpinner)
 
         // SharedPreferences
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -370,6 +381,7 @@ class MainActivity : AppCompatActivity() {
         llmSettingsTopButton.setOnClickListener { openLlmSettings() }
 
         llmSendButton.setOnClickListener { sendToLlm() }
+        setupPromptSpinner()
 
         llmSendToKeyboardButton.setOnClickListener { sendOutputToKeyboard() }
         llmClearButton.setOnClickListener { clearLlmConversation() }
@@ -584,14 +596,180 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ===== 提示词预设（下拉菜单：无提示词 / 已存预设 / 新建 / 删除） =====
+
+    private fun loadLlmPrompts() {
+        llmPrompts.clear()
+        val raw = prefs.getString(LlmPrefs.KEY_PROMPTS, null)
+        if (raw != null) {
+            try {
+                val arr = JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val name = obj.optString("name").trim()
+                    val content = obj.optString("content").trim()
+                    if (name.isNotEmpty() && content.isNotEmpty()) {
+                        llmPrompts.add(LlmPrompt(name, content))
+                    }
+                }
+            } catch (e: Exception) {
+                // 数据损坏时忽略，走默认预设
+            }
+        }
+        if (llmPrompts.isEmpty()) {
+            llmPrompts.add(LlmPrompt(
+                "书面化整理",
+                "这是一段与患者的交谈，请用正式、书面的语言重写下面的内容：" +
+                    "去除口语化表达、语气词、重复内容和多余的符号/制表符，使整段话专业、正式、通顺。"
+            ))
+        }
+        selectedPromptName = prefs.getString(LlmPrefs.KEY_SELECTED_PROMPT, null)
+        if (selectedPromptName != null && llmPrompts.none { it.name == selectedPromptName }) {
+            selectedPromptName = null
+        }
+        refreshPromptSpinner()
+    }
+
+    private fun saveLlmPrompts() {
+        val arr = JSONArray()
+        llmPrompts.forEach { p ->
+            arr.put(JSONObject().put("name", p.name).put("content", p.content))
+        }
+        prefs.edit().putString(LlmPrefs.KEY_PROMPTS, arr.toString()).apply()
+    }
+
+    private fun currentPromptPosition(): Int {
+        val idx = llmPrompts.indexOfFirst { it.name == selectedPromptName }
+        return if (idx >= 0) idx + 1 else 0
+    }
+
+    private fun refreshPromptSpinner() {
+        llmPromptItems.clear()
+        llmPromptItems.add("无提示词（直接发送）")
+        llmPrompts.forEach { llmPromptItems.add(it.name) }
+        llmPromptItems.add("＋ 新建提示词…")
+        llmPromptItems.add("✎ 删除提示词…")
+        llmPromptAdapter.notifyDataSetChanged()
+        suppressPromptEvent = true
+        llmPromptSpinner.setSelection(currentPromptPosition())
+        suppressPromptEvent = false
+    }
+
+    private fun setupPromptSpinner() {
+        llmPromptAdapter = ArrayAdapter(this, R.layout.item_llm_prompt, R.id.promptLabel, llmPromptItems)
+        llmPromptSpinner.adapter = llmPromptAdapter
+        llmPromptSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (suppressPromptEvent) return
+                val actionBase = llmPrompts.size + 1
+                when {
+                    position == 0 -> {
+                        selectedPromptName = null
+                        prefs.edit().remove(LlmPrefs.KEY_SELECTED_PROMPT).apply()
+                    }
+                    position in 1..llmPrompts.size -> {
+                        selectedPromptName = llmPrompts[position - 1].name
+                        prefs.edit().putString(LlmPrefs.KEY_SELECTED_PROMPT, selectedPromptName).apply()
+                    }
+                    position == actionBase -> {
+                        resetPromptSelectionSilently()
+                        showPromptCreateDialog()
+                    }
+                    position == actionBase + 1 -> {
+                        resetPromptSelectionSilently()
+                        showPromptDeleteDialog()
+                    }
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        loadLlmPrompts()
+    }
+
+    private fun resetPromptSelectionSilently() {
+        suppressPromptEvent = true
+        llmPromptSpinner.setSelection(currentPromptPosition())
+        suppressPromptEvent = false
+    }
+
+    private fun showPromptCreateDialog() {
+        val nameInput = EditText(this)
+        nameInput.hint = "提示词名称（如：书面化整理）"
+        nameInput.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        nameInput.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
+        nameInput.setBackgroundResource(R.drawable.bg_input)
+        nameInput.setPadding(dp(14), dp(10), dp(14), dp(10))
+
+        val contentInput = EditText(this)
+        contentInput.hint = "提示词内容（发送前自动拼到输入前面）"
+        contentInput.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        contentInput.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
+        contentInput.setBackgroundResource(R.drawable.bg_input)
+        contentInput.setPadding(dp(14), dp(10), dp(14), dp(10))
+        contentInput.minLines = 3
+        contentInput.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+
+        val container = android.widget.LinearLayout(this)
+        container.orientation = android.widget.LinearLayout.VERTICAL
+        container.setPadding(dp(20), dp(8), dp(20), 0)
+        val lp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        lp.bottomMargin = dp(10)
+        container.addView(nameInput, lp)
+        container.addView(contentInput)
+
+        AlertDialog.Builder(this)
+            .setTitle("新建提示词")
+            .setView(container)
+            .setPositiveButton("保存") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val content = contentInput.text.toString().trim()
+                if (name.isEmpty() || content.isEmpty()) {
+                    Toast.makeText(this, "名称和内容都不能为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                llmPrompts.add(LlmPrompt(name, content))
+                saveLlmPrompts()
+                selectedPromptName = name
+                prefs.edit().putString(LlmPrefs.KEY_SELECTED_PROMPT, name).apply()
+                refreshPromptSpinner()
+                appendLog("已新建提示词「$name」并选中")
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showPromptDeleteDialog() {
+        if (llmPrompts.isEmpty()) {
+            Toast.makeText(this, "还没有提示词", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = llmPrompts.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("选择要删除的提示词")
+            .setItems(names) { _, which ->
+                val removed = llmPrompts.removeAt(which)
+                saveLlmPrompts()
+                if (selectedPromptName == removed.name) selectedPromptName = null
+                prefs.edit().remove(LlmPrefs.KEY_SELECTED_PROMPT).apply()
+                refreshPromptSpinner()
+                appendLog("已删除提示词「${removed.name}」")
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     /** 进入模型设置二级页面（选择提供方自动填预设模型，只填 Token 即可） */
     private fun openLlmSettings() {
         startActivity(Intent(this, LlmSettingsActivity::class.java))
     }
 
     private fun sendToLlm() {
-        val text = llmInput.text.toString().trim()
-        if (text.isEmpty()) return
+        val userText = llmInput.text.toString().trim()
+        if (userText.isEmpty()) return
         val provider = LlmProviders.byId(llmProviderId)
         val model = llmModel.ifBlank { provider.defaultModel }
         if (provider.needsKey && llmApiKey.isBlank()) {
@@ -607,12 +785,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        val prompt = llmPrompts.firstOrNull { it.name == selectedPromptName }
+        val text = if (prompt != null) "${prompt.content.trim()}\n\n$userText" else userText
+
         llmBusy = true
         llmSendButton.isEnabled = false
         startThinking()
-        appendOutput("我：$text")
+        appendOutput("我：$userText")
         llmHistory.add("user" to text)
         llmInput.text.clear()
+        if (prompt != null) appendLog("已应用提示词「${prompt.name}」")
         appendLog("已发送给模型（${provider.displayName} / $model），等待回复...")
 
         lifecycleScope.launch {

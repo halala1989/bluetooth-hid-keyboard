@@ -15,7 +15,7 @@
 
 > 完整执行细节见 `docs/MIGRATION.md`；给 ChatGPT 的现成话术见 `docs/ONBOARDING.md`。
 
-**独立产品线 v1.4**（分支 `phone-keyboard`）：手机直接把自己注册成标准蓝牙键盘
+**独立产品线 v1.5**（分支 `phone-keyboard`）：手机直接把自己注册成标准蓝牙键盘
 （Android 9+ 系统的 `BluetoothHidDevice`），电脑蓝牙里添加“手机蓝牙键盘”配对后即可打字，**不依赖 Pico W**。
 App 里的中文输入、速度、常用语等体验沿袭旧版。
 
@@ -102,7 +102,7 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 ## 版本与回滚
 
-本产品线从 **v1.0** 开始递增归档（当前 v1.4）：
+本产品线从 **v1.0** 开始递增归档（当前 v1.5）：
 
 - 产物：`releases/vNN/`（APK + 发布说明），最新版另存于仓库根目录 `PhoneBluetoothKeyboard-debug.apk`。
 - 代码：每次发布打同名 git tag（`git tag v1.0`、`git tag v1.1`、`git tag v1.2` …）。

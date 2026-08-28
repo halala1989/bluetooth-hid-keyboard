@@ -41,6 +41,8 @@ object LlmPrefs {
     const val KEY_API_KEY = "llm_api_key"
     const val KEY_MODEL = "llm_model"
     const val KEY_OUTPUT = "llm_output"
+    const val KEY_PROMPTS = "llm_prompts"
+    const val KEY_SELECTED_PROMPT = "llm_selected_prompt"
 }
 
 /** OpenAI 兼容 Chat Completions 客户端（HttpURLConnection，无额外依赖，非流式） */
