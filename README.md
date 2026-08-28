@@ -69,7 +69,7 @@ tools/                  # 构建/校验脚本
 
 ### 1. 安装 Android App
 
-用 Android Studio 打开 `android/` 连接手机编译安装；或直接用 `releases/v1.0/PhoneBluetoothKeyboard-v1.0.apk`（要求 Android 9+）：
+用 Android Studio 打开 `android/` 连接手机编译安装；或直接用 `releases/v1.4/PhoneBluetoothKeyboard-v1.4.apk`（要求 Android 9+）：
 
 ```powershell
 cd android
@@ -112,4 +112,3 @@ android/app/build/outputs/apk/debug/app-debug.apk
 ## License
 
 MIT
-
