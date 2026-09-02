@@ -96,6 +96,11 @@
   选择仍走主下拉，不可编辑。
 - 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"）。
 
+### 2026-09-02 · v2.0-beta（修复流式回复串入 "null"）
+- 根因：`optString("content")` 对 JSON null（角色/思考/结束增量块）返回字面量 "null" 被拼进正文。
+- 修复：流式与非流式均改用 `opt("content")` + 类型判断，只接受真正的字符串内容。
+- 版本号 versionCode 9 → 10（versionName 仍为 "2.0-beta"）。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。

@@ -102,7 +102,9 @@ object LlmClient {
                 .optJSONArray("choices")
                 ?.optJSONObject(0)
                 ?.optJSONObject("message")
-                ?.optString("content")
+                ?.opt("content")
+                ?.takeIf { it is String && it.isNotEmpty() }
+                ?.toString()
             if (content.isNullOrBlank()) {
                 throw RuntimeException("模型返回为空，请检查模型名是否正确")
             }
@@ -169,12 +171,16 @@ object LlmClient {
                         val data = trimmed.removePrefix("data:").trim()
                         if (data == "[DONE]") break
                         try {
+                            // 只接受真正的字符串内容：角色切换/思考阶段/结束标记等增量块的
+                            // content 是 JSON null，optString 会返回字面量 "null" 导致正文串入 null。
                             val delta = JSONObject(data)
                                 .optJSONArray("choices")
                                 ?.optJSONObject(0)
                                 ?.optJSONObject("delta")
-                                ?.optString("content")
-                            if (!delta.isNullOrEmpty()) {
+                                ?.opt("content")
+                                ?.takeIf { it is String && it.isNotEmpty() }
+                                ?.toString()
+                            if (delta != null) {
                                 sb.append(delta)
                                 onDelta(delta)
                             }

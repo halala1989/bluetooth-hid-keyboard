@@ -7,7 +7,7 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 9 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 10 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
@@ -93,6 +93,15 @@
 
 - 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
 - 实现文件：`HidKeyboardService.kt`（新增）、`AndroidManifest.xml`、`MainActivity.kt`、`TypingEngine.kt`。
+
+## 最新一轮（2026-09-02 第三轮 · 修复流式回复串入大量 "null"）
+
+- 现象：发送给大模型后，回复正文前后出现一长串 `null`。
+- 根因：`JSONObject.optString("content")` 对 JSON `null`（角色切换/思考阶段/结束标记等无正文增量块）
+  会返回字面量字符串 `"null"`，被当成正文逐块拼进输出。
+- 修复（`LlmClient.kt`）：流式与非流式都改用 `opt("content")` + 类型判断，
+  只接受真正的非空字符串内容，空/null 增量一律跳过；思考阶段只显示“AI 正在思考…”动画，不产生 null。
+- 版本号 versionCode 9 → 10（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 
