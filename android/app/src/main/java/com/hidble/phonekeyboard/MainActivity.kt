@@ -97,6 +97,8 @@ class MainActivity : AppCompatActivity() {
     private var llmModel = ""
     private val llmHistory = mutableListOf<Pair<String, String>>()
     private var llmBusy = false
+    /** 流式输出中：跳过逐字着色/保存，结束时统一处理 */
+    private var llmStreaming = false
 
     // 提示词预设（名称 + 内容，发送前自动拼到用户输入前面）
     private data class LlmPrompt(val name: String, val content: String)
@@ -238,7 +240,7 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 prefs.edit().putString(LlmPrefs.KEY_OUTPUT, s?.toString() ?: "").apply()
-                applyLlmColors()
+                if (!llmStreaming) applyLlmColors()
             }
         })
     }
@@ -560,7 +562,37 @@ class MainActivity : AppCompatActivity() {
         llmApiKey = prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: ""
         llmModel = prefs.getString(LlmPrefs.KEY_MODEL, "") ?: ""
         llmOutput.setText(prefs.getString(LlmPrefs.KEY_OUTPUT, "") ?: "")
+        loadLlmHistory()
         applyLlmColors()
+    }
+
+    /** 对话历史持久化：重启 App 后保留多轮上下文（最多保留最近 40 条） */
+    private fun loadLlmHistory() {
+        llmHistory.clear()
+        val raw = prefs.getString(LlmPrefs.KEY_HISTORY, null) ?: return
+        try {
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val role = obj.optString("role")
+                val content = obj.optString("content")
+                if ((role == "user" || role == "assistant") && content.isNotEmpty()) {
+                    llmHistory.add(role to content)
+                }
+            }
+        } catch (e: Exception) {
+            llmHistory.clear()
+        }
+    }
+
+    private fun saveLlmHistory() {
+        // 只保留最近 40 条，避免请求体无限增长
+        val trimmed = llmHistory.takeLast(40)
+        val arr = JSONArray()
+        trimmed.forEach { (role, content) ->
+            arr.put(JSONObject().put("role", role).put("content", content))
+        }
+        prefs.edit().putString(LlmPrefs.KEY_HISTORY, arr.toString()).apply()
     }
 
     private fun appendOutput(text: String) {
@@ -897,29 +929,51 @@ class MainActivity : AppCompatActivity() {
         startThinking()
         appendOutput("我：$userText")
         llmHistory.add("user" to text)
+        saveLlmHistory()
         llmInput.text.clear()
         if (prompt != null) appendLog("已应用提示词「${prompt.name}」")
-        appendLog("已发送给模型（${provider.displayName} / $model），等待回复...")
+        appendLog("已发送给模型（${provider.displayName} / $model），正在流式回复...")
 
         lifecycleScope.launch {
+            var started = false
             val reply = try {
-                LlmClient.chat(
+                LlmClient.chatStream(
                     provider,
                     llmApiKey,
                     model,
                     listOf("system" to "你是简洁的助手。") + llmHistory
-                )
+                ) { delta ->
+                    if (!started) {
+                        started = true
+                        runOnUiThread {
+                            stopThinking()
+                            llmStreaming = true
+                            appendOutput("AI：")
+                        }
+                    }
+                    runOnUiThread {
+                        llmOutput.append(delta)
+                        llmOutput.setSelection(llmOutput.text.length)
+                    }
+                }
             } catch (e: Exception) {
                 appendLog("模型调用失败：${e.message}")
                 null
             }
             if (reply == null) {
-                Toast.makeText(this@MainActivity, "模型调用失败，详情见日志", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@MainActivity,
+                    if (started) "模型回复中断，详情见日志" else "模型调用失败，详情见日志",
+                    Toast.LENGTH_SHORT
+                ).show()
             } else {
                 llmHistory.add("assistant" to reply)
-                appendOutput("AI：$reply")
+                saveLlmHistory()
                 appendLog("模型已回复")
             }
+            llmStreaming = false
+            applyLlmColors()
+            prefs.edit().putString(LlmPrefs.KEY_OUTPUT, llmOutput.text.toString()).apply()
             llmBusy = false
             llmSendButton.isEnabled = true
             stopThinking()
@@ -1004,6 +1058,7 @@ class MainActivity : AppCompatActivity() {
     private fun clearLlmConversation() {
         llmOutput.setText("")
         llmHistory.clear()
+        prefs.edit().remove(LlmPrefs.KEY_HISTORY).apply()
         appendLog("对话已清空")
     }
 

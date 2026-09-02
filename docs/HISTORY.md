@@ -81,6 +81,12 @@
 - 功能基本完善，产品正式定名为 **2.0 Beta**（versionCode 7 / versionName "2.0-beta"）。
 - 后续测试中发现的 bug 将在 2.0 Beta 基础上修补，直至正式发布 2.0。
 
+### 2026-09-02 · v2.0-beta（大模型流式输出 + 对话历史持久化）
+- 流式输出：`LlmClient.chatStream`（SSE 逐行解析 `choices[0].delta.content`），
+  回复边生成边显示（首个增量到达前仍显示“AI 正在思考…”动画），流式期间跳过逐字着色/保存，结束统一处理。
+- 对话历史持久化：user/assistant 消息存 SharedPreferences（`llm_history`，最多 40 条），重启恢复多轮上下文；「清空」同步删除。
+- 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"）。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。

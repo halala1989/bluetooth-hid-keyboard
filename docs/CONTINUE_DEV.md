@@ -7,12 +7,13 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 7 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 8 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
 - 2026-08-28 晚新增 **v1.5**：大模型对话「提示词预设下拉」（详见下文“最新一轮”）
-- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-08-28 晚 **v1.5** 编译产物
+- 2026-09-02 新增：**大模型流式输出 + 对话历史持久化**（详见下文“最新一轮”）
+- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-02 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
   另一台电脑（今早开发的那台）的目标机用 **GBK 模式**（必须 NumLock 开启）。两边代码相同，仅目标机模式/速度档位不同。
@@ -52,6 +53,20 @@
   符合中国《病历书写基本规范》；按 `llm_prompt_preset_version` 增量补齐，不覆盖用户自定义
 
 > **给另一台电脑的 AI：本机（家用电脑）测试用 Alt+X 模式；另一台电脑（今早那台）目标机用 GBK 模式（NumLock 开启）。**
+
+## 最新一轮（2026-09-02 · 大模型流式输出 + 对话历史持久化）
+
+- **流式输出**（`LlmClient.chatStream` + `MainActivity.sendToLlm`）：
+  - 请求体加 `"stream": true`，`Accept: text/event-stream`，逐行读 SSE `data:` 块，
+    解析 `choices[0].delta.content` 增量回调；`data: [DONE]` 结束；
+  - UI：第一段到达前仍显示“AI 正在思考…”动画，首个增量到达后切到 `AI：` 行并逐字/逐段追加；
+  - 流式期间跳过逐字着色与保存（`llmStreaming` 标志），结束后统一 `applyLlmColors()` + 保存，避免卡顿；
+  - 设置页“测试连接”仍走原非流式 `chat()`。
+- **对话历史持久化**（`LlmPrefs.KEY_HISTORY`，JSON 数组）：
+  - 每轮 user/assistant 消息存入 SharedPreferences，重启 App 后 `loadLlmHistory()` 恢复多轮上下文；
+  - 最多保留最近 40 条，防止请求体无限增长；「清空」同时删除历史。
+- 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
+- 实现文件：`LlmClient.kt`、`MainActivity.kt`。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 
@@ -229,8 +244,9 @@
 ### 4. 待办（下次继续做的方向）
 
 - ~~正式发布 v1.3 + v1.4~~（已完成，2026-08-28）。
-- 正式发布 v1.5（若需要）：归档 `releases/v1.5/` + 更新 `releases/LATEST` + 打 git tag `v1.5`。
-- 大模型：改流式输出；对话历史持久化；Token 换 EncryptedSharedPreferences（个人自用可暂缓）；家用模型名可能更新。
+- ~~大模型流式输出~~（已完成，2026-09-02）；~~对话历史持久化~~（已完成，2026-09-02）。
+- 正式发布 v1.5 / v2.0-beta（若需要）：归档 `releases/v1.5/`（或按 2.0 定名）+ 更新 `releases/LATEST` + 打 git tag。
+- 大模型：Token 换 EncryptedSharedPreferences（个人自用可暂缓）；流式可加“停止”按钮；家用模型名可能更新。
 - 历史规划：微软拼音 `vuc` 方案、一键 Shift 切换中英文（见 `HISTORY.md`）。
 - 真机压测：GBK/十六进制模式 8-10 档正确率；长文本发送时中止按钮是否即时。
 
