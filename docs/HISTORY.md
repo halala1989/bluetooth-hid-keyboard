@@ -87,6 +87,15 @@
 - 对话历史持久化：user/assistant 消息存 SharedPreferences（`llm_history`，最多 40 条），重启恢复多轮上下文；「清空」同步删除。
 - 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"）。
 
+### 2026-09-02 · v2.0-beta（连接保活 + 各档提速 10% + 提示词长按编辑）
+- **蓝牙连接保活**：根因是 Android 对“非前台”的 HID 注册 App 会自动注销（官方文档明示）。
+  新增前台服务 `HidKeyboardService`（connectedDevice 类型）在键盘注册期间保持 App 前台，
+  切子页面/切后台不再断连；关闭键盘才停止服务。
+- **输入速度**：`SPEED_SCALES` 延迟系数整体 ×0.9（每档提速 10%），`MIN_DELAY_MS=10` 物理下限不动。
+- **提示词管理**：下拉改为“✎ 管理提示词…”；列表点按=删除（确认）、长按=编辑（原位更新）；
+  选择仍走主下拉，不可编辑。
+- 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"）。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。

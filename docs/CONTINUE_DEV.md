@@ -7,12 +7,13 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 8 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 9 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
 - 2026-08-28 晚新增 **v1.5**：大模型对话「提示词预设下拉」（详见下文“最新一轮”）
 - 2026-09-02 新增：**大模型流式输出 + 对话历史持久化**（详见下文“最新一轮”）
+- 2026-09-02 第二轮：**蓝牙连接保活（前台服务）+ 各档提速 10% + 提示词长按编辑**（详见下文“最新一轮”）
 - 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-02 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
@@ -67,6 +68,31 @@
   - 最多保留最近 40 条，防止请求体无限增长；「清空」同时删除历史。
 - 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
 - 实现文件：`LlmClient.kt`、`MainActivity.kt`。
+
+## 最新一轮（2026-09-02 第二轮 · 连接保活 + 提速 + 提示词管理）
+
+用户真机反馈三项，均已修复：
+
+1. **切子页面/切后台蓝牙立刻断线（重要）**
+   - 根因：Android 官方文档明确规定——BluetoothHidDevice 注册的 App **如果不是前台状态，
+     系统会自动注销注册并断开连接**。之前只做了“掉线后自动重连”，连接本身仍会被系统断开。
+   - 修复：新增前台服务 `HidKeyboardService`（`foregroundServiceType="connectedDevice"`，
+     清单加 `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CONNECTED_DEVICE` 权限）。
+     键盘注册成功即 `startForegroundService`，保持进程/UID 前台，系统不再注销 HID；
+     关闭键盘或主界面销毁（未注册时）才停止服务。通知常驻“手机蓝牙键盘运行中”。
+   - 保留自动重连作为兜底。
+2. **各档位输入速度提高 10%**
+   - `SPEED_SCALES` 延迟系数整体 ×0.9：
+     `[4000,3300,2700,2100,1600,1150,780,500,260,80]` →
+     `[3600,2970,2430,1890,1440,1035,702,450,234,72]`。
+   - 注意：`MIN_DELAY_MS=10`（蓝牙物理下限）不动，约 7 档以上会触底，实际速度以链路为准。
+3. **提示词管理：只能添加/删除 + 长按编辑**
+   - 下拉项“✎ 删除提示词…”改为“✎ 管理提示词…”；
+   - 管理弹窗 = 列表：**点按=删除（二次确认），长按=编辑**（新建/编辑共用一个表单，编辑原位更新）；
+   - 选择仍只在主下拉里进行，不可编辑。
+
+- 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
+- 实现文件：`HidKeyboardService.kt`（新增）、`AndroidManifest.xml`、`MainActivity.kt`、`TypingEngine.kt`。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 

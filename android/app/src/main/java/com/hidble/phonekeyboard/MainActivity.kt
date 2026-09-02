@@ -24,6 +24,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ListView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
@@ -187,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         if (instance === this) instance = null
         hidManager.cleanup()
+        if (!registered) stopHidService()
     }
 
     private fun initViews() {
@@ -267,9 +269,11 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 registered = reg
                 if (reg) {
+                    startHidService()
                     appendLog("蓝牙键盘已启动：请确认“对附近设备可见”，然后到电脑上搜索并配对")
                     requestDiscoverable()
                 } else {
+                    stopHidService()
                     appendLog("蓝牙键盘已停止")
                 }
                 refreshAllState()
@@ -415,8 +419,26 @@ class MainActivity : AppCompatActivity() {
             hidManager.disconnect()
             connected = false
             registered = false
+            stopHidService()
             appendLog("蓝牙键盘已关闭")
             refreshAllState()
+        }
+    }
+
+    /** 键盘注册期间启动前台服务：防止系统因“App 不在前台”注销 HID 导致断连 */
+    private fun startHidService() {
+        try {
+            ContextCompat.startForegroundService(this, Intent(this, HidKeyboardService::class.java))
+        } catch (e: Exception) {
+            appendLog("无法启动后台保活服务：${e.message}")
+        }
+    }
+
+    private fun stopHidService() {
+        try {
+            stopService(Intent(this, HidKeyboardService::class.java))
+        } catch (e: Exception) {
+            // 忽略：服务可能未启动
         }
     }
 
@@ -784,7 +806,7 @@ class MainActivity : AppCompatActivity() {
         llmPromptItems.add("无提示词（直接发送）")
         llmPrompts.forEach { llmPromptItems.add(it.name) }
         llmPromptItems.add("＋ 新建提示词…")
-        llmPromptItems.add("✎ 删除提示词…")
+        llmPromptItems.add("✎ 管理提示词…")
         llmPromptAdapter.notifyDataSetChanged()
         suppressPromptEvent = true
         llmPromptSpinner.setSelection(currentPromptPosition())
@@ -809,11 +831,11 @@ class MainActivity : AppCompatActivity() {
                     }
                     position == actionBase -> {
                         resetPromptSelectionSilently()
-                        showPromptCreateDialog()
+                        showPromptEditDialog(null)
                     }
                     position == actionBase + 1 -> {
                         resetPromptSelectionSilently()
-                        showPromptDeleteDialog()
+                        showPromptManageDialog()
                     }
                 }
             }
@@ -829,9 +851,11 @@ class MainActivity : AppCompatActivity() {
         suppressPromptEvent = false
     }
 
-    private fun showPromptCreateDialog() {
+    /** 新建/编辑提示词（existing==null 为新建，否则为编辑并原位更新） */
+    private fun showPromptEditDialog(existing: LlmPrompt?) {
         val nameInput = EditText(this)
         nameInput.hint = "提示词名称（如：书面化整理）"
+        nameInput.setText(existing?.name ?: "")
         nameInput.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
         nameInput.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
         nameInput.setBackgroundResource(R.drawable.bg_input)
@@ -839,6 +863,7 @@ class MainActivity : AppCompatActivity() {
 
         val contentInput = EditText(this)
         contentInput.hint = "提示词内容（发送前自动拼到输入前面）"
+        contentInput.setText(existing?.content ?: "")
         contentInput.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
         contentInput.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
         contentInput.setBackgroundResource(R.drawable.bg_input)
@@ -858,7 +883,7 @@ class MainActivity : AppCompatActivity() {
         container.addView(contentInput)
 
         AlertDialog.Builder(this)
-            .setTitle("新建提示词")
+            .setTitle(if (existing == null) "新建提示词" else "编辑提示词")
             .setView(container)
             .setPositiveButton("保存") { _, _ ->
                 val name = nameInput.text.toString().trim()
@@ -867,35 +892,79 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "名称和内容都不能为空", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                llmPrompts.add(LlmPrompt(name, content))
+                if (existing == null) {
+                    llmPrompts.add(LlmPrompt(name, content))
+                    selectedPromptName = name
+                    prefs.edit().putString(LlmPrefs.KEY_SELECTED_PROMPT, name).apply()
+                    appendLog("已新建提示词「$name」并选中")
+                } else {
+                    val idx = llmPrompts.indexOfFirst { it.name == existing.name }
+                    if (idx >= 0) {
+                        llmPrompts[idx] = LlmPrompt(name, content)
+                        if (selectedPromptName == existing.name) {
+                            selectedPromptName = name
+                            prefs.edit().putString(LlmPrefs.KEY_SELECTED_PROMPT, name).apply()
+                        }
+                    }
+                    appendLog("已编辑提示词「$name」")
+                }
                 saveLlmPrompts()
-                selectedPromptName = name
-                prefs.edit().putString(LlmPrefs.KEY_SELECTED_PROMPT, name).apply()
                 refreshPromptSpinner()
-                appendLog("已新建提示词「$name」并选中")
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun showPromptDeleteDialog() {
+    /** 管理提示词：点按=删除（二次确认），长按=编辑 */
+    private fun showPromptManageDialog() {
         if (llmPrompts.isEmpty()) {
-            Toast.makeText(this, "还没有提示词", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "还没有提示词，可在下拉里“＋ 新建提示词”", Toast.LENGTH_SHORT).show()
             return
         }
         val names = llmPrompts.map { it.name }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("选择要删除的提示词")
-            .setItems(names) { _, which ->
-                val removed = llmPrompts.removeAt(which)
-                saveLlmPrompts()
-                if (selectedPromptName == removed.name) selectedPromptName = null
-                prefs.edit().remove(LlmPrefs.KEY_SELECTED_PROMPT).apply()
-                refreshPromptSpinner()
-                appendLog("已删除提示词「${removed.name}」")
+
+        val listView = ListView(this)
+        listView.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, names)
+        listView.background = getDrawable(R.drawable.bg_list)
+        listView.setPadding(dp(4), dp(4), dp(4), dp(4))
+        listView.divider = getDrawable(R.color.card_stroke)
+        listView.dividerHeight = 1
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("管理提示词（点按删除 · 长按编辑）")
+            .setView(listView)
+            .setNegativeButton("关闭", null)
+            .create()
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            if (position !in llmPrompts.indices) return@setOnItemClickListener
+            val target = llmPrompts[position]
+            AlertDialog.Builder(this)
+                .setTitle("删除提示词")
+                .setMessage("确定删除「${target.name}」吗？")
+                .setPositiveButton("删除") { _, _ ->
+                    llmPrompts.removeAt(position)
+                    saveLlmPrompts()
+                    if (selectedPromptName == target.name) {
+                        selectedPromptName = null
+                        prefs.edit().remove(LlmPrefs.KEY_SELECTED_PROMPT).apply()
+                    }
+                    refreshPromptSpinner()
+                    dialog.dismiss()
+                    appendLog("已删除提示词「${target.name}」")
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            if (position in llmPrompts.indices) {
+                showPromptEditDialog(llmPrompts[position])
             }
-            .setNegativeButton("取消", null)
-            .show()
+            true
+        }
+
+        dialog.show()
     }
 
     /** 进入模型设置二级页面（选择提供方自动填预设模型，只填 Token 即可） */

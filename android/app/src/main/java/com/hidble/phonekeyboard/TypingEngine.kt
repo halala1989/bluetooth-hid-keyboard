@@ -169,8 +169,10 @@ class TypingEngine(
         /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
         private const val SEND_MAX_RETRIES = 50
         private const val SEND_RETRY_WAIT_MS = 20L
-        // 1=最慢 .. 10=最快；最低档更慢、档间差值拉开，慢档更稳（降低随机丢字/转换失败）
-        private val SPEED_SCALES = intArrayOf(4000, 3300, 2700, 2100, 1600, 1150, 780, 500, 260, 80)
+        // 1=最慢 .. 10=最快；最低档更慢、档间差值拉开，慢档更稳（降低随机丢字/转换失败）。
+        // 2026-09-02：每档提速 10%（延迟系数 ×0.9）。注意 MIN_DELAY_MS=10 为蓝牙物理下限，
+        // 高档位（约 7 档以上）会触底，实际速度以链路为准，不要再下调 MIN_DELAY_MS。
+        private val SPEED_SCALES = intArrayOf(3600, 2970, 2430, 1890, 1440, 1035, 702, 450, 234, 72)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)

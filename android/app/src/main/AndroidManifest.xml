@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 发送 HID 期间保持屏幕常亮 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 前台服务：键盘注册期间保持前台，防止系统注销 HID 导致断连 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <!-- BLE 功能声明 -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
@@ -60,6 +63,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:exported="false"
             android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <service
+            android:name=".HidKeyboardService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
     </application>
 
 </manifest>
