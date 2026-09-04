@@ -26,6 +26,10 @@
 
 - JDK 17：`D:\jdk17\jdk-17.0.20+8`（每次编译前设 `JAVA_HOME=D:\jdk17\jdk-17.0.20+8`）
 - Android SDK：`D:\Android`（设 `ANDROID_HOME=D:\Android`、`ANDROID_SDK_ROOT=D:\Android`；platforms=android-34，build-tools 33.0.1 + 34.0.0）
+- **2026-09-04 新增实测**：当前这台电脑（仓库在 `C:\Users\admin\Documents\ChatGPT\蓝牙输入项目`）
+  的环境变量已是 `JAVA_HOME=C:\Program Files\Java\jdk-17`、`ANDROID_HOME=C:\Android\Sdk`，
+  直接 `cd android; .\gradlew.bat assembleDebug --no-daemon` 即可编译，无需手动设 D 盘路径；
+  文档原 D 盘路径属于另一台电脑，两边代码一致、环境各自生效。
 - Pico SDK：`C:\pico\pico-sdk`（仅旧 `master` 产品线编译固件需要，本机未验证）
 - 编译 APK：
   ```powershell
