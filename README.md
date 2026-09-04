@@ -61,7 +61,7 @@ android/                # Android Kotlin 客户端（本版本主体）
 pico_firmware/          # 历史 Pico W 固件（v10/v11 方案，已不再需要）
 firmware/               # 历史预编译固件 UF2（已不再需要）
 releases/               # 版本化发布归档（本产品线 v1.0, v1.1, ...）
-docs/                   # 协议、设置、工作进度
+docs/                   # 协议、设置、工作进度（LLM_PROVIDERS.md = 大模型提供方手册；CONTINUE_DEV.md = 开发交接）
 tools/                  # 构建/校验脚本
 ```
 

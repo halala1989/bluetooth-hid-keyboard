@@ -294,7 +294,8 @@
 
 ## 四、给“家用电脑 ChatGPT”的提示
 
-1. 先读：本文件、`README.md`、`docs/HISTORY.md`、`docs/MIGRATION.md`、`docs/ONBOARDING.md`。
+1. 先读：本文件、`README.md`、`docs/HISTORY.md`、`docs/MIGRATION.md`、`docs/ONBOARDING.md`
+   （大模型提供方细节见 `docs/LLM_PROVIDERS.md`）。
 2. 克隆后运行 `tools/setup_check.ps1` 检查环境（Windows PowerShell 5.1 / 7 均可）。
 3. 编译 APK 需要 JDK 17 + Android SDK；CC Switch 配置从旧电脑拷贝（见 `MIGRATION.md`）。
 4. 开始前先 `git pull`，确认在 `phone-keyboard` 分支。
