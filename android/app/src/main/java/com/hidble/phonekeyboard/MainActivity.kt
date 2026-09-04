@@ -7,14 +7,17 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.Spannable
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
+import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -25,6 +28,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ListView
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
@@ -39,6 +43,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -52,6 +60,10 @@ class MainActivity : AppCompatActivity() {
         private const val SPEED_MIN = 1
         private const val SPEED_MAX = 10
         private const val PROMPT_PRESET_VERSION = 2
+        private const val MAX_ATTACH_MB = 12
+        private const val MAX_ATTACH_BYTES = MAX_ATTACH_MB * 1024 * 1024
+        private const val MAX_ATTACH_COUNT = 4
+        private const val MAX_CONVERSATIONS = 50
 
         /** 供二级页面（连接管理/更多按键）访问本 Activity 的 HID 引擎 */
         @Volatile
@@ -69,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmInput: EditText
     private lateinit var llmOutput: EditText
     private lateinit var llmSendButton: Button
+    private lateinit var llmNewConversationButton: Button
     private lateinit var llmSendToKeyboardButton: Button
     private lateinit var llmClearButton: Button
     private lateinit var llmIncludeMeCheck: CheckBox
@@ -78,6 +91,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmSettingsTopButton: Button
     private lateinit var unicodeModeSpinner: Spinner
     private lateinit var llmPromptSpinner: Spinner
+    private lateinit var llmHistorySpinner: Spinner
+    private lateinit var llmAttachmentInfo: TextView
+    private lateinit var llmAttachButton: Button
 
     private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
@@ -96,7 +112,35 @@ class MainActivity : AppCompatActivity() {
     private var llmProviderId = LlmProviders.list.first().id
     private var llmApiKey = ""
     private var llmModel = ""
-    private val llmHistory = mutableListOf<Pair<String, String>>()
+
+    // ===== 大模型对话数据结构 =====
+    // 附件（“＋”添加的本地图片/音频；base64 仅保留在内存，持久化只存名称，重启后不重传原文件）
+    private data class LlmFilePart(
+        val kind: String, // "image" | "audio"
+        val name: String,
+        val mime: String,
+        val base64: String
+    )
+
+    // 对话消息：正文 + 本条消息随附的文件
+    private class LlmHistoryMsg(
+        val role: String,
+        val text: String,
+        val files: List<LlmFilePart> = emptyList()
+    )
+
+    // 历史对话快照（点“新对话”/载入旧对话前自动存档，供历史下拉查看与恢复）
+    private data class LlmConversationSnapshot(
+        val id: String,
+        val title: String,
+        val time: Long,
+        val messages: List<LlmHistoryMsg>,
+        val output: String
+    )
+
+    private val llmHistory = mutableListOf<LlmHistoryMsg>()
+    private val llmConversations = mutableListOf<LlmConversationSnapshot>()
+    private val pendingFiles = mutableListOf<LlmFilePart>()
     private var llmBusy = false
     /** 流式输出中：跳过逐字着色/保存，结束时统一处理 */
     private var llmStreaming = false
@@ -108,6 +152,9 @@ class MainActivity : AppCompatActivity() {
     private var selectedPromptName: String? = null
     private var suppressPromptEvent = false
     private lateinit var llmPromptAdapter: ArrayAdapter<String>
+    private lateinit var llmHistoryAdapter: ArrayAdapter<String>
+    private val llmHistoryItems = mutableListOf<String>()
+    private var suppressHistoryEvent = false
 
     // 中文输入模式下拉（含绿色 √ 选中态）
     private lateinit var unicodeModeAdapter: UnicodeModeAdapter
@@ -148,6 +195,27 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(this, "未开启蓝牙，键盘未启动", Toast.LENGTH_SHORT).show()
             refreshAllState()
+        }
+    }
+
+    // 大模型“＋”附件：系统文件选择器（图片/音频，可多选）
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val data = result.data
+            if (data != null) {
+                val uris = mutableListOf<Uri>()
+                data.clipData?.let { clip ->
+                    for (i in 0 until clip.itemCount) {
+                        uris.add(clip.getItemAt(i).uri)
+                    }
+                }
+                if (uris.isEmpty()) {
+                    data.data?.let { uris.add(it) }
+                }
+                uris.forEach { addAttachment(it) }
+            }
         }
     }
 
@@ -213,6 +281,15 @@ class MainActivity : AppCompatActivity() {
         llmSettingsTopButton = findViewById(R.id.llmSettingsTopButton)
         unicodeModeSpinner = findViewById(R.id.unicodeModeSpinner)
         llmPromptSpinner = findViewById(R.id.llmPromptSpinner)
+        llmHistorySpinner = findViewById(R.id.llmHistorySpinner)
+        llmAttachmentInfo = findViewById(R.id.llmAttachmentInfo)
+        llmAttachButton = findViewById(R.id.llmAttachButton)
+        llmNewConversationButton = findViewById(R.id.llmNewConversationButton)
+
+        // 历史对话下拉（与提示词下拉同一样式：白字单行）
+        llmHistoryAdapter = ArrayAdapter(this, R.layout.item_llm_prompt, R.id.promptLabel, llmHistoryItems)
+        llmHistorySpinner.adapter = llmHistoryAdapter
+        refreshAttachmentUi()
 
         // SharedPreferences
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -388,7 +465,20 @@ class MainActivity : AppCompatActivity() {
         llmSettingsTopButton.setOnClickListener { openLlmSettings() }
 
         llmSendButton.setOnClickListener { sendToLlm() }
+        llmNewConversationButton.setOnClickListener { startNewConversation() }
+        llmAttachButton.setOnClickListener { launchFilePicker() }
+        llmAttachButton.setOnLongClickListener {
+            if (pendingFiles.isEmpty()) {
+                Toast.makeText(this, "当前没有待发送的附件", Toast.LENGTH_SHORT).show()
+            } else {
+                pendingFiles.clear()
+                refreshAttachmentUi()
+                appendLog("已清空待发送附件")
+            }
+            true
+        }
         setupPromptSpinner()
+        setupHistorySpinner()
 
         llmSendToKeyboardButton.setOnClickListener { sendOutputToKeyboard() }
         llmClearButton.setOnClickListener { clearLlmConversation() }
@@ -588,33 +678,437 @@ class MainActivity : AppCompatActivity() {
         applyLlmColors()
     }
 
-    /** 对话历史持久化：重启 App 后保留多轮上下文（最多保留最近 40 条） */
+    /**
+     * 恢复当前对话（KEY_HISTORY，附件只留名称/类型，不保留原文件字节）
+     * 和历史存档列表（KEY_CONVERSATIONS）。
+     */
     private fun loadLlmHistory() {
         llmHistory.clear()
-        val raw = prefs.getString(LlmPrefs.KEY_HISTORY, null) ?: return
         try {
-            val arr = JSONArray(raw)
-            for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val role = obj.optString("role")
-                val content = obj.optString("content")
-                if ((role == "user" || role == "assistant") && content.isNotEmpty()) {
-                    llmHistory.add(role to content)
+            val raw = prefs.getString(LlmPrefs.KEY_HISTORY, null)
+            if (!raw.isNullOrBlank()) {
+                val arr = JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    parseHistoryMessage(arr.getJSONObject(i))?.let { llmHistory.add(it) }
                 }
             }
         } catch (e: Exception) {
             llmHistory.clear()
         }
+
+        llmConversations.clear()
+        try {
+            val raw = prefs.getString(LlmPrefs.KEY_CONVERSATIONS, null)
+            if (!raw.isNullOrBlank()) {
+                val arr = JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    parseConversation(arr.getJSONObject(i))?.let { llmConversations.add(it) }
+                }
+            }
+        } catch (e: Exception) {
+            llmConversations.clear()
+        }
+        refreshHistorySpinner()
     }
 
+    /** 保存当前对话上下文（重启后保留多轮文字；附件只保留名称，不存原文件） */
     private fun saveLlmHistory() {
         // 只保留最近 40 条，避免请求体无限增长
         val trimmed = llmHistory.takeLast(40)
         val arr = JSONArray()
-        trimmed.forEach { (role, content) ->
-            arr.put(JSONObject().put("role", role).put("content", content))
-        }
+        trimmed.forEach { arr.put(historyMessageToJson(it, withBase64 = false)) }
         prefs.edit().putString(LlmPrefs.KEY_HISTORY, arr.toString()).apply()
+    }
+
+    // ===== 消息 / 历史存档的 JSON 序列化 =====
+
+    private fun historyMessageToJson(msg: LlmHistoryMsg, withBase64: Boolean): JSONObject {
+        val obj = JSONObject().put("role", msg.role).put("content", msg.text)
+        if (msg.files.isNotEmpty()) {
+            val arr = JSONArray()
+            msg.files.forEach { f ->
+                val fo = JSONObject()
+                    .put("kind", f.kind)
+                    .put("name", f.name)
+                    .put("mime", f.mime)
+                if (withBase64) fo.put("base64", f.base64)
+                arr.put(fo)
+            }
+            obj.put("files", arr)
+        }
+        return obj
+    }
+
+    private fun parseHistoryMessage(obj: JSONObject): LlmHistoryMsg? {
+        val role = obj.optString("role")
+        val content = obj.optString("content")
+        if ((role != "user" && role != "assistant") || content.isBlank()) return null
+        val files = mutableListOf<LlmFilePart>()
+        val filesArr = obj.optJSONArray("files")
+        if (filesArr != null) {
+            for (i in 0 until filesArr.length()) {
+                val fo = filesArr.optJSONObject(i) ?: continue
+                val kind = fo.optString("kind")
+                val name = fo.optString("name")
+                if ((kind == "image" || kind == "audio") && name.isNotEmpty()) {
+                    files.add(LlmFilePart(kind, name, fo.optString("mime"), fo.optString("base64")))
+                }
+            }
+        }
+        return LlmHistoryMsg(role, content, files)
+    }
+
+    private fun parseConversation(obj: JSONObject): LlmConversationSnapshot? {
+        return try {
+            val messages = mutableListOf<LlmHistoryMsg>()
+            val arr = obj.optJSONArray("messages")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    parseHistoryMessage(arr.optJSONObject(i) ?: continue)?.let { messages.add(it) }
+                }
+            }
+            LlmConversationSnapshot(
+                id = obj.optString("id", System.currentTimeMillis().toString()),
+                title = obj.optString("title", "历史对话"),
+                time = obj.optLong("time", 0L),
+                messages = messages,
+                output = obj.optString("output", "")
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun saveConversations() {
+        val arr = JSONArray()
+        llmConversations.forEach { snap ->
+            val msgs = JSONArray()
+            snap.messages.forEach { msgs.put(historyMessageToJson(it, withBase64 = false)) }
+            arr.put(
+                JSONObject()
+                    .put("id", snap.id)
+                    .put("title", snap.title)
+                    .put("time", snap.time)
+                    .put("messages", msgs)
+                    .put("output", snap.output)
+            )
+        }
+        prefs.edit().putString(LlmPrefs.KEY_CONVERSATIONS, arr.toString()).apply()
+    }
+
+    // ===== 历史对话下拉：当前对话 + 已存档会话 =====
+
+    private fun setupHistorySpinner() {
+        llmHistorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (suppressHistoryEvent) return
+                if (position == 0 || llmConversations.isEmpty() || (position - 1) !in llmConversations.indices) {
+                    resetHistorySelection()
+                    return
+                }
+                showHistoryConversationDialog(position - 1)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun refreshHistorySpinner() {
+        llmHistoryItems.clear()
+        llmHistoryItems.add("◉ 当前对话（正在编辑）")
+        llmConversations.forEach { c ->
+            val timeLabel = formatTime(c.time)
+            llmHistoryItems.add("🕘 ${c.title}" + if (timeLabel.isEmpty()) "" else " · $timeLabel")
+        }
+        if (llmConversations.isEmpty()) {
+            llmHistoryItems.add("（暂无已存档的历史对话）")
+        }
+        llmHistoryAdapter.notifyDataSetChanged()
+        resetHistorySelection()
+    }
+
+    private fun resetHistorySelection() {
+        suppressHistoryEvent = true
+        llmHistorySpinner.setSelection(0, false)
+        suppressHistoryEvent = false
+    }
+
+    private fun formatTime(millis: Long): String {
+        if (millis <= 0) return ""
+        return SimpleDateFormat("M-d HH:mm", Locale.getDefault()).format(Date(millis))
+    }
+
+    /** 把当前对话（若有内容）存档到历史列表头部 */
+    private fun archiveCurrentConversation(): String? {
+        if (llmHistory.isEmpty() && llmOutput.text.isBlank()) return null
+        val firstUserLine = llmHistory.firstOrNull { it.role == "user" }
+            ?.text?.lineSequence()?.firstOrNull()?.trim().orEmpty()
+        val now = System.currentTimeMillis()
+        val title = if (firstUserLine.isNotEmpty()) firstUserLine.take(16) else "对话 ${formatTime(now)}"
+        llmConversations.add(
+            0,
+            LlmConversationSnapshot(
+                id = "c${now}_${llmHistory.size}",
+                title = title,
+                time = now,
+                // 存档时只保留文件名称/类型（丢弃 base64），避免多个大附件长期占用内存；
+                // 如需继续追问旧对话的图片/音频，重新用“＋”添加即可。
+                messages = llmHistory.map { msg ->
+                    LlmHistoryMsg(
+                        msg.role,
+                        msg.text,
+                        msg.files.map { f -> f.copy(base64 = "") }
+                    )
+                },
+                output = llmOutput.text.toString()
+            )
+        )
+        while (llmConversations.size > MAX_CONVERSATIONS) {
+            llmConversations.removeAt(llmConversations.lastIndex)
+        }
+        saveConversations()
+        return title
+    }
+
+    /** “新对话”：先自动存档旧对话，再清空当前上下文与输出框 */
+    private fun startNewConversation() {
+        if (llmBusy) {
+            Toast.makeText(this, "正在等待模型回复，请稍候再开新对话", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val archived = archiveCurrentConversation()
+        llmHistory.clear()
+        llmOutput.setText("")
+        pendingFiles.clear()
+        refreshAttachmentUi()
+        prefs.edit()
+            .remove(LlmPrefs.KEY_HISTORY)
+            .putString(LlmPrefs.KEY_OUTPUT, "")
+            .apply()
+        refreshHistorySpinner()
+        appendLog(
+            if (archived != null) "已开始新对话（旧对话已存入下方历史下拉：「$archived」）"
+            else "已开始新对话"
+        )
+    }
+
+    private fun showHistoryConversationDialog(index: Int) {
+        val snap = llmConversations.getOrNull(index) ?: run {
+            resetHistorySelection()
+            return
+        }
+        val outputText = snap.output.ifBlank { "（该对话没有输出内容）" }
+        val content = TextView(this).apply {
+            text = outputText
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setTextIsSelectable(true)
+        }
+        val scroll = ScrollView(this).apply {
+            addView(
+                content,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(dp(20), dp(6), dp(20), 0)
+            addView(
+                scroll,
+                android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    dp(320)
+                )
+            )
+        }
+        val msgCount = snap.messages.count { it.role == "user" || it.role == "assistant" }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("历史对话：${snap.title}（${msgCount} 条消息）")
+            .setView(container)
+            .setPositiveButton("载入为当前对话") { _, _ -> loadHistoryConversation(snap.id) }
+            .setNeutralButton("删除") { _, _ -> confirmDeleteConversation(snap.id) }
+            .setNegativeButton("关闭", null)
+            .create()
+        dialog.setOnDismissListener { resetHistorySelection() }
+        dialog.show()
+    }
+
+    private fun loadHistoryConversation(id: String) {
+        val snap = llmConversations.firstOrNull { it.id == id } ?: run {
+            resetHistorySelection()
+            return
+        }
+        // 当前正在编辑的内容先存档，避免切换历史时丢失
+        archiveCurrentConversation()
+        llmConversations.removeAll { it.id == id }
+        llmHistory.clear()
+        llmHistory.addAll(snap.messages)
+        llmOutput.setText(snap.output)
+        applyLlmColors()
+        prefs.edit().putString(LlmPrefs.KEY_OUTPUT, snap.output).apply()
+        saveLlmHistory()
+        saveConversations()
+        refreshHistorySpinner()
+        appendLog("已载入历史对话：${snap.title}")
+    }
+
+    private fun confirmDeleteConversation(id: String) {
+        val snap = llmConversations.firstOrNull { it.id == id } ?: run {
+            resetHistorySelection()
+            return
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("删除历史对话")
+            .setMessage("确定删除「${snap.title}」吗？删除后不可恢复。")
+            .setPositiveButton("删除") { _, _ ->
+                llmConversations.removeAll { it.id == id }
+                saveConversations()
+                refreshHistorySpinner()
+                appendLog("已删除历史对话：${snap.title}")
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        dialog.setOnDismissListener { resetHistorySelection() }
+        dialog.show()
+    }
+
+    // ===== “＋”本地文件（图片/音频）→ 多模态消息 =====
+
+    private fun refreshAttachmentUi() {
+        if (pendingFiles.isEmpty()) {
+            llmAttachmentInfo.text = "可点“＋”添加本地图片/音频，随下一条消息发给模型（多模态）"
+        } else {
+            val names = pendingFiles.joinToString("、") {
+                (if (it.kind == "image") "图片" else "音频") + "「" + it.name + "」"
+            }
+            llmAttachmentInfo.text = "已附加 ${pendingFiles.size} 个文件：$names（点＋继续加，长按＋清空）"
+        }
+    }
+
+    private fun launchFilePicker() {
+        if (llmBusy) {
+            Toast.makeText(this, "正在等待模型回复，请稍候再添加", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (pendingFiles.size >= MAX_ATTACH_COUNT) {
+            Toast.makeText(this, "一次最多附带 $MAX_ATTACH_COUNT 个文件", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "audio/*"))
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        try {
+            filePickerLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开文件选择器", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun addAttachment(uri: Uri) {
+        if (pendingFiles.size >= MAX_ATTACH_COUNT) {
+            Toast.makeText(this, "一次最多附带 $MAX_ATTACH_COUNT 个文件", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val mime = contentResolver.getType(uri) ?: guessMimeFromName(uri.lastPathSegment)
+            val kind = when {
+                mime.startsWith("image/") -> "image"
+                mime.startsWith("audio/") -> "audio"
+                else -> {
+                    Toast.makeText(this, "暂只支持图片或音频文件", Toast.LENGTH_SHORT).show()
+                    return
+                }
+            }
+            val bytes = readUriBytes(uri)
+            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            val name = queryDisplayName(uri) ?: (uri.lastPathSegment ?: "file_${System.currentTimeMillis()}")
+            pendingFiles.add(LlmFilePart(kind, name, mime, base64))
+            refreshAttachmentUi()
+            appendLog("已添加附件：$name（${if (kind == "image") "图片" else "音频"}，${bytes.size / 1024} KB）")
+        } catch (e: Exception) {
+            Toast.makeText(this, "添加附件失败：${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun readUriBytes(uri: Uri): ByteArray {
+        val input = contentResolver.openInputStream(uri)
+            ?: throw RuntimeException("无法读取所选文件")
+        input.use { stream ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            var total = 0
+            while (true) {
+                val n = stream.read(buffer)
+                if (n <= 0) break
+                total += n
+                if (total > MAX_ATTACH_BYTES) {
+                    throw RuntimeException("文件超过 $MAX_ATTACH_MB MB 上限")
+                }
+                out.write(buffer, 0, n)
+            }
+            if (total == 0) throw RuntimeException("文件为空")
+            return out.toByteArray()
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return try {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun guessMimeFromName(name: String?): String {
+        val n = name?.lowercase(Locale.getDefault()).orEmpty()
+        return when {
+            n.endsWith(".png") -> "image/png"
+            n.endsWith(".jpg") || n.endsWith(".jpeg") -> "image/jpeg"
+            n.endsWith(".gif") -> "image/gif"
+            n.endsWith(".webp") -> "image/webp"
+            n.endsWith(".bmp") -> "image/bmp"
+            n.endsWith(".heic") || n.endsWith(".heif") -> "image/heic"
+            n.endsWith(".mp3") -> "audio/mpeg"
+            n.endsWith(".wav") -> "audio/wav"
+            n.endsWith(".flac") -> "audio/flac"
+            n.endsWith(".m4a") -> "audio/mp4"
+            n.endsWith(".aac") -> "audio/aac"
+            n.endsWith(".ogg") || n.endsWith(".oga") -> "audio/ogg"
+            n.endsWith(".amr") -> "audio/amr"
+            else -> "application/octet-stream"
+        }
+    }
+
+    /** 历史消息 → API 消息：附件有真实字节就转成 image/audio 部件，否则转成文字说明 */
+    private fun LlmHistoryMsg.toApiMessage(): LlmMessage {
+        val realFiles = files.filter { it.base64.isNotBlank() }
+        val lostFiles = files.filter { it.base64.isBlank() }
+        var text = this.text
+        if (lostFiles.isNotEmpty()) {
+            val note = lostFiles.joinToString("、") { it.name }
+            text = (text + "\n\n[以下附件在重启后无法再次上传，仅保留名称：$note]").trim()
+        }
+        if (realFiles.isEmpty()) return LlmMessage.text(role, text)
+        val parts = mutableListOf<LlmPart>()
+        parts.add(LlmPart(type = "text", text = text.ifBlank { "请分析我发送的图片/音频。" }))
+        realFiles.forEach { f ->
+            parts.add(LlmPart(type = f.kind, mime = f.mime, base64 = f.base64))
+        }
+        return LlmMessage(role, parts)
     }
 
     private fun appendOutput(text: String) {
@@ -974,7 +1468,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendToLlm() {
         val userText = llmInput.text.toString().trim()
-        if (userText.isEmpty()) return
+        val attachments = pendingFiles.toList()
+        if (userText.isEmpty() && attachments.isEmpty()) return
         val provider = LlmProviders.byId(llmProviderId)
         val model = llmModel.ifBlank { provider.defaultModel }
         if (provider.needsKey && llmApiKey.isBlank()) {
@@ -991,26 +1486,45 @@ class MainActivity : AppCompatActivity() {
         }
 
         val prompt = llmPrompts.firstOrNull { it.name == selectedPromptName }
-        val text = if (prompt != null) "${prompt.content.trim()}\n\n$userText" else userText
+        val rawText = when {
+            prompt != null && userText.isNotEmpty() -> "${prompt.content.trim()}\n\n$userText"
+            prompt != null -> prompt.content.trim()
+            else -> userText
+        }
+        // 纯附件（无文字）时给模型一句引导，避免空正文
+        val text = rawText.ifBlank { "请查看我发送的图片/音频，并给出分析或回复。" }
 
         llmBusy = true
         llmSendButton.isEnabled = false
         startThinking()
-        appendOutput("我：$userText")
-        llmHistory.add("user" to text)
+        if (userText.isNotEmpty()) appendOutput("我：$userText")
+        if (attachments.isNotEmpty()) {
+            val desc = attachments.joinToString("、") {
+                (if (it.kind == "image") "图片" else "音频") + "「" + it.name + "」"
+            }
+            appendOutput("📎 本次已附带：$desc")
+        } else if (userText.isEmpty()) {
+            appendOutput("我：$text")
+        }
+        llmHistory.add(LlmHistoryMsg("user", text, attachments))
         saveLlmHistory()
         llmInput.text.clear()
+        pendingFiles.clear()
+        refreshAttachmentUi()
         if (prompt != null) appendLog("已应用提示词「${prompt.name}」")
+        if (attachments.isNotEmpty()) appendLog("本条消息附带 ${attachments.size} 个文件（多模态格式：图片/音频）")
         appendLog("已发送给模型（${provider.displayName} / $model），正在流式回复...")
 
         lifecycleScope.launch {
             var started = false
+            val apiMessages = mutableListOf(LlmMessage.text("system", "你是简洁的助手。"))
+            llmHistory.forEach { apiMessages.add(it.toApiMessage()) }
             val reply = try {
                 LlmClient.chatStream(
                     provider,
                     llmApiKey,
                     model,
-                    listOf("system" to "你是简洁的助手。") + llmHistory
+                    apiMessages
                 ) { delta ->
                     if (!started) {
                         started = true
@@ -1036,7 +1550,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             } else {
-                llmHistory.add("assistant" to reply)
+                llmHistory.add(LlmHistoryMsg("assistant", reply))
                 saveLlmHistory()
                 appendLog("模型已回复")
             }

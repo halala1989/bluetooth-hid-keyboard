@@ -266,6 +266,34 @@
                 android:textColor="@color/text_secondary"
                 android:layout_marginBottom="8dp" />
 
+            <!-- 附件行：＋ 添加本地图片/音频（多模态模型） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="2dp">
+
+                <TextView
+                    android:id="@+id/llmAttachmentInfo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="可点“＋”添加本地图片/音频，随下一条消息发给模型（多模态）"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+
+                <Button
+                    android:id="@+id/llmAttachButton"
+                    style="@style/KeyButton"
+                    android:layout_width="46dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:textSize="18sp"
+                    android:text="＋"
+                    android:contentDescription="添加本地文件" />
+            </LinearLayout>
+
             <!-- 提问输入框：4 行，右侧可上下滚动查看长文本（内容溢出时优先内部滚动） -->
             <com.hidble.phonekeyboard.ScrollableEditText
                 android:id="@+id/llmInput"
@@ -288,6 +316,7 @@
                 android:fadeScrollbars="false"
                 android:importantForAutofill="no" />
 
+            <!-- 发送行：发送给模型（缩短）+ 新对话（归档并遗忘前文） -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -299,23 +328,54 @@
                     android:id="@+id/llmSendButton"
                     style="@style/PrimaryButton"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1.4"
-                    android:layout_marginEnd="4dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.9"
+                    android:textSize="13sp"
                     android:text="发送给模型" />
 
-                <Spinner
-                    android:id="@+id/llmPromptSpinner"
+                <Button
+                    android:id="@+id/llmNewConversationButton"
+                    style="@style/KeyButton"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/spinner_bg"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="34dp"
-                    android:gravity="center_vertical"
-                    android:popupBackground="@color/card_background"
-                    android:contentDescription="提示词" />
+                    android:layout_height="46dp"
+                    android:layout_weight="0.7"
+                    android:text="新对话"
+                    android:contentDescription="开始新对话，遗忘前文内容" />
             </LinearLayout>
+
+            <!-- 提示词选择（独占一行，避免与发送/新对话挤在一起） -->
+            <Spinner
+                android:id="@+id/llmPromptSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/spinner_bg"
+                android:paddingStart="12dp"
+                android:paddingEnd="34dp"
+                android:gravity="center_vertical"
+                android:popupBackground="@color/card_background"
+                android:contentDescription="提示词选择" />
+
+            <!-- 历史对话下拉：查看 / 载入 / 删除所有已存档对话 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="历史对话（点“新对话”会自动存档；点选可查看 / 载入 / 删除）"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="10dp" />
+
+            <Spinner
+                android:id="@+id/llmHistorySpinner"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/spinner_bg"
+                android:paddingStart="12dp"
+                android:paddingEnd="34dp"
+                android:gravity="center_vertical"
+                android:popupBackground="@color/card_background"
+                android:contentDescription="历史对话" />
 
             <!-- AI 思考状态（请求中显示，回复后隐藏） -->
             <LinearLayout
