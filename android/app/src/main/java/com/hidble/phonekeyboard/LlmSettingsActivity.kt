@@ -24,6 +24,7 @@ class LlmSettingsActivity : AppCompatActivity() {
     private lateinit var tokenInput: EditText
     private lateinit var modelInput: EditText
     private lateinit var baseUrlText: TextView
+    private lateinit var providerHint: TextView
     private lateinit var testButton: Button
     private lateinit var saveButton: Button
     private lateinit var prefs: android.content.SharedPreferences
@@ -38,6 +39,7 @@ class LlmSettingsActivity : AppCompatActivity() {
         tokenInput = findViewById(R.id.llmTokenInput)
         modelInput = findViewById(R.id.llmModelInput)
         baseUrlText = findViewById(R.id.llmBaseUrlText)
+        providerHint = findViewById(R.id.llmProviderHint)
         testButton = findViewById(R.id.llmTestButton)
         saveButton = findViewById(R.id.llmSaveButton)
 
@@ -77,6 +79,12 @@ class LlmSettingsActivity : AppCompatActivity() {
         baseUrlText.text = "API 地址：${p.baseUrl.trimEnd('/')}/chat/completions"
         if (overwriteModel || modelInput.text.isBlank()) {
             modelInput.setText(p.defaultModel)
+        }
+        if (p.hint.isNotBlank()) {
+            providerHint.text = "提示：${p.hint}"
+            providerHint.visibility = View.VISIBLE
+        } else {
+            providerHint.visibility = View.GONE
         }
         tokenInput.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         tokenInput.hint = "sk-..."

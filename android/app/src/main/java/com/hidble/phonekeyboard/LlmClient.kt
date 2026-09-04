@@ -17,7 +17,8 @@ data class LlmProvider(
     val displayName: String,
     val baseUrl: String,          // 不含 /chat/completions
     val defaultModel: String,
-    val needsKey: Boolean = true  // 自定义提供方可不填 token
+    val needsKey: Boolean = true,  // 自定义提供方可不填 token
+    val hint: String = ""          // 设置页针对该提供方的说明（如套餐/模型名注意事项）
 ) {
     fun endpoint(): String = baseUrl.trimEnd('/') + "/chat/completions"
 }
@@ -26,7 +27,17 @@ object LlmProviders {
     val list = listOf(
         LlmProvider("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash"),
         LlmProvider("mimo", "小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2.5"),
-        LlmProvider("volcano", "火山引擎（豆包）", "https://ark.cn-beijing.volces.com/api/v3", "doubao-seed-1-8-251228")
+        LlmProvider("volcano", "火山引擎（豆包）", "https://ark.cn-beijing.volces.com/api/v3", "doubao-seed-1-8-251228"),
+        LlmProvider(
+            id = "volcano-agent-plan",
+            displayName = "火山 AI Hub（Agent Plan）",
+            baseUrl = "https://ark.cn-beijing.volces.com/api/plan/v3",
+            defaultModel = "doubao-seed-2.0-lite",
+            hint = "“Agent-Plan-Small”是您的订阅套餐档位，不是模型名，请勿填进“模型”框。" +
+                "模型框应填该套餐支持的具体模型，如 doubao-seed-2.0-lite（默认，快/省燃料）、" +
+                "doubao-seed-2.0-pro（更强、支持图片）、glm-5.2、kimi-k2.6、deepseek-v4-pro 等。" +
+                "API Token 填火山方舟控制台 Agent Plan 的专用 API Key（ark- 开头）。"
+        )
     )
 
     fun byId(id: String): LlmProvider = list.firstOrNull { it.id == id } ?: list[0]

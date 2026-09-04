@@ -119,6 +119,19 @@
 - 实现文件：`MainActivity.kt`、`LlmClient.kt`（`LlmPart`/`LlmMessage` + content 数组）、`activity_main.xml`、`TypingEngine.kt`。
 - 版本号 versionCode 10 → 11（versionName 仍为 "2.0-beta"）；根目录 APK 已更新；**新功能待真机验证**。
 
+### 2026-09-04 · v2.0-beta（新增“火山 AI Hub（Agent Plan）”提供方）
+- 需求：大模型增加对**火山 AI Hub** 的支持，用户使用 **Agent-Plan-Small** 套餐。
+- 调研结论：“Agent-Plan-Small”是火山方舟 Agent Plan 个人版的**套餐档位**（Small/Medium/Large/Max），
+  **不是模型名**；接入需用 Agent Plan 专属 OpenAI 兼容端点
+  `https://ark.cn-beijing.volces.com/api/plan/v3`（`.../chat/completions`），
+  `model` 填套餐内具体模型（如 `doubao-seed-2.0-lite`、`doubao-seed-2.0-pro`、`glm-5.2` 等），
+  Token 用控制台 Agent Plan 专用 API Key；Agent Plan 不提供 `/models` 列表接口。
+- 实现：`LlmProviders` 新增第 4 个提供方“火山 AI Hub（Agent Plan）”（默认模型
+  `doubao-seed-2.0-lite`）；`LlmProvider` 增加 `hint` 字段，设置页在模型框下方提示
+  “Small 是套餐档位不是模型名，请填具体模型名”并列出常用模型。
+- 实现文件：`LlmClient.kt`、`LlmSettingsActivity.kt`、`activity_llm_settings.xml`。
+- 版本号 versionCode 11 → 12（versionName 仍为 "2.0-beta"）；根目录 APK 已更新；**待真机验证**。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
@@ -135,6 +148,10 @@
     图片 = `{"type":"image_url","image_url":{"url":"data:<mime>;base64,..."}}`；
     音频 = `{"type":"input_audio","input_audio":{"data":"data:<mime>;base64,..."}}`（小米 MiMo 原生支持）。
     发送前务必确认所选模型支持该模态，否则会返回 4xx/提示不支持。
+12. **火山 AI Hub（Agent Plan）**：`Agent-Plan-Small` 是套餐档位不是模型名；专属地址为
+    `https://ark.cn-beijing.volces.com/api/plan/v3`（OpenAI 兼容，Chat Completions/SSE 均可用），
+    Token 用 Agent Plan 专用 Key（ark- 开头，与普通方舟 Key 不通用），无 `/models` 列表接口，
+    模型名需手动填套餐内具体模型。
 
 ## 四、测试反馈与已知限制
 

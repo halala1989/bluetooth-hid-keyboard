@@ -7,7 +7,7 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 11 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 12 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
@@ -16,6 +16,7 @@
 - 2026-09-02 第二轮：**蓝牙连接保活（前台服务）+ 各档提速 10% + 提示词长按编辑**（详见下文“最新一轮”）
 - 2026-09-02 第四轮：**真机验证完成，未发现新问题**（详见下文“最新一轮”）
 - 2026-09-04：**各档再提速 10% + 缩短“发送给模型”/新增“新对话” + 历史对话下拉（查看/载入/删除）+ “＋”多模态附件**（详见下文“最新一轮”）
+- 2026-09-04（第二轮）：**新增“火山 AI Hub（Agent Plan）”大模型提供方**（详见下文“最新一轮”）
 - 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-04 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
@@ -144,6 +145,29 @@
    根目录 APK 已更新（2026-09-04）。
 7. **尚未真机验证**：历史下拉载入/删除、＋附件发送（尤其音频格式在小米 MiMo、图片在所选视觉模型上的表现）。
 
+## 最新一轮（2026-09-04 第二轮 · 新增“火山 AI Hub（Agent Plan）”提供方）
+
+需求（用户原话）：大模型增加对**火山 AI Hub** 的支持，我使用的是 **Agent-Plan-Small**。
+
+- **调研结论（重要，避免再踩坑）**：“Agent-Plan-Small”是**火山方舟 Agent Plan 个人版的套餐档位**
+  （Small/Medium/Large/Max），**不是模型名**。火山方舟文档与多个实测来源一致：
+  - Agent Plan 使用**专属 OpenAI 兼容端点**：Base URL `https://ark.cn-beijing.volces.com/api/plan/v3`
+    （即接口 `.../api/plan/v3/chat/completions`），鉴权仍是 `Authorization: Bearer <API Key>`；
+  - `model` 字段必须填**套餐内的具体模型名**（如 `doubao-seed-2.0-lite`、`doubao-seed-2.0-pro`、
+    `glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）；把 `Agent-Plan-Small` 当模型名会返回 400/模型不存在；
+  - Agent Plan API **不提供 `/models` 列表接口**（404），所以设置页必须手动/预设填模型名，不能自动拉取；
+  - 普通火山方舟 Key（`/api/v3`）与 Agent Plan Key 不通用，Token 要填控制台 Agent Plan 专用 API Key。
+- 实现（`LlmClient.kt` + `LlmSettingsActivity.kt` + `activity_llm_settings.xml`）：
+  - `LlmProviders.list` 新增第 4 个提供方：
+    `id="volcano-agent-plan"`、显示名 **火山 AI Hub（Agent Plan）**、
+    Base URL `https://ark.cn-beijing.volces.com/api/plan/v3`、默认模型 `doubao-seed-2.0-lite`
+    （Small 档可用、快/省燃料；可自行改成 pro / glm / kimi 等）；
+  - `LlmProvider` 新增 `hint` 字段，设置页在“模型”输入框下方显示该提供方的说明：
+    明确提示“Agent-Plan-Small 是套餐档位不是模型名，模型框应填具体模型名”，并列出常用模型示例。
+- 版本号 versionCode 11 → 12（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-04 第二轮）。
+- **待真机验证**：用真实 Agent Plan API Key + 套餐内模型名测试“测试连接”与流式对话；
+  若个别模型对 Chat Completions/流式不兼容（社区反馈个别模型走 Responses 更稳），在日志中看报错并换模型。
+
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 
 ### 1. GBK / 中文输入提速
@@ -169,9 +193,11 @@
 ### 3. 大模型接入（类 CC Switch：选提供方 + 填 Token）
 
 - 新增 `LlmClient.kt`：OpenAI 兼容 Chat Completions 客户端（HttpURLConnection，无新增依赖）。
-- 提供方预设（`LlmProviders`）只有三个：**DeepSeek**（`deepseek-v4-flash`）、
+- 提供方预设（`LlmProviders`）现有四个：**DeepSeek**（`deepseek-v4-flash`）、
   **小米 MiMo**（`mimo-v2.5`）、**火山引擎豆包**（`doubao-seed-1-8-251228`，
-  地址 `https://ark.cn-beijing.volces.com/api/v3`）。
+  地址 `https://ark.cn-beijing.volces.com/api/v3`）、**火山 AI Hub（Agent Plan）**
+  （默认 `doubao-seed-2.0-lite`，地址 `https://ark.cn-beijing.volces.com/api/plan/v3`，
+  2026-09-04 第二轮新增，详见上文“最新一轮”）。
 - 模型设置二级页面（`LlmSettingsActivity`）：下拉选提供方 → 模型自动填预设 → 只填 API Token →
   测试连接 → 保存自动返回。主界面右上角新增常驻“模型设置”按钮。
 - 大模型对话卡片：提问输入框、“发送给模型”、可编辑输出框（显示“我/AI”对话）、“发送到键盘”、“清空”。
@@ -257,9 +283,13 @@
       **不要为了“提速”再把 MIN_DELAY_MS 调回 10ms 以下**——那是丢报告/卡键/误全选删除的根源。
 - [x] 2026-09-04 已实现：各档再提速 10%、发送行缩短 + “新对话”按钮、历史对话下拉（查看/载入/删除）、
       “＋”本地图片/音频多模态附件（versionCode 11，APK 已更新）；**尚未真机验证**。
+- [x] 2026-09-04（第二轮）已实现：新增“火山 AI Hub（Agent Plan）”提供方预设（versionCode 12，
+      APK 已更新）；**尚未真机验证**——需真实 Agent Plan Key + 套餐内模型名验证“测试连接”与流式对话。
 - [ ] 大模型：Token 换 EncryptedSharedPreferences（个人自用可暂缓）；流式可加“停止”按钮；
       各家用模型名可能更新，需在设置页改。
 - [ ] 真机验证 2026-09-04 新功能；多模态附件能否成功取决于所选模型/提供方是否支持（不支持会在日志报错，属模型能力限制）。
+- [ ] 真机验证“火山 AI Hub（Agent Plan）”：确认所选套餐档位（如 Small）下模型可用、流式输出正常；
+      若某模型报错，按报错信息在模型框换一个套餐内模型。
 - [ ] 历史规划（`HISTORY.md` 待办）：微软拼音 `vuc` 方案、一键 Shift 切换中英文等，尚未实现。
 
 ## 四、给“家用电脑 ChatGPT”的提示
@@ -327,6 +357,7 @@
 - ~~正式发布 v1.3 + v1.4~~（已完成，2026-08-28）。
 - ~~大模型流式输出~~（已完成，2026-09-02）；~~对话历史持久化~~（已完成，2026-09-02）。
 - ~~2026-09-04：各档再提速 10%、发送行缩短 + “新对话”、历史对话下拉、＋多模态附件~~（已实现，待真机验证）。
+- ~~2026-09-04（第二轮）：新增“火山 AI Hub（Agent Plan）”提供方~~（已实现，待真机验证）。
 - 正式发布 v1.5 / v2.0-beta（若需要）：归档 `releases/v1.5/`（或按 2.0 定名）+ 更新 `releases/LATEST` + 打 git tag。
 - 大模型：Token 换 EncryptedSharedPreferences（个人自用可暂缓）；流式可加“停止”按钮；家用模型名可能更新。
 - 历史规划：微软拼音 `vuc` 方案、一键 Shift 切换中英文（见 `HISTORY.md`）。
@@ -337,3 +368,12 @@
 - 直接在本分支 `phone-keyboard` 上提交并 `git push origin phone-keyboard`（与历史一致）。
 - 提交信息用中文、带 `feat(v1.x)` / `fix(v1.x)` 前缀；每次改完都重新编译 + 更新根目录 APK。
 - 版本号规则见 `releases/README.md`（当前开发版定名 **v2.0 Beta**，versionName "2.0-beta"）。
+
+### 6. 火山 AI Hub / Agent Plan 接入要点（2026-09-04，重要）
+
+- **“Agent-Plan-Small”是套餐档位，不是模型名**；模型框只能填套餐内具体模型
+  （`doubao-seed-2.0-lite/pro`、`glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）。
+- 专属 Base URL：`https://ark.cn-beijing.volces.com/api/plan/v3`；接口 `.../chat/completions`；
+  鉴权 `Bearer <Agent Plan 专用 Key>`；普通火山 Key 不通用；无 `/models` 列表接口。
+- 本 App 已用 Chat Completions（含 SSE 流式）接入；若用户反馈某模型 4xx/不兼容，
+  优先建议在模型框换模型，其次才考虑个别模型是否需走 Responses API（社区反馈个别模型有差异）。

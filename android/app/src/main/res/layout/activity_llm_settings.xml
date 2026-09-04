@@ -107,6 +107,15 @@
                 android:textSize="11sp"
                 android:textColor="@color/text_hint"
                 android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/llmProviderHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:paddingTop="2dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <Button
