@@ -13,7 +13,7 @@
 - 请求格式：OpenAI 兼容 Chat Completions；纯文本 content 用字符串，带图片/音频附件时用 content 数组
   （图片 `image_url` data-URI；音频 `input_audio`，小米 MiMo 原生支持）。
 
-## 2. 四个提供方速查表（截至 2026-09-04，versionCode 12）
+## 2. 四个提供方速查表（截至 2026-09-05，versionCode 14）
 
 | 显示名（下拉） | id | Base URL（接口自动补 `/chat/completions`） | 默认模型 | Key 格式 | 说明 |
 |---|---|---|---|---|---|
@@ -26,7 +26,7 @@
 
 ## 3. 火山 AI Hub / Agent Plan（重点，容易踩坑）
 
-### 3.1 结论（多来源交叉核实，2026-09-04）
+### 3.1 结论（多来源交叉核实 + 2026-09-05 官方文档复核）
 
 - **“Agent-Plan-Small”是套餐档位（Small / Medium / Large / Max），不是模型名。**
   把 `Agent-Plan-Small` 填进 `model` 字段会报模型不存在/400。
@@ -34,7 +34,7 @@
   - Base URL：`https://ark.cn-beijing.volces.com/api/plan/v3`
   - 实际接口：`https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions`
   - 鉴权：`Authorization: Bearer <Agent Plan 专用 API Key>`
-- **推荐模型名：`ark-code-latest`**（2026-09-05 用户按官方文档确认）：多模型聚合入口，
+- **推荐模型名：`ark-code-latest`**（2026-09-05 官方文档复核确认）：多模型聚合入口，
   填它会自动选择套餐内最合适的子模型，最省心；作为本 App 该提供方的默认模型。
 - 也可填**套餐内具体模型名**强制指定，例如：
   `doubao-seed-2.0-mini` / `doubao-seed-2.0-lite` / `doubao-seed-2.0-pro` /
@@ -55,6 +55,14 @@
   请填具体模型名”并列出常用模型；新增其它“套餐型”提供方时可复用该机制。
 
 ### 3.3 参考链接
+
+- 官方《Agent Plan 个人版 · 快速开始》（2026-09-05 复核）：
+  <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373738?lang=zh>
+  （模型名可填 `ark-code-latest`；开通管理页切换子模型 3–5 分钟生效）
+- 官方《Agent Plan · 其他工具 · OpenAI 兼容接入》（2026-09-05 复核，本 App 属此类）：
+  <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373746?lang=zh>
+  （OpenAI 兼容 Base URL = `https://ark.cn-beijing.volces.com/api/plan/v3`；
+  Model 支持 `ark-code-latest` 或具体 Model Name 两种方式）
 
 - 火山方舟官方 Agent/Coding Plan API 参考（入口）：<https://docs.volcengine.com/docs/82379/2407058?lang=zh>
 - CC Switch 实测 issue（确认 Base URL、`model = <Model_Name>`、无 `/models` 接口）：

@@ -19,6 +19,7 @@
 - 2026-09-04（第二轮）：**新增“火山 AI Hub（Agent Plan）”大模型提供方**（详见下文“最新一轮”）
 - 2026-09-05：**流式回复实时显示“思考中…”过程 + 各档提速 5% + 新增“普通模式”预设**（详见下文“最新一轮”）
 - 2026-09-05（第二轮）：**火山 AI Hub（Agent Plan）默认模型改为官方聚合模型 `ark-code-latest`**（详见下文“最新一轮”）
+- 2026-09-05（第三轮）：**按官方文档复核火山 Agent Plan 接入配置，确认与现有实现完全一致（无需改代码）**（详见下文“最新一轮”）
 - 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-04 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
@@ -204,6 +205,27 @@
 - `MainActivity.loadLlmPrefs()`：自动迁移——仅当提供方是 volcano-agent-plan 且已存模型恰为旧默认
   `doubao-seed-2.0-lite` 时替换为 `ark-code-latest`；不覆盖用户手动指定的其它具体模型。
 - 版本号 versionCode 13 → 14（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-05 第二轮）。
+
+## 最新一轮（2026-09-05 第三轮 · 官方文档复核 Agent Plan 接入配置）
+
+用户发来火山方舟官方文档页（Agent Plan 个人版 · 快速开始，另核对了同目录《其他工具》页），要求阅读其配置说明。
+结论：**现有实现与官方文档完全一致，本轮不改代码、不升版本号、不重编 APK**，仅把官方核对结论与链接归档。
+
+- 官方《快速开始》要点（<https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373738?lang=zh>）：
+  - Agent Plan 用**专属 Base URL + 专属 API Key**（其他方舟 Key 不可用）；
+  - 模型名可填 **`ark-code-latest`**（官方示例：“更新文本生成模型的名称，如 ark-code-latest”）——
+    它是“控制台可切换的聚合模型”：在开通管理页选子模型后 3–5 分钟生效，最省心；
+    也可填套餐内具体 Model Name 强制指定。
+- 官方《其他工具（OpenAI 兼容接入）》要点
+  （<https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373746?lang=zh>，本 App 属此类）：
+  - Agent Plan 兼容两种协议：Anthropic（Base URL `.../api/plan`）与 **OpenAI（Base URL `.../api/plan/v3`）**；
+  - OpenAI 兼容类工具（Cline/Cursor/Roo Code/Kilo Code/Codex CLI 等）配置 =
+    Base URL `https://ark.cn-beijing.volces.com/api/plan/v3` + Agent Plan 专用 Key +
+    Model ID 填 **`ark-code-latest`** 或具体 Model Name——与本 App 预设逐项一致。
+- 逐项对照现有实现（`LlmClient.kt` 的 `volcano-agent-plan`）：
+  `baseUrl=https://ark.cn-beijing.volces.com/api/plan/v3`、`defaultModel=ark-code-latest`、
+  `endpoint=…/chat/completions`、hint 提示 Agent Plan 专用 Key——**全部与官方一致**。
+- 归档：`docs/LLM_PROVIDERS.md` §3.1/§3.3 已补官方核对说明与两个官方链接。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 

@@ -143,6 +143,12 @@
 - 提供方预设默认模型 doubao-seed-2.0-lite → ark-code-latest；设置页提示同步更新；
   自动迁移已保存的旧默认值（不覆盖手动指定的具体模型）。versionCode 14。
 
+### 2026-09-05 · v2.0-beta（官方文档复核 Agent Plan 接入配置）
+- 阅读火山方舟官方《Agent Plan 个人版 · 快速开始》与《其他工具（OpenAI 兼容接入）》，
+  确认现有接入（Base URL `https://ark.cn-beijing.volces.com/api/plan/v3` + 模型 `ark-code-latest`
+  + Agent Plan 专用 Key）与官方文档完全一致；`ark-code-latest` 为控制台可切换的聚合模型（切换 3–5 分钟生效）。
+- 本轮不改代码、不升版本号，仅归档核对结论与官方链接。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
