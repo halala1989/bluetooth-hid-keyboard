@@ -7,7 +7,7 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 13 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 14 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
@@ -18,6 +18,7 @@
 - 2026-09-04：**各档再提速 10% + 缩短“发送给模型”/新增“新对话” + 历史对话下拉（查看/载入/删除）+ “＋”多模态附件**（详见下文“最新一轮”）
 - 2026-09-04（第二轮）：**新增“火山 AI Hub（Agent Plan）”大模型提供方**（详见下文“最新一轮”）
 - 2026-09-05：**流式回复实时显示“思考中…”过程 + 各档提速 5% + 新增“普通模式”预设**（详见下文“最新一轮”）
+- 2026-09-05（第二轮）：**火山 AI Hub（Agent Plan）默认模型改为官方聚合模型 `ark-code-latest`**（详见下文“最新一轮”）
 - 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-04 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
@@ -192,6 +193,17 @@
    预设版本号 2→3（老用户自动增量补齐，不覆盖自定义）。
 - 版本号 versionCode 12 → 13（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-05）。
 - 实现文件：`LlmClient.kt`、`MainActivity.kt`、`activity_main.xml`、`TypingEngine.kt`。
+
+## 最新一轮（2026-09-05 第二轮 · 火山 Agent Plan 默认模型改为 ark-code-latest）
+
+用户按火山官方文档确认：Agent Plan 的模型应填 **`ark-code-latest`**（多模型聚合入口，
+会自动选择套餐内最合适的子模型），而不是写死某个具体模型。
+
+- `LlmClient.kt`：`volcano-agent-plan` 提供方 `defaultModel` 由 `doubao-seed-2.0-lite` 改为 `ark-code-latest`；
+  设置页 `hint` 同步更新（推荐聚合模型，仍可手动填具体模型强制指定）。
+- `MainActivity.loadLlmPrefs()`：自动迁移——仅当提供方是 volcano-agent-plan 且已存模型恰为旧默认
+  `doubao-seed-2.0-lite` 时替换为 `ark-code-latest`；不覆盖用户手动指定的其它具体模型。
+- 版本号 versionCode 13 → 14（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-05 第二轮）。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 
@@ -397,8 +409,9 @@
 
 ### 6. 火山 AI Hub / Agent Plan 接入要点（2026-09-04，重要）
 
-- **“Agent-Plan-Small”是套餐档位，不是模型名**；模型框只能填套餐内具体模型
-  （`doubao-seed-2.0-lite/pro`、`glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）。
+- **“Agent-Plan-Small”是套餐档位，不是模型名**；模型框推荐填 **`ark-code-latest`**
+  （多模型聚合入口，自动选套餐内最合适子模型，2026-09-05 起默认），
+  也可填套餐内具体模型（`doubao-seed-2.0-lite/pro`、`glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）。
 - 专属 Base URL：`https://ark.cn-beijing.volces.com/api/plan/v3`；接口 `.../chat/completions`；
   鉴权 `Bearer <Agent Plan 专用 Key>`；普通火山 Key 不通用；无 `/models` 列表接口。
 - 本 App 已用 Chat Completions（含 SSE 流式）接入；若用户反馈某模型 4xx/不兼容，

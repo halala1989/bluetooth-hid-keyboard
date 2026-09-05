@@ -32,10 +32,10 @@ object LlmProviders {
             id = "volcano-agent-plan",
             displayName = "火山 AI Hub（Agent Plan）",
             baseUrl = "https://ark.cn-beijing.volces.com/api/plan/v3",
-            defaultModel = "doubao-seed-2.0-lite",
-            hint = "“Agent-Plan-Small”是您的订阅套餐档位，不是模型名，请勿填进“模型”框。" +
-                "模型框应填该套餐支持的具体模型，如 doubao-seed-2.0-lite（默认，快/省燃料）、" +
-                "doubao-seed-2.0-pro（更强、支持图片）、glm-5.2、kimi-k2.6、deepseek-v4-pro 等。" +
+            defaultModel = "ark-code-latest",
+            hint = "官方推荐模型：ark-code-latest（多模型聚合入口，会自动选套餐内最合适的子模型，最省心）。" +
+                "也可手动填套餐内具体模型强制指定，如 doubao-seed-2.0-lite、doubao-seed-2.0-pro、" +
+                "glm-5.2、kimi-k2.6、deepseek-v4-pro 等。注意“Agent-Plan-Small”是订阅套餐档位，不是模型名。" +
                 "API Token 填火山方舟控制台 Agent Plan 的专用 API Key（ark- 开头）。"
         )
     )

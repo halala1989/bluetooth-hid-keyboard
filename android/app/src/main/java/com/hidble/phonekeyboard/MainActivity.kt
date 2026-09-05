@@ -675,6 +675,12 @@ class MainActivity : AppCompatActivity() {
         llmProviderId = prefs.getString(LlmPrefs.KEY_PROVIDER, null) ?: LlmProviders.list.first().id
         llmApiKey = prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: ""
         llmModel = prefs.getString(LlmPrefs.KEY_MODEL, "") ?: ""
+        // 迁移（2026-09-05）：火山 AI Hub(Agent Plan) 旧默认模型 doubao-seed-2.0-lite
+        // → 官方推荐的多模型聚合模型 ark-code-latest（仅当仍是旧默认值时替换，不覆盖手动指定的具体模型）
+        if (llmProviderId == "volcano-agent-plan" && llmModel == "doubao-seed-2.0-lite") {
+            llmModel = "ark-code-latest"
+            prefs.edit().putString(LlmPrefs.KEY_MODEL, llmModel).apply()
+        }
         llmOutput.setText(prefs.getString(LlmPrefs.KEY_OUTPUT, "") ?: "")
         loadLlmHistory()
         applyLlmColors()

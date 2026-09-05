@@ -20,7 +20,7 @@
 | DeepSeek | `deepseek` | `https://api.deepseek.com` | `deepseek-v4-flash` | `sk-…` | 最省心通用 |
 | 小米 MiMo | `mimo` | `https://api.xiaomimimo.com/v1` | `mimo-v2.5` | `sk-…` | 原生支持本地音频 `input_audio` |
 | 火山引擎（豆包） | `volcano` | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-1-8-251228` | `ark-…`（普通方舟 Key） | 标准方舟 OpenAI 兼容端点 |
-| 火山 AI Hub（Agent Plan） | `volcano-agent-plan` | `https://ark.cn-beijing.volces.com/api/plan/v3` | `doubao-seed-2.0-lite` | `ark-…`（Agent Plan 专用 Key） | Agent Plan 套餐专属端点，2026-09-04 新增 |
+| 火山 AI Hub（Agent Plan） | `volcano-agent-plan` | `https://ark.cn-beijing.volces.com/api/plan/v3` | `ark-code-latest` | `ark-…`（Agent Plan 专用 Key） | Agent Plan 套餐专属端点；默认官方聚合模型 `ark-code-latest`（2026-09-05 更新） |
 
 代码位置：`android/app/src/main/java/com/hidble/phonekeyboard/LlmClient.kt` 的 `LlmProviders.list`。
 
@@ -34,7 +34,9 @@
   - Base URL：`https://ark.cn-beijing.volces.com/api/plan/v3`
   - 实际接口：`https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions`
   - 鉴权：`Authorization: Bearer <Agent Plan 专用 API Key>`
-- `model` 字段填**套餐内具体模型名**，例如：
+- **推荐模型名：`ark-code-latest`**（2026-09-05 用户按官方文档确认）：多模型聚合入口，
+  填它会自动选择套餐内最合适的子模型，最省心；作为本 App 该提供方的默认模型。
+- 也可填**套餐内具体模型名**强制指定，例如：
   `doubao-seed-2.0-mini` / `doubao-seed-2.0-lite` / `doubao-seed-2.0-pro` /
   `glm-5.2` / `kimi-k2.6` / `deepseek-v4-pro` 等（以火山方舟控制台/官方文档为准）。
 - **普通火山方舟 Key（`/api/v3`）与 Agent Plan Key 不通用**；Token 填控制台 Agent Plan 专用 Key。
@@ -45,8 +47,10 @@
 
 ### 3.2 本 App 的预设
 
-- 提供方显示名：“火山 AI Hub（Agent Plan）”，默认模型 `doubao-seed-2.0-lite`
-  （Small 档可用、快/省燃料；可自行改成 pro / glm / kimi 等）。
+- 提供方显示名：“火山 AI Hub（Agent Plan）”，默认模型 **`ark-code-latest`**
+  （官方推荐多模型聚合入口，自动选套餐内最合适的子模型；2026-09-05 起默认）。
+- 也可手动填套餐内具体模型强制指定（`doubao-seed-2.0-lite` / `doubao-seed-2.0-pro` /
+  `glm-5.2` / `kimi-k2.6` / `deepseek-v4-pro` 等）。
 - `LlmProvider` 有 `hint` 字段：设置页在模型框下方显示“Agent-Plan-Small 是套餐档位不是模型名，
   请填具体模型名”并列出常用模型；新增其它“套餐型”提供方时可复用该机制。
 
