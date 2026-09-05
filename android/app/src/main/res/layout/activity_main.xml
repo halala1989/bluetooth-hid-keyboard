@@ -394,12 +394,15 @@
 
                 <TextView
                     android:id="@+id/llmThinkingText"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="AI 正在思考"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textColor="@color/text_secondary"
-                    android:layout_marginStart="8dp" />
+                    android:layout_marginStart="8dp"
+                    android:maxLines="4"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <!-- 对话输出框：右侧上下滑块可查看长文本（内容溢出时优先内部滚动） -->

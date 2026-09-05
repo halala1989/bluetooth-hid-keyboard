@@ -174,7 +174,7 @@ class TypingEngine(
         // 2026-09-04：再提速 10%（×0.9）：[3600,2970,...] → [3240,2673,...]。
         // 注意 MIN_DELAY_MS=10 为蓝牙物理下限，高档位（约 7 档以上）会触底，
         // 实际速度以链路为准，不要再下调 MIN_DELAY_MS。
-        private val SPEED_SCALES = intArrayOf(3240, 2673, 2187, 1701, 1296, 932, 632, 405, 211, 65)
+        private val SPEED_SCALES = intArrayOf(3078, 2539, 2078, 1616, 1231, 885, 600, 385, 200, 62)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)

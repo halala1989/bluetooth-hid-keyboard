@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         private const val DEFAULT_SPEED_LEVEL = 5
         private const val SPEED_MIN = 1
         private const val SPEED_MAX = 10
-        private const val PROMPT_PRESET_VERSION = 2
+        private const val PROMPT_PRESET_VERSION = 3
         private const val MAX_ATTACH_MB = 12
         private const val MAX_ATTACH_BYTES = MAX_ATTACH_MB * 1024 * 1024
         private const val MAX_ATTACH_COUNT = 4
@@ -170,6 +170,8 @@ class MainActivity : AppCompatActivity() {
     // AI 思考动画（类 ChatGPT 的“正在思考…”点号动画）
     private val thinkingHandler = Handler(Looper.getMainLooper())
     private var thinkingRunnable: Runnable? = null
+    private var thinkingStartMs = 0L
+    private val reasoningBuffer = StringBuilder()
 
     // 正在发送的协程（用于“停止”中止）
     private var sendJob: Job? = null
@@ -1155,6 +1157,10 @@ class MainActivity : AppCompatActivity() {
                 "去除口语化表达、语气词、重复内容和多余的符号/制表符，使整段话专业、正式、通顺。"
         ),
         LlmPrompt(
+            "普通模式",
+            "普通模式：不用把我说的话做成任何医学/病历相关的东西，也不要改写润色、不要套模板；就像平时聊天一样，自然地直接回复我即可。"
+        ),
+        LlmPrompt(
             "门诊病历草稿",
             """
             你是医院的门诊病历助手。请把下面这段“医生与患者的对话”整理成一份规范的门诊病历草稿，遵循中国《病历书写基本规范》：
@@ -1517,6 +1523,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             var started = false
+            reasoningBuffer.setLength(0)
             val apiMessages = mutableListOf(LlmMessage.text("system", "你是简洁的助手。"))
             llmHistory.forEach { apiMessages.add(it.toApiMessage()) }
             val reply = try {
@@ -1524,7 +1531,10 @@ class MainActivity : AppCompatActivity() {
                     provider,
                     llmApiKey,
                     model,
-                    apiMessages
+                    apiMessages,
+                    onReasoning = { r ->
+                        runOnUiThread { showStreamingReasoning(r) }
+                    }
                 ) { delta ->
                     if (!started) {
                         started = true
@@ -1566,16 +1576,33 @@ class MainActivity : AppCompatActivity() {
     /** 显示“AI 正在思考…”动画（类 ChatGPT），请求发出后开始，回复/失败后停止 */
     private fun startThinking() {
         llmThinkingRow.visibility = View.VISIBLE
+        thinkingStartMs = System.currentTimeMillis()
         val runnable = object : Runnable {
             private var dots = 0
             override fun run() {
                 dots = (dots % 3) + 1
-                llmThinkingText.text = "AI 正在思考" + ".".repeat(dots)
+                val secs = (System.currentTimeMillis() - thinkingStartMs) / 1000
+                llmThinkingText.text = "AI 正在思考" + ".".repeat(dots) + "（已等待 ${secs}s）"
                 thinkingHandler.postDelayed(this, 400)
             }
         }
         thinkingRunnable = runnable
         runnable.run()
+    }
+
+    /** 流式中实时显示模型思考过程（reasoning_content），让用户看到“在动、没卡住”；不写入对话正文 */
+    private fun showStreamingReasoning(delta: String) {
+        // 进入实时思考显示后取消点号动画，避免互相覆盖
+        thinkingRunnable?.let { thinkingHandler.removeCallbacks(it) }
+        thinkingRunnable = null
+        llmThinkingRow.visibility = View.VISIBLE
+        reasoningBuffer.append(delta)
+        if (reasoningBuffer.length > 6000) {
+            reasoningBuffer.delete(0, reasoningBuffer.length - 6000)
+        }
+        val full = reasoningBuffer.toString()
+        val tail = if (full.length > 250) "…" + full.takeLast(250) else full
+        llmThinkingText.text = "思考中：" + tail
     }
 
     private fun stopThinking() {

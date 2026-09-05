@@ -168,6 +168,7 @@ object LlmClient {
         apiKey: String,
         model: String,
         messages: List<LlmMessage>,
+        onReasoning: (String) -> Unit = {},
         onDelta: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val body = JSONObject()
@@ -220,16 +221,26 @@ object LlmClient {
                         try {
                             // 只接受真正的字符串内容：角色切换/思考阶段/结束标记等增量块的
                             // content 是 JSON null，optString 会返回字面量 "null" 导致正文串入 null。
-                            val delta = JSONObject(data)
+                            val choice = JSONObject(data)
                                 .optJSONArray("choices")
                                 ?.optJSONObject(0)
-                                ?.optJSONObject("delta")
+                            val deltaObj = choice?.optJSONObject("delta")
+                            // 正文增量：只接受真正的字符串内容（JSON null/数字会被忽略，避免串入 "null"）
+                            val delta = deltaObj
                                 ?.opt("content")
                                 ?.takeIf { it is String && it.isNotEmpty() }
                                 ?.toString()
                             if (delta != null) {
                                 sb.append(delta)
                                 onDelta(delta)
+                            }
+                            // 思考过程增量（reasoning_content / reasoning）：不少模型“思考”阶段只回这个、
+                            // 正文要等想完才给。单独回调给 UI 实时显示，避免看起来“卡住/一次性输出”
+                            val reasoning = (deltaObj?.opt("reasoning_content") ?: deltaObj?.opt("reasoning"))
+                                ?.takeIf { it is String && it.isNotEmpty() }
+                                ?.toString()
+                            if (reasoning != null) {
+                                onReasoning(reasoning)
                             }
                         } catch (e: Exception) {
                             // 忽略非 JSON 的注释行
