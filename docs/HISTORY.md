@@ -149,6 +149,14 @@
   + Agent Plan 专用 Key）与官方文档完全一致；`ark-code-latest` 为控制台可切换的聚合模型（切换 3–5 分钟生效）。
 - 本轮不改代码、不升版本号，仅归档核对结论与官方链接。
 
+### 2026-09-06 · v2.0-beta（科学文献检索：对话前勾选自动查学术文献）
+- 新增 LlmLiterature.kt：直连火山 Agent Plan“专业数据集”MCP（工具 dataPro_search，Streamable HTTP JSON-RPC），
+  覆盖 CNKI/万方/维普/arxiv/PubMed/MDPI/Biorxiv；code 4011 = Key 无效/额度不足/未开启专业数据集 Harness。
+- 主界面新增“🔬 检索科学文献”勾选框：发送前先检索，文献作参考上下文附给模型（不写入历史），
+  结果条可点按查看并复制链接；检索失败不阻断对话。
+- 模型设置新增“科学文献检索专用 Key（可选）”，留空用 Agent Plan Token；需先在方舟控制台开启专业数据集 Harness。
+  versionCode 15。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
@@ -169,6 +177,9 @@
     `https://ark.cn-beijing.volces.com/api/plan/v3`（OpenAI 兼容，Chat Completions/SSE 均可用），
     Token 用 Agent Plan 专用 Key（ark- 开头，与普通方舟 Key 不通用），无 `/models` 列表接口，
     模型名需手动填套餐内具体模型。
+13. **火山 Agent Plan 科学文献检索 = MCP（dataPro_search）**：不是聊天自动开关。端点
+    `https://datapro.hqd.cn-beijing.volces.com/mcp`，头 `X-Agent-Plan-Key`；App 在发送前调它把文献拼进上下文。
+    返回 code==0 成功、**4011=Key 无效/额度不足/未开启专业数据集权限**；需先在控制台“配置 Harness”开启专业数据集。
 
 ## 四、测试反馈与已知限制
 

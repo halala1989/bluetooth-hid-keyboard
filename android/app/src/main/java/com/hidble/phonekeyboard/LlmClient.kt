@@ -36,7 +36,8 @@ object LlmProviders {
             hint = "官方推荐模型：ark-code-latest（多模型聚合入口，会自动选套餐内最合适的子模型，最省心）。" +
                 "也可手动填套餐内具体模型强制指定，如 doubao-seed-2.0-lite、doubao-seed-2.0-pro、" +
                 "glm-5.2、kimi-k2.6、deepseek-v4-pro 等。注意“Agent-Plan-Small”是订阅套餐档位，不是模型名。" +
-                "API Token 填火山方舟控制台 Agent Plan 的专用 API Key（ark- 开头）。"
+                "API Token 填火山方舟控制台 Agent Plan 的专用 API Key（ark- 开头）。" +
+                "科学文献检索（对话前勾选）：需先在方舟控制台“使用配置→配置 Harness”开启“专业数据集”才能用，检索用本 Token 即可；设置页另有“科学文献检索专用 Key”一栏可单独填。"
         )
     )
 
@@ -90,6 +91,8 @@ object LlmPrefs {
     const val KEY_PROMPT_PRESET_VERSION = "llm_prompt_preset_version"
     const val KEY_HISTORY = "llm_history"
     const val KEY_CONVERSATIONS = "llm_conversations"
+    const val KEY_LIT_SEARCH = "llm_lit_search"
+    const val KEY_DATAPRO_KEY = "llm_datapro_key"
 }
 
 /** OpenAI 兼容 Chat Completions 客户端（HttpURLConnection，无额外依赖，非流式） */

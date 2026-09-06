@@ -7,7 +7,7 @@
 ## 一、当前状态（重要）
 
 - 分支：`phone-keyboard`（默认分支，当前产品线）
-- 版本：**v2.0 Beta（开发版）**（versionCode 14 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+- 版本：**v2.0 Beta（开发版）**（versionCode 15 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
   v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
 - 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
 - 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
@@ -20,7 +20,8 @@
 - 2026-09-05：**流式回复实时显示“思考中…”过程 + 各档提速 5% + 新增“普通模式”预设**（详见下文“最新一轮”）
 - 2026-09-05（第二轮）：**火山 AI Hub（Agent Plan）默认模型改为官方聚合模型 `ark-code-latest`**（详见下文“最新一轮”）
 - 2026-09-05（第三轮）：**按官方文档复核火山 Agent Plan 接入配置，确认与现有实现完全一致（无需改代码）**（详见下文“最新一轮”）
-- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-04 最新编译产物
+- 2026-09-06：**大模型对话新增“检索科学文献”（勾选后先查学术文献再让模型回答）**（详见下文“最新一轮”）
+- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-06 最新编译产物
   （本机调试签名 SHA-256 开头 `042c0c23...`）
 - **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
   另一台电脑（今早开发的那台）的目标机用 **GBK 模式**（必须 NumLock 开启）。两边代码相同，仅目标机模式/速度档位不同。
@@ -226,6 +227,39 @@
   `baseUrl=https://ark.cn-beijing.volces.com/api/plan/v3`、`defaultModel=ark-code-latest`、
   `endpoint=…/chat/completions`、hint 提示 Agent Plan 专用 Key——**全部与官方一致**。
 - 归档：`docs/LLM_PROVIDERS.md` §3.1/§3.3 已补官方核对说明与两个官方链接。
+
+## 最新一轮（2026-09-06 · 大模型对话新增“检索科学文献”）
+
+用户希望：在手机 App 跟模型对话时，勾选一个“检索科学文献”选项就能启用 Agent Plan 的专业数据集（科学文献检索），
+让模型先查文献再回答（医疗/科普场景：给病人解释时能引用真实文献）。
+
+背景/原理（重要）：火山 Agent Plan 的“科学文献检索”不是对话开关，而是官方以 **MCP Server** 提供的
+“专业数据集”Harness（工具 `dataPro_search`，入参 `query`）。App 的做法 = 发消息给模型前先调该 MCP 把文献取回，
+拼成参考上下文塞给模型，让模型据此回答并标注来源。
+
+- 新文件 `LlmLiterature.kt`：MCP Streamable HTTP JSON-RPC 客户端（HttpURLConnection，零新依赖）。
+  - 端点 `https://datapro.hqd.cn-beijing.volces.com/mcp`，鉴权头 `X-Agent-Plan-Key`（网关也认 `X-Hqd-Api-Key`）；
+  - 流程 initialize → notifications/initialized → tools/list → tools/call；协议版本 2025-06-18；
+  - 返回 structuredContent/content[].text = `{code,msg,query,total,items}`；code==0 成功，**code==4011** =
+    Key 无效/额度不足/未开启专业数据集 Harness（服务端返回中文提示，直接展示给用户）；
+  - 宽容解析 items 字段（title/url/date/author/journal/abstract 中英文键名都试），raw 留档便于排查；
+  - 实测覆盖：学术文献库含 CNKI、万方、维普、arxiv、PubMed、MDPI、Biorxiv 等（服务端能力说明原文）。
+- 主界面：发送行下方新增勾选框 **“🔬 检索科学文献”**（`llmLitCheck`，状态存 `llm_lit_search`）；
+  勾选后发送流程 = 先检索（显示“正在检索科学文献…”），成功后：
+  - 文献作为额外上下文插到最新提问前（**不写入对话历史**，避免上下文膨胀/重复检索）；
+  - 输出区上方出现结果条“已检索到 N 篇学术文献 · 点按查看”，点按弹出本次命中条目，点条目复制链接；
+  - 检索失败不阻断对话：结果条红字提示 + 写命令日志，按普通问答继续。
+  - 检索词生成：用户话里没带“论文/文献/期刊…”等词时自动补“请检索近5年相关学术论文与文献”以便路由到学术库。
+- 设置页：新增 **“科学文献检索专用 Key（可选）”**（`llm_datapro_key`，仅火山 AI Hub 提供方显示）；
+  留空 = 使用上方 Agent Plan Token；也可单独填，便于“用别家模型对话 + 用 Agent Plan 检索”解耦。
+  勾选框可用条件 = 有该专用 Key 或当前提供方是火山 AI Hub(Agent Plan) 且有 Token。
+- `LlmProvider.hint` 同步加了“需在控制台开启专业数据集”的提示。
+- 使用前提（用户需自己在控制台做一次）：已购 Agent Plan 套餐 → 「使用配置 → 配置 Harness」打开
+  **专业数据集**抵扣开关 → 拿到 Agent Plan 专属 Key。文档见
+  <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2479086?lang=zh>。
+- 版本号 versionCode 14 → 15（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-06）。
+- **待真机验证**：真实 Key + 控制台开启 Harness 后，勾选“检索科学文献”发一条医疗/科普问题，看结果条命中条数、
+  模型是否按文献回答并给参考来源；若报 4011，按提示去控制台开 Harness 或确认 Key/额度。
 
 ## 二、本次开发会话内容（2026-08-27 对话整理）
 

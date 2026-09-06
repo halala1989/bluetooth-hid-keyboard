@@ -13,7 +13,7 @@
 - 请求格式：OpenAI 兼容 Chat Completions；纯文本 content 用字符串，带图片/音频附件时用 content 数组
   （图片 `image_url` data-URI；音频 `input_audio`，小米 MiMo 原生支持）。
 
-## 2. 四个提供方速查表（截至 2026-09-05，versionCode 14）
+## 2. 四个提供方速查表（截至 2026-09-06，versionCode 15）
 
 | 显示名（下拉） | id | Base URL（接口自动补 `/chat/completions`） | 默认模型 | Key 格式 | 说明 |
 |---|---|---|---|---|---|
@@ -63,6 +63,9 @@
   <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373746?lang=zh>
   （OpenAI 兼容 Base URL = `https://ark.cn-beijing.volces.com/api/plan/v3`；
   Model 支持 `ark-code-latest` 或具体 Model Name 两种方式）
+- 官方《专业数据集（科学文献检索等）MCP Harness》
+  <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2479086?lang=zh>
+  （MCP 端点 `https://datapro.hqd.cn-beijing.volces.com/mcp`，头 `X-Agent-Plan-Key`；工具 `dataPro_search`，入参 `query`）
 
 - 火山方舟官方 Agent/Coding Plan API 参考（入口）：<https://docs.volcengine.com/docs/82379/2407058?lang=zh>
 - CC Switch 实测 issue（确认 Base URL、`model = <Model_Name>`、无 `/models` 接口）：
@@ -70,6 +73,19 @@
 - pi-provider-volcengine-agent-plan（Agent Plan 模型清单与档位可用性、协议差异）：
   <https://pi.dev/packages/pi-provider-volcengine-agent-plan>
 - CodePick 火山 Coding Plan / Agent Plan 指南：<https://codepick.dev/zh/guides/ark-coding-plan-guide/>
+
+### 3.4 App 内“科学文献检索”勾选（2026-09-06 新增）
+
+- 交互：主界面大模型对话的发送行下方有 **“🔬 检索科学文献”** 勾选框（状态存 `llm_lit_search`）。
+  勾选后，点“发送给模型”会**先检索、再问答**：App 直连上面 3.3 的 MCP 把文献取回，拼成参考上下文塞给模型，
+  让模型据此回答并标注来源；结果条“已检索到 N 篇学术文献 · 点按查看”可查看/复制链接。
+- Key：模型设置新增 **“科学文献检索专用 Key（可选）”**（`llm_datapro_key`，仅火山 AI Hub 提供方显示）；
+  留空 = 使用 Agent Plan Token；单独填可让“别家模型对话 + Agent Plan 检索”解耦。
+  勾选框可用条件：有专用 Key，或当前提供方是 `volcano-agent-plan` 且有 Token。
+- 前提（控制台一次性）：已购 Agent Plan 套餐 → 「使用配置 → 配置 Harness」开启**专业数据集**抵扣开关。
+- 代码：`LlmLiterature.kt`（MCP JSON-RPC 客户端，dataPro_search）；接入点在 `MainActivity.sendToLlm()`。
+  文献上下文只进本次请求、不写历史；检索失败不阻断对话（红字提示 + 命令日志）。
+- 常见错误：code 4011 = Key 无效 / 额度不足 / 未开启专业数据集权限（服务端返回中文提示）。
 
 ## 4. 多模态（图片/音频）注意事项
 

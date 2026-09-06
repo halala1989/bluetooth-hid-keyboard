@@ -79,6 +79,32 @@
                 android:layout_marginBottom="14dp" />
 
             <TextView
+                android:id="@+id/llmDataproLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="科学文献检索专用 Key（可选）"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+
+            <EditText
+                android:id="@+id/llmDataproKeyInput"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:hint="留空=使用上方 Agent Plan Token；需控制台开启“专业数据集”Harness"
+                android:inputType="textPassword"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="14sp"
+                android:importantForAutofill="no"
+                android:layout_marginBottom="14dp"
+                android:visibility="gone" />
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="模型"

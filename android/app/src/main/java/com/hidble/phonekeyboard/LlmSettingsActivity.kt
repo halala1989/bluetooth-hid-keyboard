@@ -25,6 +25,8 @@ class LlmSettingsActivity : AppCompatActivity() {
     private lateinit var modelInput: EditText
     private lateinit var baseUrlText: TextView
     private lateinit var providerHint: TextView
+    private lateinit var dataproLabel: TextView
+    private lateinit var dataproKeyInput: EditText
     private lateinit var testButton: Button
     private lateinit var saveButton: Button
     private lateinit var prefs: android.content.SharedPreferences
@@ -40,6 +42,8 @@ class LlmSettingsActivity : AppCompatActivity() {
         modelInput = findViewById(R.id.llmModelInput)
         baseUrlText = findViewById(R.id.llmBaseUrlText)
         providerHint = findViewById(R.id.llmProviderHint)
+        dataproLabel = findViewById(R.id.llmDataproLabel)
+        dataproKeyInput = findViewById(R.id.llmDataproKeyInput)
         testButton = findViewById(R.id.llmTestButton)
         saveButton = findViewById(R.id.llmSaveButton)
 
@@ -56,6 +60,7 @@ class LlmSettingsActivity : AppCompatActivity() {
         providerSpinner.setSelection(LlmProviders.indexOf(savedProvider ?: providers.first().id))
         tokenInput.setText(prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: "")
         modelInput.setText(prefs.getString(LlmPrefs.KEY_MODEL, "") ?: "")
+        dataproKeyInput.setText(prefs.getString(LlmPrefs.KEY_DATAPRO_KEY, "") ?: "")
 
         // 首次进入：保留已保存的模型，没有则用预设
         refreshPreset(overwriteModel = false)
@@ -88,6 +93,10 @@ class LlmSettingsActivity : AppCompatActivity() {
         }
         tokenInput.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         tokenInput.hint = "sk-..."
+        // 科学文献检索专用 Key：仅火山 AI Hub(Agent Plan) 需要；留空则用上方 Agent Plan Token
+        val showDatapro = p.id == "volcano-agent-plan"
+        dataproLabel.visibility = if (showDatapro) View.VISIBLE else View.GONE
+        dataproKeyInput.visibility = if (showDatapro) View.VISIBLE else View.GONE
     }
 
     private fun testConnection() {
@@ -137,6 +146,7 @@ class LlmSettingsActivity : AppCompatActivity() {
             .putString(LlmPrefs.KEY_PROVIDER, p.id)
             .putString(LlmPrefs.KEY_API_KEY, token)
             .putString(LlmPrefs.KEY_MODEL, model)
+            .putString(LlmPrefs.KEY_DATAPRO_KEY, dataproKeyInput.text.toString().trim())
             .apply()
         Toast.makeText(this, "已保存：${p.displayName}（$model）", Toast.LENGTH_SHORT).show()
         finish()

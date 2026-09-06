@@ -343,6 +343,18 @@
                     android:contentDescription="开始新对话，遗忘前文内容" />
             </LinearLayout>
 
+            <!-- 科学文献检索开关：勾选后，发送给模型前先调火山“专业数据集”MCP 检索学术文献，再让模型据此回答 -->
+            <CheckBox
+                android:id="@+id/llmLitCheck"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:buttonTint="@color/primary"
+                android:text="🔬 检索科学文献（发送前先查学术文献，让模型据此回答并给出参考来源）"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:contentDescription="检索科学文献开关" />
+
             <!-- 提示词选择（独占一行，避免与发送/新对话挤在一起） -->
             <Spinner
                 android:id="@+id/llmPromptSpinner"
@@ -404,6 +416,21 @@
                     android:maxLines="4"
                     android:ellipsize="end" />
             </LinearLayout>
+
+            <!-- 科学文献检索结果条：有结果/失败时显示，点按查看本次命中条目（可复制链接） -->
+            <TextView
+                android:id="@+id/llmLitInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_input"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="科学文献检索结果" />
 
             <!-- 对话输出框：右侧上下滑块可查看长文本（内容溢出时优先内部滚动） -->
             <com.hidble.phonekeyboard.ScrollableEditText

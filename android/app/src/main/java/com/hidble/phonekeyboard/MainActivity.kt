@@ -5,6 +5,8 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -64,6 +66,8 @@ class MainActivity : AppCompatActivity() {
         private const val MAX_ATTACH_BYTES = MAX_ATTACH_MB * 1024 * 1024
         private const val MAX_ATTACH_COUNT = 4
         private const val MAX_CONVERSATIONS = 50
+        private const val MAX_LIT_ITEMS = 6      // 一次最多塞给模型几条文献
+        private const val MAX_LIT_CHARS = 9000  // 文献参考上下文总预算
 
         /** 供二级页面（连接管理/更多按键）访问本 Activity 的 HID 引擎 */
         @Volatile
@@ -94,6 +98,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmHistorySpinner: Spinner
     private lateinit var llmAttachmentInfo: TextView
     private lateinit var llmAttachButton: Button
+    private lateinit var llmLitCheck: CheckBox
+    private lateinit var llmLitInfo: TextView
+    private var llmDataproKey = ""
+    private var lastLitItems: List<LlmLiterature.Item> = emptyList()
 
     private lateinit var hidManager: HidDeviceManager
     private lateinit var hidProtocol: HidProtocol
@@ -287,6 +295,8 @@ class MainActivity : AppCompatActivity() {
         llmAttachmentInfo = findViewById(R.id.llmAttachmentInfo)
         llmAttachButton = findViewById(R.id.llmAttachButton)
         llmNewConversationButton = findViewById(R.id.llmNewConversationButton)
+        llmLitCheck = findViewById(R.id.llmLitCheck)
+        llmLitInfo = findViewById(R.id.llmLitInfo)
 
         // 历史对话下拉（与提示词下拉同一样式：白字单行）
         llmHistoryAdapter = ArrayAdapter(this, R.layout.item_llm_prompt, R.id.promptLabel, llmHistoryItems)
@@ -468,6 +478,13 @@ class MainActivity : AppCompatActivity() {
 
         llmSendButton.setOnClickListener { sendToLlm() }
         llmNewConversationButton.setOnClickListener { startNewConversation() }
+        llmLitCheck.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(LlmPrefs.KEY_LIT_SEARCH, checked).apply()
+            if (!checked) hideLitInfo()
+        }
+        llmLitInfo.setOnClickListener {
+            if (lastLitItems.isNotEmpty()) showLiteratureDialog(lastLitItems)
+        }
         llmAttachButton.setOnClickListener { launchFilePicker() }
         llmAttachButton.setOnLongClickListener {
             if (pendingFiles.isEmpty()) {
@@ -684,6 +701,9 @@ class MainActivity : AppCompatActivity() {
         llmOutput.setText(prefs.getString(LlmPrefs.KEY_OUTPUT, "") ?: "")
         loadLlmHistory()
         applyLlmColors()
+        // 科学文献检索：读取专用 Key / 开关状态，并按当前提供方是否可用刷新勾选框
+        llmDataproKey = prefs.getString(LlmPrefs.KEY_DATAPRO_KEY, "") ?: ""
+        updateLiteratureUi()
     }
 
     /**
@@ -894,6 +914,8 @@ class MainActivity : AppCompatActivity() {
             .putString(LlmPrefs.KEY_OUTPUT, "")
             .apply()
         refreshHistorySpinner()
+        hideLitInfo()
+        lastLitItems = emptyList()
         appendLog(
             if (archived != null) "已开始新对话（旧对话已存入下方历史下拉：「$archived」）"
             else "已开始新对话"
@@ -960,6 +982,8 @@ class MainActivity : AppCompatActivity() {
         saveLlmHistory()
         saveConversations()
         refreshHistorySpinner()
+        hideLitInfo()
+        lastLitItems = emptyList()
         appendLog("已载入历史对话：${snap.title}")
     }
 
@@ -1527,11 +1551,51 @@ class MainActivity : AppCompatActivity() {
         if (attachments.isNotEmpty()) appendLog("本条消息附带 ${attachments.size} 个文件（多模态格式：图片/音频）")
         appendLog("已发送给模型（${provider.displayName} / $model），正在流式回复...")
 
+        // 科学文献检索：勾选 + 有可用 Key + 有文字才检索（纯附件提问无法检索）
+        val litKey = literatureKeyOrNull() ?: ""
+        val litWanted = llmLitCheck.isChecked && litKey.isNotEmpty() && userText.isNotEmpty()
+        if (!litWanted) {
+            hideLitInfo()
+            lastLitItems = emptyList()
+        }
+
         lifecycleScope.launch {
             var started = false
             reasoningBuffer.setLength(0)
+
+            // —— 勾选“检索科学文献”时：先检索，成功后把文献作为上下文附给模型 ——
+            var litCtx: String? = null
+            if (litWanted) {
+                showLitInfo("🔬 正在检索科学文献…", warn = false)
+                try {
+                    val items = LlmLiterature.search(litKey, buildLiteratureQuery(userText))
+                    if (items.isEmpty()) {
+                        hideLitInfo()
+                        appendLog("科学文献检索：无返回结果，本次按普通问答继续")
+                    } else {
+                        lastLitItems = items
+                        litCtx = buildLiteratureContext(items)
+                        appendLog("🔬 科学文献检索成功：命中 ${items.size} 篇，已附给模型作为参考")
+                        showLitInfo("🔬 已检索到 ${items.size} 篇学术文献 · 点按查看", warn = false)
+                    }
+                } catch (e: Exception) {
+                    appendLog("科学文献检索失败：${e.message}")
+                    showLitInfo("🔬 科学文献检索失败，已按普通问答继续", warn = true)
+                }
+            }
+
             val apiMessages = mutableListOf(LlmMessage.text("system", "你是简洁的助手。"))
             llmHistory.forEach { apiMessages.add(it.toApiMessage()) }
+            // 检索结果只插进本次请求（最新提问之前），不写入历史，避免上下文膨胀/重复检索
+            if (litCtx != null && apiMessages.isNotEmpty()) {
+                val last = apiMessages.last()
+                if (last.role == "user" && last.parts.size == 1 && last.parts[0].type == "text") {
+                    apiMessages[apiMessages.lastIndex] =
+                        LlmMessage.text("user", litCtx + "\n\n" + last.parts[0].text)
+                } else {
+                    apiMessages.add(apiMessages.lastIndex, LlmMessage.text("user", litCtx))
+                }
+            }
             val reply = try {
                 LlmClient.chatStream(
                     provider,
@@ -1617,6 +1681,93 @@ class MainActivity : AppCompatActivity() {
         llmThinkingRow.visibility = View.GONE
     }
 
+    // ===== 科学文献检索（火山 Agent Plan「专业数据集」MCP）=====
+
+    /** 当前可用的科学文献检索 Key：设置页单独填的优先，否则用火山 AI Hub(Agent Plan) 的 Token */
+    private fun literatureKeyOrNull(): String? {
+        val dedicated = llmDataproKey.trim()
+        if (dedicated.isNotEmpty()) return dedicated
+        return if (llmProviderId == "volcano-agent-plan" && llmApiKey.isNotBlank()) llmApiKey else null
+    }
+
+    /** 按当前提供方/Key 刷新“检索科学文献”勾选框的可用性与选中态 */
+    private fun updateLiteratureUi() {
+        val ok = literatureKeyOrNull() != null
+        llmLitCheck.isEnabled = ok
+        val want = ok && prefs.getBoolean(LlmPrefs.KEY_LIT_SEARCH, false)
+        if (llmLitCheck.isChecked != want) llmLitCheck.isChecked = want
+        if (!ok) hideLitInfo()
+    }
+
+    private fun showLitInfo(text: String, warn: Boolean) {
+        llmLitInfo.text = text
+        llmLitInfo.setTextColor(
+            ContextCompat.getColor(this, if (warn) R.color.disconnected else R.color.text_secondary)
+        )
+        llmLitInfo.visibility = View.VISIBLE
+    }
+
+    private fun hideLitInfo() {
+        llmLitInfo.visibility = View.GONE
+    }
+
+    /** 生成发给 dataPro 的检索词：尽量带“文献/论文/近N年”等便于路由到学术库的关键词 */
+    private fun buildLiteratureQuery(userText: String): String {
+        val t = userText.trim()
+        val markers = listOf("论文", "文献", "期刊", "综述", "研究", "学术", "doi", "pubmed", "作者", "近")
+        return if (markers.any { t.contains(it, ignoreCase = true) }) t
+        else "$t，请检索近5年相关学术论文与文献"
+    }
+
+    /** 把检索结果拼成给模型的参考上下文（截断摘要、控制条数与总长度，不写入历史） */
+    private fun buildLiteratureContext(items: List<LlmLiterature.Item>): String {
+        val sb = StringBuilder()
+        sb.append("【科学文献检索】本次提问前用户开启了“科学文献检索”，以下是实时检索到的学术文献。")
+            .append("请主要依据这些资料回答，能引用处用 [编号] 标注，并在回答末尾列出“参考来源”（标题+链接）。")
+            .append("若资料不足以回答请如实说明，不要编造。")
+        var n = 0
+        for (it in items) {
+            n++
+            val title = it.title.ifBlank { "（无标题条目）" }
+            sb.append("\n[$n] ").append(title)
+            if (it.date.isNotBlank()) sb.append("（").append(it.date).append("）")
+            if (it.authors.isNotBlank()) sb.append("；作者：").append(it.authors)
+            if (it.journal.isNotBlank()) sb.append("；来源：").append(it.journal)
+            if (it.url.isNotBlank()) sb.append("\n链接：").append(it.url)
+            val sn = it.snippet.trim()
+            if (sn.isNotEmpty()) {
+                val cut = if (sn.length > 500) sn.take(500) + "…" else sn
+                sb.append("\n摘要：").append(cut)
+            }
+            if (n >= MAX_LIT_ITEMS || sb.length >= MAX_LIT_CHARS) break
+        }
+        return sb.toString()
+    }
+
+    /** 点检索结果条：弹出本次命中条目，点某条复制其链接 */
+    private fun showLiteratureDialog(items: List<LlmLiterature.Item>) {
+        if (items.isEmpty()) return
+        val labels = items.mapIndexed { i, it ->
+            val title = it.title.ifBlank { "（无标题条目）" }
+            val date = if (it.date.isNotBlank()) " · ${it.date}" else ""
+            "${i + 1}. $title$date"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("🔬 本次检索到的学术文献（${items.size} 篇）")
+            .setItems(labels.toTypedArray()) { _, which ->
+                val it = items.getOrNull(which) ?: return@setItems
+                if (it.url.isNotBlank()) {
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("文献链接", it.url))
+                    Toast.makeText(this, "已复制链接到剪贴板", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "该条目没有链接", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
     /**
      * 把对话输出框内容发送到蓝牙键盘。
      * 默认不发送“我：”的发言（只发 AI 回复）；勾选“包含我的发言”后才全部发送。
@@ -1674,6 +1825,8 @@ class MainActivity : AppCompatActivity() {
     private fun clearLlmConversation() {
         llmOutput.setText("")
         llmHistory.clear()
+        hideLitInfo()
+        lastLitItems = emptyList()
         prefs.edit().remove(LlmPrefs.KEY_HISTORY).apply()
         appendLog("对话已清空")
     }
