@@ -329,9 +329,21 @@
                     style="@style/PrimaryButton"
                     android:layout_width="0dp"
                     android:layout_height="46dp"
-                    android:layout_weight="0.9"
+                    android:layout_weight="0.85"
                     android:textSize="13sp"
                     android:text="发送给模型" />
+
+                <Button
+                    android:id="@+id/llmStopButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.7"
+                    android:layout_marginStart="6dp"
+                    android:textSize="12sp"
+                    android:text="停止输出"
+                    android:enabled="false"
+                    android:contentDescription="停止大模型输出" />
 
                 <Button
                     android:id="@+id/llmNewConversationButton"

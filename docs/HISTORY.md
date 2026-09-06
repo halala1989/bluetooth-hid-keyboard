@@ -157,6 +157,12 @@
 - 模型设置新增“科学文献检索专用 Key（可选）”，留空用 Agent Plan Token；需先在方舟控制台开启专业数据集 Harness。
   versionCode 15。
 
+### 2026-09-06 · v2.0-beta（“停止输出”按钮 + 切后台继续输出）
+- 发送行新增“停止输出”按钮：请求持独立协程 llmRequestJob，点击即取消；流式读取/文献检索加
+  ensureActive 使停止及时生效；CancellationException 静默收尾，已生成内容保留；try/finally 统一复位。
+- 新增前台保活服务 LlmRunService（通知“大模型输出中”+ 唤醒锁）：请求期间切后台/锁屏也把回复跑完，
+  请求结束/停止/页面关闭自动停止。versionCode 16。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
@@ -180,6 +186,8 @@
 13. **火山 Agent Plan 科学文献检索 = MCP（dataPro_search）**：不是聊天自动开关。端点
     `https://datapro.hqd.cn-beijing.volces.com/mcp`，头 `X-Agent-Plan-Key`；App 在发送前调它把文献拼进上下文。
     返回 code==0 成功、**4011=Key 无效/额度不足/未开启专业数据集权限**；需先在控制台“配置 Harness”开启专业数据集。
+14. **大模型输出的停止与后台续跑**：请求在独立协程 `llmRequestJob`，点“停止输出”= cancel；
+    切后台/锁屏要跑完靠前台服务 `LlmRunService`（通知+唤醒锁）。从最近任务划掉 App 会中断本次请求，属正常。
 
 ## 四、测试反馈与已知限制
 

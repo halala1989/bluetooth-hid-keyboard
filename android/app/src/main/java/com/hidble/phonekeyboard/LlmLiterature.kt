@@ -2,6 +2,7 @@ package com.hidble.phonekeyboard
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -57,6 +58,7 @@ object LlmLiterature {
             .put("protocolVersion", PROTOCOL_VERSION)
             .put("capabilities", JSONObject())
             .put("clientInfo", JSONObject().put("name", "phonekeyboard").put("version", "2.0-beta"))
+        coroutineContext.ensureActive()
         val session = rpc("initialize", initParams, null, apiKey).first
 
         // 2) notifications/initialized（规范要求，通知无响应体，失败可忽略）
@@ -67,6 +69,7 @@ object LlmLiterature {
         }
 
         // 3) tools/list：确认 dataPro_search 存在（顺便拿到最新工具说明）
+        coroutineContext.ensureActive()
         val tools = rpc("tools/list", null, session, apiKey).second
             .optJSONObject("result")?.optJSONArray("tools")
         if (tools == null || !toolExists(tools)) {
@@ -74,6 +77,7 @@ object LlmLiterature {
         }
 
         // 4) tools/call：真正检索
+        coroutineContext.ensureActive()
         val callParams = JSONObject()
             .put("name", TOOL_NAME)
             .put("arguments", JSONObject().put("query", query))

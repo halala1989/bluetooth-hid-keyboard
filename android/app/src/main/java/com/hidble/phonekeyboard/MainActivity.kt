@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmInput: EditText
     private lateinit var llmOutput: EditText
     private lateinit var llmSendButton: Button
+    private lateinit var llmStopButton: Button
     private lateinit var llmNewConversationButton: Button
     private lateinit var llmSendToKeyboardButton: Button
     private lateinit var llmClearButton: Button
@@ -184,6 +185,9 @@ class MainActivity : AppCompatActivity() {
     // 正在发送的协程（用于“停止”中止）
     private var sendJob: Job? = null
     private var llmSendJob: Job? = null
+    // 大模型请求协程：供“停止输出”取消；与 llmSendJob（发送到键盘）互不干扰
+    private var llmRequestJob: Job? = null
+    private var llmStopRequested = false
 
     // 请求“对附近设备可见”（ACTION_REQUEST_DISCOVERABLE），否则电脑搜不到模拟的键盘
     private val discoverableLauncher = registerForActivityResult(
@@ -263,6 +267,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        // 页面销毁时停掉保活服务（正常结束也会在请求收尾处停）
+        LlmRunService.stop(this)
         super.onDestroy()
         if (instance === this) instance = null
         hidManager.cleanup()
@@ -282,6 +288,8 @@ class MainActivity : AppCompatActivity() {
         llmInput = findViewById(R.id.llmInput)
         llmOutput = findViewById(R.id.llmOutput)
         llmSendButton = findViewById(R.id.llmSendButton)
+        llmStopButton = findViewById(R.id.llmStopButton)
+        llmStopButton.isEnabled = false
         llmSendToKeyboardButton = findViewById(R.id.llmSendToKeyboardButton)
         llmClearButton = findViewById(R.id.llmClearButton)
         llmIncludeMeCheck = findViewById(R.id.llmIncludeMeCheck)
@@ -477,6 +485,7 @@ class MainActivity : AppCompatActivity() {
         llmSettingsTopButton.setOnClickListener { openLlmSettings() }
 
         llmSendButton.setOnClickListener { sendToLlm() }
+        llmStopButton.setOnClickListener { stopLlmOutput() }
         llmNewConversationButton.setOnClickListener { startNewConversation() }
         llmLitCheck.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(LlmPrefs.KEY_LIT_SEARCH, checked).apply()
@@ -1532,6 +1541,10 @@ class MainActivity : AppCompatActivity() {
 
         llmBusy = true
         llmSendButton.isEnabled = false
+        llmStopRequested = false
+        llmStopButton.isEnabled = true
+        // 前台保活（通知+唤醒锁）：切后台/锁屏也继续输出直到完成
+        LlmRunService.start(this)
         startThinking()
         if (userText.isNotEmpty()) appendOutput("我：$userText")
         if (attachments.isNotEmpty()) {
@@ -1559,88 +1572,113 @@ class MainActivity : AppCompatActivity() {
             lastLitItems = emptyList()
         }
 
-        lifecycleScope.launch {
-            var started = false
-            reasoningBuffer.setLength(0)
+        llmRequestJob = lifecycleScope.launch {
+            try {
+                var started = false
+                reasoningBuffer.setLength(0)
 
-            // —— 勾选“检索科学文献”时：先检索，成功后把文献作为上下文附给模型 ——
-            var litCtx: String? = null
-            if (litWanted) {
-                showLitInfo("🔬 正在检索科学文献…", warn = false)
-                try {
-                    val items = LlmLiterature.search(litKey, buildLiteratureQuery(userText))
-                    if (items.isEmpty()) {
-                        hideLitInfo()
-                        appendLog("科学文献检索：无返回结果，本次按普通问答继续")
+                // —— 勾选“检索科学文献”时：先检索，成功后把文献作为上下文附给模型 ——
+                var litCtx: String? = null
+                if (litWanted) {
+                    showLitInfo("🔬 正在检索科学文献…", warn = false)
+                    try {
+                        val items = LlmLiterature.search(litKey, buildLiteratureQuery(userText))
+                        if (items.isEmpty()) {
+                            hideLitInfo()
+                            appendLog("科学文献检索：无返回结果，本次按普通问答继续")
+                        } else {
+                            lastLitItems = items
+                            litCtx = buildLiteratureContext(items)
+                            appendLog("🔬 科学文献检索成功：命中 ${items.size} 篇，已附给模型作为参考")
+                            showLitInfo("🔬 已检索到 ${items.size} 篇学术文献 · 点按查看", warn = false)
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e // 停止/中断：向上传递（finally 统一收尾）
+                    } catch (e: Exception) {
+                        appendLog("科学文献检索失败：${e.message}")
+                        showLitInfo("🔬 科学文献检索失败，已按普通问答继续", warn = true)
+                    }
+                }
+
+                val apiMessages = mutableListOf(LlmMessage.text("system", "你是简洁的助手。"))
+                llmHistory.forEach { apiMessages.add(it.toApiMessage()) }
+                // 检索结果只插进本次请求（最新提问之前），不写入历史，避免上下文膨胀/重复检索
+                if (litCtx != null && apiMessages.isNotEmpty()) {
+                    val last = apiMessages.last()
+                    if (last.role == "user" && last.parts.size == 1 && last.parts[0].type == "text") {
+                        apiMessages[apiMessages.lastIndex] =
+                            LlmMessage.text("user", litCtx + "\n\n" + last.parts[0].text)
                     } else {
-                        lastLitItems = items
-                        litCtx = buildLiteratureContext(items)
-                        appendLog("🔬 科学文献检索成功：命中 ${items.size} 篇，已附给模型作为参考")
-                        showLitInfo("🔬 已检索到 ${items.size} 篇学术文献 · 点按查看", warn = false)
+                        apiMessages.add(apiMessages.lastIndex, LlmMessage.text("user", litCtx))
                     }
-                } catch (e: Exception) {
-                    appendLog("科学文献检索失败：${e.message}")
-                    showLitInfo("🔬 科学文献检索失败，已按普通问答继续", warn = true)
                 }
-            }
-
-            val apiMessages = mutableListOf(LlmMessage.text("system", "你是简洁的助手。"))
-            llmHistory.forEach { apiMessages.add(it.toApiMessage()) }
-            // 检索结果只插进本次请求（最新提问之前），不写入历史，避免上下文膨胀/重复检索
-            if (litCtx != null && apiMessages.isNotEmpty()) {
-                val last = apiMessages.last()
-                if (last.role == "user" && last.parts.size == 1 && last.parts[0].type == "text") {
-                    apiMessages[apiMessages.lastIndex] =
-                        LlmMessage.text("user", litCtx + "\n\n" + last.parts[0].text)
-                } else {
-                    apiMessages.add(apiMessages.lastIndex, LlmMessage.text("user", litCtx))
-                }
-            }
-            val reply = try {
-                LlmClient.chatStream(
-                    provider,
-                    llmApiKey,
-                    model,
-                    apiMessages,
-                    onReasoning = { r ->
-                        runOnUiThread { showStreamingReasoning(r) }
-                    }
-                ) { delta ->
-                    if (!started) {
-                        started = true
+                val reply = try {
+                    LlmClient.chatStream(
+                        provider,
+                        llmApiKey,
+                        model,
+                        apiMessages,
+                        onReasoning = { r ->
+                            runOnUiThread { showStreamingReasoning(r) }
+                        }
+                    ) { delta ->
+                        if (!started) {
+                            started = true
+                            runOnUiThread {
+                                stopThinking()
+                                llmStreaming = true
+                                appendOutput("AI：")
+                            }
+                        }
                         runOnUiThread {
-                            stopThinking()
-                            llmStreaming = true
-                            appendOutput("AI：")
+                            llmOutput.append(delta)
+                            llmOutput.setSelection(llmOutput.text.length)
                         }
                     }
-                    runOnUiThread {
-                        llmOutput.append(delta)
-                        llmOutput.setSelection(llmOutput.text.length)
-                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // 用户点“停止输出”或页面被销毁：静默收尾，保留已生成内容
+                    appendLog(if (llmStopRequested) "已手动停止输出" else "输出已中断（页面已关闭）")
+                    null
+                } catch (e: Exception) {
+                    appendLog("模型调用失败：${e.message}")
+                    null
                 }
-            } catch (e: Exception) {
-                appendLog("模型调用失败：${e.message}")
-                null
+                if (reply == null) {
+                    if (!llmStopRequested) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            if (started) "模型回复中断，详情见日志" else "模型调用失败，详情见日志",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    llmHistory.add(LlmHistoryMsg("assistant", reply))
+                    saveLlmHistory()
+                    appendLog("模型已回复")
+                }
+            } finally {
+                // 无论成功/失败/停止/中断：复位 UI 并停掉前台保活服务
+                llmStreaming = false
+                applyLlmColors()
+                prefs.edit().putString(LlmPrefs.KEY_OUTPUT, llmOutput.text.toString()).apply()
+                llmBusy = false
+                llmSendButton.isEnabled = true
+                llmStopButton.isEnabled = false
+                llmRequestJob = null
+                LlmRunService.stop(this@MainActivity)
+                stopThinking()
             }
-            if (reply == null) {
-                Toast.makeText(
-                    this@MainActivity,
-                    if (started) "模型回复中断，详情见日志" else "模型调用失败，详情见日志",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                llmHistory.add(LlmHistoryMsg("assistant", reply))
-                saveLlmHistory()
-                appendLog("模型已回复")
-            }
-            llmStreaming = false
-            applyLlmColors()
-            prefs.edit().putString(LlmPrefs.KEY_OUTPUT, llmOutput.text.toString()).apply()
-            llmBusy = false
-            llmSendButton.isEnabled = true
-            stopThinking()
         }
+    }
+
+    /** 点击“停止输出”：取消正在进行的模型请求（含检索阶段） */
+    private fun stopLlmOutput() {
+        val job = llmRequestJob
+        if (job == null || !job.isActive) return
+        llmStopRequested = true
+        llmStopButton.isEnabled = false
+        job.cancel()
+        Toast.makeText(this, "正在停止输出…", Toast.LENGTH_SHORT).show()
     }
 
     /** 显示“AI 正在思考…”动画（类 ChatGPT），请求发出后开始，回复/失败后停止 */

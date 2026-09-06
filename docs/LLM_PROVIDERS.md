@@ -13,7 +13,7 @@
 - 请求格式：OpenAI 兼容 Chat Completions；纯文本 content 用字符串，带图片/音频附件时用 content 数组
   （图片 `image_url` data-URI；音频 `input_audio`，小米 MiMo 原生支持）。
 
-## 2. 四个提供方速查表（截至 2026-09-06，versionCode 15）
+## 2. 四个提供方速查表（截至 2026-09-06，versionCode 16）
 
 | 显示名（下拉） | id | Base URL（接口自动补 `/chat/completions`） | 默认模型 | Key 格式 | 说明 |
 |---|---|---|---|---|---|

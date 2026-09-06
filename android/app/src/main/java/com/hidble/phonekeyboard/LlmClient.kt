@@ -2,6 +2,7 @@ package com.hidble.phonekeyboard
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -217,6 +218,8 @@ object LlmClient {
             conn.inputStream.bufferedReader(StandardCharsets.UTF_8).use { reader ->
                 var line = reader.readLine()
                 while (line != null) {
+                    // 用户点“停止输出”时能及时打断阻塞读取（每行到达都会检查一次）
+                    coroutineContext.ensureActive()
                     val trimmed = line.trim()
                     if (trimmed.startsWith("data:")) {
                         val data = trimmed.removePrefix("data:").trim()
