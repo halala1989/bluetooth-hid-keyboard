@@ -22,6 +22,7 @@
 #if CONFIG_BT_NIMBLE_ENABLED
 #include "host/ble_hs.h"
 #include "nimble/nimble_port.h"
+#include "services/bas/ble_svc_bas.h"
 #include "nimble/nimble_port_freertos.h"
 #else
 #include "esp_bt_defs.h"
@@ -921,5 +922,9 @@ void app_main(void)
     if (ret) {
         ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
     }
+    // 板子由 USB 供电、无电池：把标准电池服务(0x180F)报为 100%，避免电脑显示“无电量”
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    ble_svc_bas_battery_level_set(100);
+    ESP_LOGI(TAG, "battery level set to 100%% (USB powered)");
 #endif
 }
