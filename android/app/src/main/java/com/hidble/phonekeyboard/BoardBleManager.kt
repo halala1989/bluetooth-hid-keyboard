@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import java.util.UUID
+import kotlinx.coroutines.delay
 
 /**
  * 外接键盘板（ESP32-S3）BLE 客户端。
@@ -273,6 +274,28 @@ object BoardLink {
     }
 
     fun isConnected(): Boolean = manager?.isConnected() == true
+
+    fun lastAddress(context: Context): String? = manager?.lastBoardAddress() ?: get(context).lastBoardAddress()
+
+    /** 主界面发送前调用：若当前没连上，但之前连过板子，就自动按地址重连并等待就绪 */
+    suspend fun reconnectAndWait(context: Context, timeoutMs: Long = 6000): Boolean {
+        val m = get(context)
+        if (m.isConnected()) return true
+        val addr = m.lastBoardAddress() ?: return false
+        return try {
+            val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager).adapter ?: return false
+            val device = adapter.getRemoteDevice(addr)
+            m.connect(device)
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                if (m.isConnected()) return true
+                delay(250)
+            }
+            false
+        } catch (e: Exception) {
+            false
+        }
+    }
     fun sendText(text: String): Boolean {
         val m = manager ?: return false
         if (!m.isConnected()) return false

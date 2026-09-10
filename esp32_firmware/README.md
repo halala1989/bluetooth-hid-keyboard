@@ -77,7 +77,7 @@ idf.py -B C:\esp32_fw_build -p COM10 flash
    → 解决：在 `BLE_GAP_EVENT_CONNECT` 里重新 `esp_hid_ble_gap_adv_start()`（连上电脑也继续广播），
    并把广播时长改成 `BLE_HS_FOREVER` 永久广播。
 6. **App 扫描不到板子**：板子若已被手机系统蓝牙连着（或正连电脑），就不再广播，扫描自然也扫不到（App 会误报“板子没上电”）。
-   → 解决：App 连接页扫描 8 秒后，会把**手机系统里已配对的 ESP32-S3 Keyboard** 一并列出来（标记“已配对/可直接连”），可直接连接；并记忆上次连过的板子地址。
+   → 解决：App 连接页扫描 8 秒后，会把**手机系统里已配对的 ESP32-S3 Keyboard** 一并列出来（标记“已配对/可直接连”），可直接连接；并记忆上次连过的板子地址；主界面“发送到键盘”若发现板子掉线，会按记住的地址自动重连（最多 8 秒）后再发送，不再要求手机先连电脑。
 7. **Flash 大小**：工程默认按 2MB 编译，实际板子是 4MB。
    → 已在 `sdkconfig.defaults` 固定 `CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y`。
 

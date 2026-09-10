@@ -1836,19 +1836,28 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 优先走外接键盘板（ESP32-S3）：板子有 512KB 缓冲 + 控速输出，长文本更稳、丢键更少
-        if (BoardLink.isConnected()) {
+        // 优先走外接键盘板（ESP32-S3）：板子有 512KB 缓冲 + 控速输出，长文本更稳、丢键更少。
+        // 只要之前连过板子（保存过地址），即使当前 GATT 被系统断开，也会自动重连后再发送。
+        if (BoardLink.isConnected() || BoardLink.lastAddress(this) != null) {
             setKeepScreenOn(true)
             llmSendToKeyboardButton.text = "停止"
             llmSendJob = lifecycleScope.launch {
                 try {
+                    if (!BoardLink.isConnected()) {
+                        appendLog("外接键盘板未连接，正在自动重连…")
+                        if (!BoardLink.reconnectAndWait(this@MainActivity, 8000)) {
+                            throw IllegalStateException("自动重连失败，请到“连接管理”重新连接外接键盘板")
+                        }
+                    }
                     BoardLink.setSpeed(savedSpeedLevel)
                     BoardLink.setUnicodeMode(savedUnicodeMode)
                     if (!BoardLink.sendText(text)) {
-                        appendLog("外接键盘板发送失败：连接已断开")
-                    } else {
-                        appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字（板子缓冲后控速输出）")
+                        throw IllegalStateException("发送失败（连接已断开）")
                     }
+                    appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字（板子缓冲后控速输出）")
+                } catch (e: Exception) {
+                    appendLog("外接板发送失败：${e.message}")
+                    Toast.makeText(this@MainActivity, e.message ?: "外接键盘板未连接", Toast.LENGTH_LONG).show()
                 } finally {
                     setKeepScreenOn(false)
                     llmSendJob = null
@@ -1857,7 +1866,6 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-
         if (!connected) {
             Toast.makeText(this, "尚未连接到电脑（也未连接外接键盘板）", Toast.LENGTH_SHORT).show()
             return
