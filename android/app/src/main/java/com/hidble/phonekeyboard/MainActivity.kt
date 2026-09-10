@@ -1824,10 +1824,6 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
             return
         }
-        if (!connected) {
-            Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
-            return
-        }
         val text = if (llmIncludeMeCheck.isChecked) {
             full
         } else {
@@ -1837,6 +1833,33 @@ class MainActivity : AppCompatActivity() {
         }
         if (text.isEmpty()) {
             Toast.makeText(this, "没有可发送的内容（已默认排除“我”的发言，可勾选“包含我的发言”）", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 优先走外接键盘板（ESP32-S3）：板子有 512KB 缓冲 + 控速输出，长文本更稳、丢键更少
+        if (BoardLink.isConnected()) {
+            setKeepScreenOn(true)
+            llmSendToKeyboardButton.text = "停止"
+            llmSendJob = lifecycleScope.launch {
+                try {
+                    BoardLink.setSpeed(savedSpeedLevel)
+                    BoardLink.setUnicodeMode(savedUnicodeMode)
+                    if (!BoardLink.sendText(text)) {
+                        appendLog("外接键盘板发送失败：连接已断开")
+                    } else {
+                        appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字（板子缓冲后控速输出）")
+                    }
+                } finally {
+                    setKeepScreenOn(false)
+                    llmSendJob = null
+                    llmSendToKeyboardButton.text = "发送到键盘"
+                }
+            }
+            return
+        }
+
+        if (!connected) {
+            Toast.makeText(this, "尚未连接到电脑（也未连接外接键盘板）", Toast.LENGTH_SHORT).show()
             return
         }
         setKeepScreenOn(true)
