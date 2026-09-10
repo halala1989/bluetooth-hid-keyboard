@@ -163,6 +163,16 @@
 - 新增前台保活服务 LlmRunService（通知“大模型输出中”+ 唤醒锁）：请求期间切后台/锁屏也把回复跑完，
   请求结束/停止/页面关闭自动停止。versionCode 16。
 
+### 2026-09-10 · ESP32-S3 Super Mini 硬件线启动（BLE HID 键盘，替代 Pico）
+- 新硬件实测：ESP32-S3 (QFN56) v0.2，Wi-Fi + BT5 LE，4MB Flash + 2MB PSRAM，原生 USB-Serial/JTAG（COM10）。
+- 新目录 esp32_firmware/（ESP-IDF v5.2.2 + NimBLE，基于官方 esp_hid_device 示例）：已完成编译、
+  烧录、开机稳定、电脑 BLE 扫描可见 "ESP32-S3 Keyboard"（广播含 HID 服务 0x1812）。
+- 踩坑已固化到 esp32_firmware/README.md 与 patch_idf_nimble_hid_stack.ps1：
+  ① 中文路径导致 ldgen 失败 → build 目录放英文路径；② NimBLE HID 事件任务栈 2048 溢出导致重启 → 改 6144；
+  ③ 无屏幕配对 → 改 Just Works（NO_IO + 关闭 MITM）；④ Flash 按 4MB 配置。
+- 下一步：自定义服务 1234/1235/1236 + TEXT/KEY/MOD/UNI/UMOD/SPEED 协议；PSRAM 环形大缓冲 + 控速输出；
+  GBK/Alt+X 输入逻辑移植；手机 App 侧接入。
+
 ## 三、关键技术点 / 踩坑记录
 
 1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。

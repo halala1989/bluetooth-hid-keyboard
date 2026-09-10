@@ -1,0 +1,30 @@
+# ============================================================
+# ESP32-S3 Super Mini（4MB Flash + 2MB PSRAM）· BLE HID 键盘固件
+# 移植自仓库 pico_firmware（Pico W + BTstack），改用 ESP-IDF + NimBLE
+# ============================================================
+
+# 目标芯片
+CONFIG_IDF_TARGET="esp32s3"
+
+# ---- 蓝牙：只用 BLE（NimBLE），不要经典蓝牙（ESP32-S3 也不支持经典蓝牙）----
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+# 电脑(作 HID 主机) + 手机(发命令) 需要同时连接
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=3
+CONFIG_BT_NIMBLE_SVC_GAP_DEVICE_NAME="ESP32-S3 Keyboard"
+
+# 官方 esp_hid_device 示例的角色选择：键盘
+CONFIG_EXAMPLE_KBD_ENABLE=y
+
+# ---- 板载 PSRAM（后面用作大容量输入缓冲）----
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+
+# 板载 4MB Flash
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+# 应用分区加大（后面要放 GBK 码表等，约 540KB）
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
