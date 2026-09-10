@@ -35,7 +35,8 @@
 - [x] 自定义服务 1234/1235/1236 + `TEXT/KEY/MOD/UNI/UMOD/SPEED` 命令解析（固件自检通过，待重新配对后端到端验证）
 - [x] PSRAM 512KB 环形缓冲 + 按速度档控速输出（数据先入缓冲，独立任务“滴灌”成 HID 报文）
 - [~] Unicode 已支持 Alt+X 模式（默认，Win11 记事本/Word 可用）；GBK/十六进制小键盘模式待移植（gbk_table.c）
-- [ ] 手机 App 侧接入（或直接复用 master 分支的 Pico App）
+- [x] 数据通道端到端实测通过（电脑端 BLE 客户端发 SPEED/TEXT → 收到 STATUS:READY/OK，键盘报文已发出）
+- [ ] 手机 App 侧接入（方案 B：现在的 App 增加“外接键盘设备”模式）
 
 ## 四、构建与烧录（本机实测）
 
@@ -69,7 +70,13 @@ idf.py -B C:\esp32_fw_build -p COM10 flash
 3. **无屏幕开发板如何配对**：官方示例默认 `BLE_SM_IO_CAP_DISP_ONLY` + MITM（需要显示配对码），
    这块板没有屏幕，Windows 会卡在输入配对码。
    → 解决：改为 `BLE_SM_IO_CAP_NO_IO`（Just Works）+ `sm_mitm = 0`，Windows 直接配对。
-4. **Flash 大小**：工程默认按 2MB 编译，实际板子是 4MB。
+4. **Windows 要“显示更多设备”才能看到它**：广播数据里漏了 Appearance（设备类型），Windows 只当它是普通 BLE 设备。
+   → 解决：`fields.appearance = appearance`（0x03C1=键盘），同时把设备名挪到 scan response——否则主广播包
+   （flags+tx+UUID+Appearance+名字）超过 31 字节，NimBLE 会报 `error setting advertisement data; rc=4` 直接不广播。
+5. **被电脑连上后板子就搜不到了**：默认连接后停止广播，手机无法再发现它；且广播默认 180 秒后自动停。
+   → 解决：在 `BLE_GAP_EVENT_CONNECT` 里重新 `esp_hid_ble_gap_adv_start()`（连上电脑也继续广播），
+   并把广播时长改成 `BLE_HS_FOREVER` 永久广播。
+6. **Flash 大小**：工程默认按 2MB 编译，实际板子是 4MB。
    → 已在 `sdkconfig.defaults` 固定 `CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y`。
 
 ## 六、说明

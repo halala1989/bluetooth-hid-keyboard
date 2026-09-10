@@ -733,6 +733,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
 
 extern void ble_hid_task_start_up(void);
 static struct ble_hs_adv_fields fields;
+static struct ble_hs_adv_fields rsp_fields;
 
 esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 {
@@ -761,9 +762,18 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.tx_pwr_lvl_is_present = 1;
     fields.tx_pwr_lvl = BLE_HS_ADV_TX_PWR_LVL_AUTO;
 
-    fields.name = (uint8_t *)device_name;
-    fields.name_len = strlen(device_name);
-    fields.name_is_complete = 1;
+    /* 设备名放在 scan response：主广播包（flags+tx+UUID+Appearance）必须 ≤31 字节，
+     * 名字放主包里会超限（NimBLE rc=4 EMSGSIZE），导致广播直接失败。 */
+    memset(&rsp_fields, 0, sizeof rsp_fields);
+    rsp_fields.name = (uint8_t *)device_name;
+    rsp_fields.name_len = strlen(device_name);
+    rsp_fields.name_is_complete = 1;
+
+    /* 关键：广播里带上 Appearance（设备类型）。
+     * 0x03C1 = Keyboard，Windows 才会在“添加设备”里直接把它归为键盘，
+     * 否则会被当成普通 BLE 设备、需要点“显示更多设备”才能看到。 */
+    fields.appearance = appearance;
+    fields.appearance_is_present = 1;
 
     uuid16 = (ble_uuid16_t *)malloc(sizeof(ble_uuid16_t));
     uuid16_1 = (ble_uuid16_t[]) {
@@ -798,6 +808,12 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "connection %s; status=%d",
                 event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
+        if (event->connect.status == 0) {
+            /* 关键：被电脑连上作为 HID 键盘后仍继续广播，
+             * 这样手机还能搜到本设备并连接自定义服务 1234。 */
+            int adv_rc = esp_hid_ble_gap_adv_start();
+            ESP_LOGI(TAG, "keep advertising while connected: rc=%d", adv_rc);
+        }
         return 0;
         break;
     case BLE_GAP_EVENT_DISCONNECT:
@@ -909,8 +925,13 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     int rc;
     struct ble_gap_adv_params adv_params;
     /* maximum possible duration for hid device(180s) */
-    int32_t adv_duration_ms = 180000;
+    int32_t adv_duration_ms = BLE_HS_FOREVER; /* 一直广播（原来 180s 后会自动停） */
 
+    rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
+    if (rc != 0) {
+        MODLOG_DFLT(ERROR, "error setting scan response data; rc=%d\n", rc);
+        return rc;
+    }
     rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) {
         MODLOG_DFLT(ERROR, "error setting advertisement data; rc=%d\n", rc);
