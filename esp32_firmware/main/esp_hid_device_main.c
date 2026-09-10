@@ -23,6 +23,7 @@
 #include "host/ble_hs.h"
 #include "nimble/nimble_port.h"
 #include "services/bas/ble_svc_bas.h"
+#include "data_service.h"
 #include "nimble/nimble_port_freertos.h"
 #else
 #include "esp_bt_defs.h"
@@ -898,6 +899,10 @@ void app_main(void)
     ESP_LOGI(TAG, "setting ble device");
     ESP_ERROR_CHECK(
         esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &s_ble_hid_param.hid_dev));
+#if CONFIG_BT_NIMBLE_ENABLED
+    // 手机数据通道：自定义服务 1234/1235/1236 + PSRAM 缓冲 + HID 打字
+    ESP_ERROR_CHECK(data_service_init(s_ble_hid_param.hid_dev));
+#endif
 #endif
 
 #if CONFIG_BT_HID_DEVICE_ENABLED

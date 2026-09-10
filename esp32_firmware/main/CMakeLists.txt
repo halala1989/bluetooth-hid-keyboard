@@ -1,5 +1,6 @@
 set(srcs "esp_hid_device_main.c"
-         "esp_hid_gap.c")
+         "esp_hid_gap.c"
+         "data_service.c")
 set(include_dirs ".")
 
 idf_component_register(SRCS "${srcs}"

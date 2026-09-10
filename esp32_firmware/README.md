@@ -32,9 +32,9 @@
 - [x] 编译、烧录到 COM10 成功；开机稳定不重启。
 - [x] 电脑 BLE 扫描能发现 **"ESP32-S3 Keyboard"**，广播含标准 HID 服务 `00001812`。
 - [x] 无屏幕配对：改为 Just Works（`BLE_SM_IO_CAP_NO_IO` + `sm_mitm=0`），Windows 可直接配对。
-- [ ] 自定义服务 1234/1235/1236 + `TEXT/KEY/MOD/UNI/UMOD/SPEED` 命令解析
-- [ ] PSRAM 环形缓冲 + 控速输出（大缓存、低丢键）
-- [ ] 移植 Unicode/GBK/十六进制输入（gbk_table.c）
+- [x] 自定义服务 1234/1235/1236 + `TEXT/KEY/MOD/UNI/UMOD/SPEED` 命令解析（固件自检通过，待重新配对后端到端验证）
+- [x] PSRAM 512KB 环形缓冲 + 按速度档控速输出（数据先入缓冲，独立任务“滴灌”成 HID 报文）
+- [~] Unicode 已支持 Alt+X 模式（默认，Win11 记事本/Word 可用）；GBK/十六进制小键盘模式待移植（gbk_table.c）
 - [ ] 手机 App 侧接入（或直接复用 master 分支的 Pico App）
 
 ## 四、构建与烧录（本机实测）
