@@ -164,25 +164,39 @@ class ConnectionActivity : AppCompatActivity() {
     }
 
     private fun showBoardDeviceDialog() {
-        if (foundBoards.isEmpty()) {
-            Toast.makeText(this, "没扫到设备，请确认板子已上电、在广播", Toast.LENGTH_SHORT).show()
+        // 扫描结果 + 手机系统蓝牙里已配对的板子。
+        // 板子若已被系统连着，就不再广播，扫描扫不到；但已配对设备可以直接连。
+        val candidates = mutableListOf<Triple<BluetoothDevice, Int, String?>>()
+        candidates.addAll(foundBoards)
+        for (d in boardManager.bondedBoardDevices()) {
+            if (candidates.none { it.first.address == d.address }) {
+                val n = try { d.name } catch (_: SecurityException) { null }
+                candidates.add(Triple(d, 0, n))
+            }
+        }
+        if (candidates.isEmpty()) {
+            Toast.makeText(
+                this,
+                "没扫到设备，也没找到已配对的板子。请先确认板子已上电并在广播；若已在手机蓝牙设置里连过它，请先在系统设置里取消连接再试",
+                Toast.LENGTH_LONG
+            ).show()
             refreshBoardStatus(boardManager.isConnected())
             return
         }
-        val labels = foundBoards.map { (device, rssi, name) ->
-            "${name ?: "未知设备"}  (${rssi} dBm)\n${device.address}"
+        val labels = candidates.map { (device, rssi, name) ->
+            val tag = if (rssi != 0) "$rssi dBm" else "已配对/可直接连"
+            "${name ?: "未知设备"}  ($tag)\n${device.address}"
         }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("选择外接键盘板")
             .setItems(labels) { _, which ->
-                val (device, _, name) = foundBoards[which]
+                val (device, _, name) = candidates[which]
                 LogStore.append("正在连接外接板：${name ?: device.address}…")
                 boardManager.connect(device)
             }
             .setNegativeButton("取消", null)
             .show()
     }
-
     /** 从 MainActivity 拉取最新状态刷新本页（含从连接页返回、主界面状态变化时） */
     fun refreshAll() {
         val main = MainActivity.instance ?: run {

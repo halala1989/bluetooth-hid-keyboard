@@ -94,6 +94,8 @@ class BoardBleManager(private val context: Context) {
         ready = false
         mtu = 20
         try {
+            context.getSharedPreferences("hidble_prefs", Context.MODE_PRIVATE)
+                .edit().putString("board_address", device.address).apply()
             gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
             Log.d(TAG, "Connecting to ${device.address}")
         } catch (e: SecurityException) {
@@ -154,6 +156,20 @@ class BoardBleManager(private val context: Context) {
     fun setSpeed(level: Int) = sendCommand("SPEED:$level")
     fun setUnicodeMode(mode: Int) = sendCommand("UMOD:$mode")
     fun sendKey(key: String) = sendCommand("KEY:$key")
+
+    /** 手机系统蓝牙里已配对的“外接键盘板”设备（扫不到广播时的兜底：直接连） */
+    fun bondedBoardDevices(): List<BluetoothDevice> {
+        return try {
+            bluetoothAdapter?.bondedDevices.orEmpty().filter { d ->
+                val n = try { d.name } catch (_: SecurityException) { null } ?: ""
+                n.contains("ESP32", true) || n.contains("Keyboard", true)
+            }
+        } catch (e: SecurityException) { emptyList() }
+    }
+
+    /** 上次成功连接过的板子地址（保存在 hidble_prefs.board_address） */
+    fun lastBoardAddress(): String? =
+        context.getSharedPreferences("hidble_prefs", Context.MODE_PRIVATE).getString("board_address", null)
 
     fun cleanup() { stopScan(); disconnect() }
 
