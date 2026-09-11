@@ -144,12 +144,17 @@ static void hid_press(uint8_t modifier, uint8_t usage)
 {
     if (!s_hid_dev) { s_hid_failed = true; return; }
     uint8_t buf[8] = {0};
-    buf[0] = modifier;
-    buf[2] = usage;
+    /* HID over GATT：报文值第一位是 Report ID（本报表映射用 ID=1），
+       然后是 [modifier][reserved][key1..key5]。示例代码把 modifier 放在第一位，
+       Windows 会当成 Report ID=0 直接忽略，所以必须补上 0x01。 */
+    buf[0] = 0x01;
+    buf[1] = modifier;
+    buf[3] = usage;
     esp_err_t rc = esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
     if (rc != ESP_OK) { s_hid_failed = true; ESP_LOGW(TAG, "HID input failed: %d (PC 未作为键盘连接?)", rc); }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_DOWN_MS)));
     memset(buf, 0, sizeof(buf));
+    buf[0] = 0x01;   /* 松开报文也必须带 Report ID */
     rc = esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
     if (rc != ESP_OK) { s_hid_failed = true; }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
