@@ -673,34 +673,40 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val text = textInput.text.toString()
-        if (text.isNotEmpty()) {
-            if (!connected) {
-                Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
-                return
-            }
-            setKeepScreenOn(true)
-            sendButton.text = "停止"
-            sendJob = lifecycleScope.launch {
-                try {
-                    if (text.length > TypingEngine.CHUNK_SIZE) {
-                        appendLog("文本较长（${text.length} 字），已自动分段发送")
+        if (text.isEmpty()) return
+
+        // ESP32-S3 专用版：只发给外接键盘板（板子再输出到电脑），不检查手机是否连电脑
+        setKeepScreenOn(true)
+        sendButton.text = "停止"
+        sendJob = lifecycleScope.launch {
+            try {
+                if (!BoardLink.isConnected()) {
+                    if (BoardLink.knownBoardAddress(this@MainActivity) == null ||
+                        !BoardLink.reconnectAndWait(this@MainActivity, 8000)
+                    ) {
+                        throw IllegalStateException("尚未连接外接键盘板：请到“连接管理”页连接 ESP32-S3 Keyboard")
                     }
-                    hidProtocol.typeText(text)
-                    appendLog("发送文本: $text")
-                    textInput.text.clear()
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    appendLog("文本发送已中止")
-                    throw e
-                } finally {
-                    hidProtocol.releaseAll()
-                    setKeepScreenOn(false)
-                    sendJob = null
-                    sendButton.text = "发送到键盘"
                 }
+                BoardLink.setSpeed(savedSpeedLevel)
+                BoardLink.setUnicodeMode(savedUnicodeMode)
+                if (!BoardLink.sendText(text)) {
+                    throw IllegalStateException("发送失败（连接已断开）")
+                }
+                appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字")
+                textInput.text.clear()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                appendLog("文本发送已中止")
+                throw e
+            } catch (e: Exception) {
+                appendLog("外接板发送失败：${e.message}")
+                Toast.makeText(this@MainActivity, e.message ?: "外接键盘板未连接", Toast.LENGTH_LONG).show()
+            } finally {
+                setKeepScreenOn(false)
+                sendJob = null
+                sendButton.text = "发送到键盘"
             }
         }
     }
-
     // ===== 大模型对话 =====
 
     private fun loadLlmPrefs() {
