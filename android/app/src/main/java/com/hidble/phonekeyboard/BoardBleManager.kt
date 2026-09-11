@@ -277,11 +277,18 @@ object BoardLink {
 
     fun lastAddress(context: Context): String? = manager?.lastBoardAddress() ?: get(context).lastBoardAddress()
 
+    /** 已知的板子地址：优先上次连接保存的，其次手机系统蓝牙里已配对的板子 */
+    fun knownBoardAddress(context: Context): String? {
+        val m = get(context)
+        m.lastBoardAddress()?.let { return it }
+        return m.bondedBoardDevices().firstOrNull()?.address
+    }
+
     /** 主界面发送前调用：若当前没连上，但之前连过板子，就自动按地址重连并等待就绪 */
     suspend fun reconnectAndWait(context: Context, timeoutMs: Long = 6000): Boolean {
         val m = get(context)
         if (m.isConnected()) return true
-        val addr = m.lastBoardAddress() ?: return false
+        val addr = m.lastBoardAddress() ?: m.bondedBoardDevices().firstOrNull()?.address ?: return false
         return try {
             val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager).adapter ?: return false
             val device = adapter.getRemoteDevice(addr)
