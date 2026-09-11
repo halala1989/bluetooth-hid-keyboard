@@ -16,7 +16,7 @@
 - 分支：`esp32-s3-app`（本分支）
 - 包名：**`com.hidble.esp32keyboard`**
 - 应用名：**ESP32 蓝牙键盘**
-- APK：**`Esp32BluetoothKeyboard-debug.apk`**
+- APK：`Esp32BluetoothKeyboard-v<版本号>.apk`（如 `Esp32BluetoothKeyboard-v25.apk`；同时保留 `Esp32BluetoothKeyboard-debug.apk` 作为最新版便捷名）`n  - **约定：每次更新都要递增 versionCode，并把 APK 文件名带上新版本号**
 - 说明：
   - 连接管理页第一张卡片就是「外接键盘板（ESP32-S3）」，扫描/连接 `ESP32-S3 Keyboard`
   - 连上后「发送到键盘」把文本通过 BLE 发给板子（服务 1234/1235/1236），

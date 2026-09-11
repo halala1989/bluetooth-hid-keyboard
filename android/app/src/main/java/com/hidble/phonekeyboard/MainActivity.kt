@@ -253,7 +253,15 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 BoardLink.reconnectAndWait(this@MainActivity, 6000)
             }
+        }        // 板子连接状态变化时实时刷新主界面顶部状态；板子返回错误时提示
+        BoardLink.get(this).onConnectionStateChanged = { _ -> runOnUiThread { refreshAllState() } }
+        BoardLink.get(this).onDataReceived = { data ->
+            if (data.startsWith("ERR")) {
+                appendLog("外接板: $data")
+                runOnUiThread { Toast.makeText(this@MainActivity, "外接板: $data", Toast.LENGTH_LONG).show() }
+            }
         }
+        refreshAllState()
         // 蓝牙可能在此前未开启，重新获取 HID profile
         hidManager.init()
         // 键盘已注册但连接掉了：回到前台时尝试恢复
@@ -606,25 +614,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshHeaderStatus() {
-        when {
-            connected -> {
-                headerStatusText.text = "已连接"
-                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
-                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
-            }
-            registered -> {
-                headerStatusText.text = "键盘已启动"
-                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
-                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
-            }
-            else -> {
-                headerStatusText.text = "未启动"
-                headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-                headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            }
+        // ESP32-S3 专用版：顶部状态只看“外接键盘板”是否连接
+        if (BoardLink.isConnected()) {
+            headerStatusText.text = "外接板已连接"
+            headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
+            headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
+        } else {
+            headerStatusText.text = "未连接外接板"
+            headerStatusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+            headerStatusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
         }
     }
-
     private fun refreshConnectionPage() {
         connectionActivity?.refreshAll()
     }
@@ -693,6 +693,7 @@ class MainActivity : AppCompatActivity() {
                     throw IllegalStateException("发送失败（连接已断开）")
                 }
                 appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字")
+                Toast.makeText(this@MainActivity, "已发送 ${text.length} 字到外接键盘板", Toast.LENGTH_SHORT).show()
                 textInput.text.clear()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 appendLog("文本发送已中止")
@@ -1867,6 +1868,7 @@ class MainActivity : AppCompatActivity() {
                         throw IllegalStateException("发送失败（连接已断开）")
                     }
                     appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字（板子缓冲后控速输出）")
+                    Toast.makeText(this@MainActivity, "已发送 ${text.length} 字到外接键盘板", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     appendLog("外接板发送失败：${e.message}")
                     Toast.makeText(this@MainActivity, e.message ?: "外接键盘板未连接", Toast.LENGTH_LONG).show()

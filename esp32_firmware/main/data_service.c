@@ -82,6 +82,7 @@ static struct ble_gap_event_listener s_gap_listener;
 
 static uint8_t s_unicode_mode = UNI_MODE_ALTX;
 static uint8_t s_speed = 5;
+static volatile bool s_hid_failed = false;   // 本次命令里 HID 报告发送是否失败（电脑没连时会出现）
 static uint32_t s_scale = 1000;                 /* 千分比，速度 10 时 300 */
 
 /* ---------- PSRAM 环形缓冲（单生产者 BLE 回调 / 单消费者任务） ---------- */
@@ -141,14 +142,16 @@ static uint32_t scaled(uint32_t ms)
 
 static void hid_press(uint8_t modifier, uint8_t usage)
 {
-    if (!s_hid_dev) return;
+    if (!s_hid_dev) { s_hid_failed = true; return; }
     uint8_t buf[8] = {0};
     buf[0] = modifier;
     buf[2] = usage;
-    esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
+    esp_err_t rc = esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
+    if (rc != ESP_OK) { s_hid_failed = true; ESP_LOGW(TAG, "HID input failed: %d (PC 未作为键盘连接?)", rc); }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_DOWN_MS)));
     memset(buf, 0, sizeof(buf));
-    esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
+    rc = esp_hidd_dev_input_set(s_hid_dev, 0, 1, buf, sizeof(buf));
+    if (rc != ESP_OK) { s_hid_failed = true; }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
 }
 
@@ -338,13 +341,15 @@ static void handle_command(char *line)
     if (colon) { *colon = 0; arg = colon + 1; }
 
     if (!strcasecmp(cmd, "TEXT")) {
+        s_hid_failed = false;
         handle_text(arg);
-        notify_status("OK");
+        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
     } else if (!strcasecmp(cmd, "KEY")) {
         uint8_t usage = key_from_name(arg);
         if (!usage) { notify_status("ERR:INVALID_KEY"); return; }
+        s_hid_failed = false;
         hid_press(0, usage);
-        notify_status("OK");
+        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
     } else if (!strcasecmp(cmd, "MOD")) {
         char buf[128];
         strncpy(buf, arg, sizeof(buf) - 1);
@@ -365,13 +370,15 @@ static void handle_command(char *line)
             mod |= m;
         }
         if (!usage) { notify_status("ERR:INVALID_KEY"); return; }
+        s_hid_failed = false;
         hid_press(mod, usage);
-        notify_status("OK");
+        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
     } else if (!strcasecmp(cmd, "UNI")) {
         uint32_t cp = (uint32_t)strtoul(arg, NULL, 0);
         if (cp == 0 || cp > 0x10FFFF) { notify_status("ERR:INVALID_CODEPOINT"); return; }
+        s_hid_failed = false;
         type_codepoint(cp);
-        notify_status("OK");
+        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
     } else if (!strcasecmp(cmd, "UMOD")) {
         int mode = atoi(arg);
         if (mode < 0 || mode > 3) { notify_status("ERR:INVALID_MODE"); return; }
