@@ -96,6 +96,9 @@ static uint8_t s_speed = 5;
 static volatile bool s_hid_failed = false;   // 本次命令里 HID 报告发送是否失败（电脑没连时会出现）
 static uint32_t s_scale = 1000;                 /* 千分比，速度 10 时 300 */
 
+static bool hid_send_report(uint8_t modifier, const uint8_t *keycode);   // 前置声明
+static volatile bool s_key_down;                                  // 前置声明（是否有键按着）
+
 /* ---------- PSRAM 环形缓冲（单生产者 BLE 回调 / 单消费者任务） ---------- */
 static uint8_t *s_rb = NULL;
 static size_t s_rb_cap = 0;
@@ -128,7 +131,8 @@ static void clear_pending_input(const char *why)
         s_rb_head = s_rb_tail = 0;   // 丢掉还没打的命令
         xSemaphoreGive(s_rb_mtx);
     }
-    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);  // 松开所有键，防卡键
+    hid_send_report(0, NULL);   // 松开所有键（等待式，确保真的松开）
+    s_key_down = false;
     ESP_LOGW(TAG, "EMERGENCY STOP (%s): buffer cleared, keys released", why ? why : "manual");
     notify_status("OK:STOPPED");
 }
@@ -188,35 +192,40 @@ static uint32_t scaled(uint32_t ms)
     return v < T_MIN_MS ? T_MIN_MS : v;
 }
 
-/* 发送一份 HID 报文；若 USB 被 Windows 挂起（idle suspend），先远程唤醒并等待就绪。
- * 返回 false 表示等待超时/发送失败。 */
+/* 发送一份 HID 报文：等到"端点上一次传输完成 + USB 未挂起"（tud_hid_n_ready）再发。
+ * 如果 USB 被 Windows 挂起，会先 remote wakeup。返回 false 表示超时/失败。 */
 static bool hid_send_report(uint8_t modifier, const uint8_t *keycode)
 {
-    for (int i = 0; i < 300; i++) {          // 最多等 3 秒
-        if (tud_ready()) {
+    for (int i = 0; i < 1500; i++) {         // 最多等 15 秒
+        if (tud_hid_n_ready(0)) {
             return tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, modifier, keycode);
         }
         if (tud_suspended()) {
-            tud_remote_wakeup();             // 唤醒主机
+            tud_remote_wakeup();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
-    ESP_LOGW(TAG, "USB HID not ready after 3s (mounted=%d suspended=%d)",
+    ESP_LOGW(TAG, "USB HID busy/suspended too long (mount=%d susp=%d)",
              (int)tud_mounted(), (int)tud_suspended());
     return false;
 }
 
+static volatile bool s_key_down = false;   // 是否有键还按着（看门狗会持续尝试松开）
 static void hid_press(uint8_t modifier, uint8_t usage)
 {
     uint8_t keycode[6] = {0};
     keycode[0] = usage;
     if (!hid_send_report(modifier, keycode)) {
         s_hid_failed = true;
-        return;
+        return;                 // 按下都没成功，不会卡键
     }
+    s_key_down = true;          // 已按下，必须确保松开
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_DOWN_MS)));
-    if (!hid_send_report(0, NULL)) {
-        s_hid_failed = true;
+
+    if (hid_send_report(0, NULL)) {
+        s_key_down = false;
+    } else {
+        s_hid_failed = true;    // 交给看门狗继续尝试松开
     }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
 }
@@ -229,8 +238,17 @@ static void usb_keepalive_task(void *arg)
     }
     vTaskDelay(pdMS_TO_TICKS(1000));
     while (1) {
-        if (tud_ready()) {
-            tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);  // 空报文（不按任何键）
+        if (s_key_down) {
+            // 卡键看门狗：只要还有键按着，就不断尝试松开
+            if (hid_send_report(0, NULL)) {
+                s_key_down = false;
+                ESP_LOGW(TAG, "watchdog released stuck key");
+            }
+            vTaskDelay(pdMS_TO_TICKS(200));
+            continue;
+        }
+        if (tud_hid_n_ready(0)) {
+            tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);  // 空报文保活
         }
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
