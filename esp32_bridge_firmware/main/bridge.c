@@ -21,6 +21,7 @@
 
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "driver/gpio.h"
 
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
@@ -87,6 +88,7 @@ static uint16_t s_status_val_handle = 0;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static struct ble_gap_event_listener s_gap_listener;
 
+static void notify_status(const char *msg);   // 前置声明（急停函数会用到）
 static void start_advertising(void);   // 前置声明（gap 回调里会用到）
 
 static uint8_t s_unicode_mode = UNI_MODE_ALTX;
@@ -114,6 +116,43 @@ static size_t rb_push(const uint8_t *data, size_t len)
     }
     xSemaphoreGive(s_rb_mtx);
     return written;
+}
+
+/* ---------- 安全阀：清空待打缓冲 + 松开所有按键 ---------- */
+#define BOOT_BTN_GPIO GPIO_NUM_0
+
+static void clear_pending_input(const char *why)
+{
+    if (s_rb_mtx) {
+        xSemaphoreTake(s_rb_mtx, portMAX_DELAY);
+        s_rb_head = s_rb_tail = 0;   // 丢掉还没打的命令
+        xSemaphoreGive(s_rb_mtx);
+    }
+    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);  // 松开所有键，防卡键
+    ESP_LOGW(TAG, "EMERGENCY STOP (%s): buffer cleared, keys released", why ? why : "manual");
+    notify_status("OK:STOPPED");
+}
+
+/* BOOT 键（GPIO0）按下 = 紧急停止 */
+static void safety_task(void *arg)
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = BIT64(BOOT_BTN_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = true,
+        .pull_down_en = false,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&cfg);
+    bool prev = true;
+    while (1) {
+        bool now = gpio_get_level(BOOT_BTN_GPIO);
+        if (prev && !now) {          // 下降沿：按下了
+            clear_pending_input("BOOT button");
+        }
+        prev = now;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
 
 static bool rb_pop(uint8_t *out)
@@ -400,6 +439,8 @@ static void handle_command(char *line)
         s_speed = (uint8_t)level;
         s_scale = scales[level - 1];
         notify_status("OK");
+    } else if (!strcasecmp(cmd, "STOP")) {
+        clear_pending_input("STOP command");
     } else {
         notify_status("ERR:INVALID_CMD");
     }
@@ -642,6 +683,7 @@ void app_main(void)
 
     /* 4) 命令解析 + 打字任务 */
     xTaskCreate(data_task, "data_task", 4096, NULL, 5, NULL);
+    xTaskCreate(safety_task, "safety_task", 3072, NULL, 6, NULL);   // BOOT 键急停
 
     ESP_LOGI(TAG, "BRIDGE READY: USB HID out + BLE data in (0x1234/0x1235/0x1236), buffer %u KB",
              (unsigned)(s_rb_cap / 1024));
