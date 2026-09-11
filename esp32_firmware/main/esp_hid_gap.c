@@ -796,6 +796,16 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 
 }
 
+/* 连接稳定后再恢复广播（延迟 3 秒）：既不让 Windows 把连接判为异常，
+ * 又能让手机搜到本设备、连上自定义服务 1234。 */
+static void adv_restart_after_connect(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    int rc = esp_hid_ble_gap_adv_start();
+    ESP_LOGI(TAG, "re-advertise while connected: rc=%d", rc);
+    vTaskDelete(NULL);
+}
+
 static int
 nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 {
@@ -809,9 +819,8 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
                 event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
         if (event->connect.status == 0) {
-            /* 注意：不要在连接建立的瞬间立刻重开广播——Windows 会因此把连接判定为异常
-             * 并主动断开（日志里的 reason=531）。先让连接稳定；断开后底层会自动重新广播。 */
-            ESP_LOGI(TAG, "connected; advertising will resume after disconnect");
+            ESP_LOGI(TAG, "connected; will re-advertise after 3s");
+            xTaskCreate(adv_restart_after_connect, "adv_restart", 3072, NULL, 5, NULL);
         }
         return 0;
         break;
