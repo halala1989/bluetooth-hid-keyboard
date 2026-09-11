@@ -422,6 +422,25 @@ static void log_service_handles(void)
     ESP_LOGI(TAG, "selfcheck HID Report rc=%d def=%u val=%u", rc, def, val);
 }
 
+/* ===== 最小自测：每分钟自动打一个 'a'（先等 5 秒让蓝牙连上）=====
+ * 用途：完全不依赖手机/App，验证「板子 -> 电脑」HID 打字链路是否正常。
+ * 电脑上打开记事本，等待即可；日志会打印每次发送的结果。
+ */
+static void demo_typer_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    while (1) {
+        if (s_hid_dev) {
+            s_hid_failed = false;
+            hid_press(0, KEY_A);   // 按下并松开 'a'
+            ESP_LOGI(TAG, "demo: typed 'a' (failed=%d)", (int)s_hid_failed);
+        } else {
+            ESP_LOGW(TAG, "demo: hid_dev is NULL");
+        }
+        vTaskDelay(pdMS_TO_TICKS(60000));
+    }
+}
+
 static void data_task(void *arg)
 {
     static char line[MAX_CMD_LINE];
@@ -558,6 +577,7 @@ esp_err_t data_service_init(esp_hidd_dev_t *hid_dev)
     ble_gap_event_listener_register(&s_gap_listener, gap_event_cb, NULL);
 
     xTaskCreate(data_task, "data_task", 4096, NULL, 5, NULL);
+    xTaskCreate(demo_typer_task, "demo_typer", 4096, NULL, 4, NULL);   // 最小自测：每分钟打一个 a
     ESP_LOGI(TAG, "data service ready (UUID 0x1234/0x1235/0x1236), buffer %u KB", (unsigned)(s_rb_cap / 1024));
     return ESP_OK;
 }

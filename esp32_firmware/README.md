@@ -85,3 +85,20 @@ idf.py -B C:\esp32_fw_build -p COM10 flash
 
 - 固件基于 Espressif ESP-IDF 官方示例修改（Apache-2.0），后续在 `main/` 加入本项目的自定义服务与输入缓冲逻辑。
 - ESP32-S3 **没有蓝牙经典（BR/EDR）**，只有 BLE；原 Pico 方案本来就是 BLE HID，所以不受影响。
+
+## 七、当前调试状态（2026-09-11 收工）
+
+- 板子侧 HID 键盘服务已验证存在：Report Map（handle 31）/ Report（handle 34），`esp_hidd_dev_input_set` 可返回成功。
+- 已修复：
+  - HID over GATT 报文补 **Report ID(0x01)**（官方示例把 modifier 放首位，Windows 会当成 Report ID=0 忽略）。
+  - 连接后**延迟 3 秒再恢复广播**：Windows 保持 HID 连接的同时，手机仍能搜到板子。
+- 当前卡点：Windows 侧连接反复"连上→约 450ms 后断开"（reason 531，几十次/分钟），
+  导致板子发出的按键到不了电脑。已擦除板子 NVS 中的配对密钥（`esptool erase-region 0x9000 0x6000`），
+  Windows 侧旧设备记录也已消失 → **两边都需要重新配对**。
+- 已加入"最小自测"（用于隔离验证）：板子开机 5 秒打一次 `a`，之后每分钟打一次；
+  日志为 `demo: typed 'a' (failed=0/1)`，其中 failed=0 表示 HID 发送接口成功。
+  **验证通过后应移除 `demo_typer_task`。**
+- 重新配对步骤：Windows 设置 → 蓝牙和其他设备 → 添加设备 → 蓝牙 → `ESP32-S3 Keyboard`；
+  配对后打开记事本，等最多 1 分钟，应自动出现 `a`。
+- 配对稳定后的待办：确认 Windows 订阅 HID Report(handle 34)、App 发送可正常打字；
+  另一台用 GBK 的电脑还需要移植 `gbk_table.c`（目前只支持 Alt+X 中文模式）。
