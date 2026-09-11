@@ -809,10 +809,9 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
                 event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
         if (event->connect.status == 0) {
-            /* 关键：被电脑连上作为 HID 键盘后仍继续广播，
-             * 这样手机还能搜到本设备并连接自定义服务 1234。 */
-            int adv_rc = esp_hid_ble_gap_adv_start();
-            ESP_LOGI(TAG, "keep advertising while connected: rc=%d", adv_rc);
+            /* 注意：不要在连接建立的瞬间立刻重开广播——Windows 会因此把连接判定为异常
+             * 并主动断开（日志里的 reason=531）。先让连接稳定；断开后底层会自动重新广播。 */
+            ESP_LOGI(TAG, "connected; advertising will resume after disconnect");
         }
         return 0;
         break;

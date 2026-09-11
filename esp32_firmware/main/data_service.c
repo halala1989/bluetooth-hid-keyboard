@@ -412,6 +412,14 @@ static void log_service_handles(void)
     chr = (ble_uuid16_t)BLE_UUID16_INIT(DATA_STATUS_UUID);
     rc = ble_gatts_find_chr(&svc.u, &chr.u, &def, &val);
     ESP_LOGI(TAG, "selfcheck chr 0x1236 rc=%d def=%u val=%u", rc, def, val);
+    // HID 键盘服务自检：Report Map(0x2A4B) / Report(0x2A4D) 必须存在，Windows 才能当键盘用
+    ble_uuid16_t hid = BLE_UUID16_INIT(0x1812);
+    ble_uuid16_t map_chr = BLE_UUID16_INIT(0x2A4B);
+    ble_uuid16_t rpt_chr = BLE_UUID16_INIT(0x2A4D);
+    rc = ble_gatts_find_chr(&hid.u, &map_chr.u, &def, &val);
+    ESP_LOGI(TAG, "selfcheck HID ReportMap rc=%d def=%u val=%u", rc, def, val);
+    rc = ble_gatts_find_chr(&hid.u, &rpt_chr.u, &def, &val);
+    ESP_LOGI(TAG, "selfcheck HID Report rc=%d def=%u val=%u", rc, def, val);
 }
 
 static void data_task(void *arg)
