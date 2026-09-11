@@ -141,3 +141,55 @@ cd <repo>\android; .\gradlew.bat assembleDebug
 - `esp32_bridge_firmware/README.md`：桥接固件说明
 - `esp32_usb_hid_test/README.md`：USB HID 最小测试（含"每分钟打数字"验证记录）
 - `docs/LLM_PROVIDERS.md`：App 里大模型提供方（含火山 Agent Plan / 文献检索）
+---
+
+## 9. 后续开发目标（Roadmap，2026-09-12 整理）
+
+> 完整的三版本并行方案见 `docs/PARALLEL_DEVELOPMENT.md`。
+
+### P0 · 必做（下一阶段主线）
+
+1. **三版本并行架构落地**（一次改动三端生效）
+   - 一份 Android 代码 + Gradle product flavors：`bt` / `esp32` / `pico`
+   - 抽 `OutputTransport` 接口：`PhoneHidTransport`（bt）/ `BoardTransport`（esp32+pico 共用）
+   - 建 `shared_firmware/`：`protocol.h` + `typing_engine.c` + `gbk_table.c`，两个固件共用
+   - 迁移 6 步详见 `docs/PARALLEL_DEVELOPMENT.md` 第 4 节
+2. **GBK 中文模式移植**
+   - 目前桥接固件只支持 `UNI_MODE_ALTX`（Alt+X）；另一台电脑用 **GBK 机内码**
+   - 把 `pico_firmware/gbk_table.c`（约 540KB）与 `usb_hid.c` 里的 GBK 逻辑移到 `shared_firmware/`
+   - 桥接固件实现 `UMOD:2`（GBK）与 `UMOD:0/1`（十进制/十六进制小键盘）
+3. **App 端"停止/清空"按钮**
+   - 协议已支持 `STOP`（清空缓冲 + 强制松开），App 的 `BoardTransport` 加一个按钮调用即可
+
+### P1 · 重要
+
+4. **长时真机测试清单**
+   - 长文本（数千字）连续发送；多轮对话连续发送
+   - 电脑休眠/唤醒后继续发送；USB 拔插后自动恢复
+   - 手机切后台/锁屏期间板子继续打字
+   - 不同速度档（1-10）在电脑端的实际表现与丢键率
+5. **Pico 版 App 建立**
+   - 新建 flavor `pico`（`com.hidble.picokeyboard`，应用名"Pico 蓝牙键盘"）
+   - 复用 `BoardTransport`（Pico 与 ESP32 协议一致），仅默认设备名提示不同
+   - 用现有 `pico_firmware/` 固件联调
+6. **固件健壮性**
+   - BLE 断线自动重连、连接多个手机时的行为
+   - USB 挂起/恢复策略再优化（当前靠 5 秒空报文保活）
+   - 给固件打版本号，`DEBUG` 命令输出固件版本
+
+### P2 · 可选/优化
+
+7. **气泡界面增强**：长按复制、时间戳、编辑"最近一条 AI 回复"后重新发送
+8. **Token 加密**：API Key/检索 Key 改用 `EncryptedSharedPreferences`（当前明文）
+9. **清理调试代码**：正式版去掉 `DEBUG` 命令与保活日志噪音；
+   `esp32_usb_hid_test/` 保留为验证工具，不参与正式发布
+10. **医学预设同步**：门诊病历/书面化/普通模式等预设在三版本中统一维护
+11. **APK 发布规范**：三版本各自 `versionCode +1`，文件名带版本号
+    （`PhoneBluetoothKeyboard-vXX.apk` / `Esp32BluetoothKeyboard-vXX.apk` / `PicoBluetoothKeyboard-vXX.apk`）
+
+### 维护规则（避免再分叉）
+
+- 通用功能只改 `src/main`（三端自动生效）
+- 新增差异只加在 flavor 配置 / `OutputTransport` 实现 / 各平台固件目录
+- 协议改动先改 `shared_firmware/protocol.h`，App 侧同步改 `BoardTransport`
+- 每次发布三个 flavor 都要编译；更新本文件与 `docs/PARALLEL_DEVELOPMENT.md`
