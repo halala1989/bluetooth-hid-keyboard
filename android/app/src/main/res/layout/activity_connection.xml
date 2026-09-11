@@ -36,9 +36,68 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="蓝牙键盘 · 已配对设备"
+                android:text="ESP32-S3 · 外接键盘板"
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary" />
+        </LinearLayout>
+
+        <!-- 外接键盘板卡片：ESP32-S3（大缓存 + 控速 HID 输出） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="外接键盘板（ESP32-S3）"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/boardStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="未连接：点下面按钮扫描并连接 ESP32-S3 Keyboard"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="连上后，“发送到键盘”会改走板子：板子用 512KB 缓冲、按速度档控速输出 HID 键盘报文，长文本更稳、丢键更少。"
+                android:textSize="12sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="6dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp">
+
+                <Button
+                    android:id="@+id/boardScanButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1.2"
+                    android:text="扫描并连接" />
+
+                <Button
+                    android:id="@+id/boardDisconnectButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.8"
+                    android:layout_marginStart="8dp"
+                    android:text="断开" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 模拟蓝牙键盘开关卡片 -->
@@ -145,64 +204,6 @@
                 android:scrollbarStyle="outsideOverlay" />
         </LinearLayout>
 
-        <!-- 外接键盘板卡片：ESP32-S3（大缓存 + 控速 HID 输出） -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginBottom="20dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="外接键盘板（ESP32-S3）"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:id="@+id/boardStatusText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="未连接：点下面按钮扫描并连接 ESP32-S3 Keyboard"
-                android:textSize="13sp"
-                android:textColor="@color/text_secondary" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="连上后，“发送到键盘”会改走板子：板子用 512KB 缓冲、按速度档控速输出 HID 键盘报文，长文本更稳、丢键更少。"
-                android:textSize="12sp"
-                android:textColor="@color/text_hint"
-                android:layout_marginTop="6dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="10dp">
-
-                <Button
-                    android:id="@+id/boardScanButton"
-                    style="@style/PrimaryButton"
-                    android:layout_width="0dp"
-                    android:layout_height="46dp"
-                    android:layout_weight="1.2"
-                    android:text="扫描并连接" />
-
-                <Button
-                    android:id="@+id/boardDisconnectButton"
-                    style="@style/KeyButton"
-                    android:layout_width="0dp"
-                    android:layout_height="46dp"
-                    android:layout_weight="0.8"
-                    android:layout_marginStart="8dp"
-                    android:text="断开" />
-            </LinearLayout>
-        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
