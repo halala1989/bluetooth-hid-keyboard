@@ -444,9 +444,29 @@
                 android:focusable="true"
                 android:contentDescription="科学文献检索结果" />
 
+            <!-- 聊天气泡列表：我的消息靠右、AI 靠左，气泡宽度按内容自适应（不占满整框） -->
+            <ScrollView
+                android:id="@+id/llmBubbleScroll"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginTop="8dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_log"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:id="@+id/llmBubbleContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
             <!-- 对话输出框：右侧上下滑块可查看长文本（内容溢出时优先内部滚动） -->
             <com.hidble.phonekeyboard.ScrollableEditText
                 android:id="@+id/llmOutput"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="190dp"
                 android:background="@drawable/bg_log"

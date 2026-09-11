@@ -22,6 +22,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.AlignmentSpan
 import android.text.Layout
 import android.util.Base64
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -32,6 +33,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ListView
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
@@ -86,6 +88,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var llmInput: EditText
     private lateinit var llmOutput: EditText
+    private lateinit var llmBubbleScroll: ScrollView
+    private lateinit var llmBubbleContainer: LinearLayout
     private lateinit var llmSendButton: Button
     private lateinit var llmStopButton: Button
     private lateinit var llmNewConversationButton: Button
@@ -302,6 +306,8 @@ class MainActivity : AppCompatActivity() {
         // 大模型对话
         llmInput = findViewById(R.id.llmInput)
         llmOutput = findViewById(R.id.llmOutput)
+        llmBubbleScroll = findViewById(R.id.llmBubbleScroll)
+        llmBubbleContainer = findViewById(R.id.llmBubbleContainer)
         llmSendButton = findViewById(R.id.llmSendButton)
         llmStopButton = findViewById(R.id.llmStopButton)
         llmStopButton.isEnabled = false
@@ -354,8 +360,10 @@ class MainActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {
                 prefs.edit().putString(LlmPrefs.KEY_OUTPUT, s?.toString() ?: "").apply()
                 if (!llmStreaming) applyLlmColors()
+                scheduleRenderBubbles()
             }
         })
+        renderBubbles()   // 首次进入渲染已保存的对话气泡
     }
 
     private fun initHid() {
@@ -1175,6 +1183,79 @@ class MainActivity : AppCompatActivity() {
      * 给对话输出框着色：“我：”开头为绿色，“AI：”开头为白色，其余用默认文字色。
      * 只改颜色 span，不改文本，可安全在 TextWatcher 中调用。
      */
+    // ===== 聊天气泡渲染 =====
+
+    private val bubbleHandler = Handler(Looper.getMainLooper())
+    private var bubbleRenderPending = false
+
+    /** 限流刷新气泡（流式输出时每个字都刷新会很卡） */
+    private fun scheduleRenderBubbles() {
+        if (bubbleRenderPending) return
+        bubbleRenderPending = true
+        bubbleHandler.postDelayed({
+            bubbleRenderPending = false
+            renderBubbles()
+        }, 120)
+    }
+
+    /** 把对话文本（"我：…" / "AI：…"）渲染成一左一右的气泡列表 */
+    private fun renderBubbles() {
+        if (!::llmBubbleContainer.isInitialized) return
+        val messages = parseBubbles(llmOutput.text.toString())
+        llmBubbleContainer.removeAllViews()
+        val density = resources.displayMetrics.density
+        val maxWidth = (resources.displayMetrics.widthPixels * 0.72f).toInt()
+        for ((role, content) in messages) {
+            val row = layoutInflater.inflate(R.layout.item_llm_bubble, llmBubbleContainer, false) as LinearLayout
+            val tv = row.findViewById<TextView>(R.id.bubbleText)
+            tv.text = content
+            tv.maxWidth = maxWidth
+            if (role == "me") {
+                row.gravity = Gravity.END
+                tv.setBackgroundResource(R.drawable.bg_bubble_me)
+            } else {
+                row.gravity = Gravity.START
+                tv.setBackgroundResource(R.drawable.bg_bubble_ai)
+            }
+            val lp = row.layoutParams as LinearLayout.LayoutParams
+            lp.bottomMargin = (6 * density).toInt()
+            row.layoutParams = lp
+            llmBubbleContainer.addView(row)
+        }
+        llmBubbleScroll.post { llmBubbleScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /** 解析对话文本为若干条消息：("me"/"ai", 内容) */
+    private fun parseBubbles(text: String): List<Pair<String, String>> {
+        val out = mutableListOf<Pair<String, String>>()
+        var role: String? = null
+        val sb = StringBuilder()
+        fun flush() {
+            if (role != null && sb.isNotBlank()) out.add(role!! to sb.toString().trim())
+            sb.setLength(0)
+        }
+        for (line in text.split("\n")) {
+            val t = line.trimStart()
+            when {
+                t.startsWith("我：") -> {
+                    flush()
+                    role = "me"
+                    sb.append(t.removePrefix("我："))
+                }
+                t.startsWith("AI：") -> {
+                    flush()
+                    role = "ai"
+                    sb.append(t.removePrefix("AI："))
+                }
+                else -> if (role != null) {
+                    if (sb.isNotEmpty()) sb.append("\n")
+                    sb.append(line)
+                }
+            }
+        }
+        flush()
+        return out
+    }
     private fun applyLlmColors() {
         val editable = llmOutput.text
         editable.getSpans(0, editable.length, ForegroundColorSpan::class.java)
