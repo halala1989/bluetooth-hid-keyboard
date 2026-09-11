@@ -2046,7 +2046,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             arrayOf(
                 Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION // Android 11 及以下做 BLE 扫描需要定位权限
             )
         }
 

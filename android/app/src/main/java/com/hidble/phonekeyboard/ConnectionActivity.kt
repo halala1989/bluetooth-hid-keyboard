@@ -177,7 +177,7 @@ class ConnectionActivity : AppCompatActivity() {
         if (candidates.isEmpty()) {
             Toast.makeText(
                 this,
-                "没扫到设备，也没找到已配对的板子。请先确认板子已上电并在广播；若已在手机蓝牙设置里连过它，请先在系统设置里取消连接再试",
+                "没扫到设备，也没找到已配对的板子。请检查：①App 的“附近设备”权限是否允许；②板子已上电且在广播；③若已在手机系统蓝牙里连过它，先在系统设置里取消连接再试",
                 Toast.LENGTH_LONG
             ).show()
             refreshBoardStatus(boardManager.isConnected())
