@@ -188,17 +188,34 @@ static uint32_t scaled(uint32_t ms)
     return v < T_MIN_MS ? T_MIN_MS : v;
 }
 
+/* 发送一份 HID 报文；若 USB 被 Windows 挂起（idle suspend），先远程唤醒并等待就绪。
+ * 返回 false 表示等待超时/发送失败。 */
+static bool hid_send_report(uint8_t modifier, const uint8_t *keycode)
+{
+    for (int i = 0; i < 300; i++) {          // 最多等 3 秒
+        if (tud_ready()) {
+            return tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, modifier, keycode);
+        }
+        if (tud_suspended()) {
+            tud_remote_wakeup();             // 唤醒主机
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    ESP_LOGW(TAG, "USB HID not ready after 3s (mounted=%d suspended=%d)",
+             (int)tud_mounted(), (int)tud_suspended());
+    return false;
+}
+
 static void hid_press(uint8_t modifier, uint8_t usage)
 {
-    /* USB HID（TinyUSB）：第一参数是 Report ID(1)，keycode 为 6 键数组，NULL 表示全松开 */
     uint8_t keycode[6] = {0};
     keycode[0] = usage;
-    if (!tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, modifier, keycode)) {
+    if (!hid_send_report(modifier, keycode)) {
         s_hid_failed = true;
-        ESP_LOGW(TAG, "USB HID report failed (PC 未就绪?)");
+        return;
     }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_DOWN_MS)));
-    if (!tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL)) {
+    if (!hid_send_report(0, NULL)) {
         s_hid_failed = true;
     }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
