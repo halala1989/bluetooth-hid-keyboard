@@ -153,7 +153,41 @@ class BoardBleManager(private val context: Context) {
         cmdCharacteristic?.let { writeNext(it) }
     }
 
-    fun sendText(text: String) = sendCommand("TEXT:$text")
+    /**
+     * 发送文本（协议用 \n 作为命令结束符，所以文本里的换行必须拆开处理）：
+     *  - 按行拆分：每行发一条 TEXT；行与行之间发 KEY:ENTER
+     *  - 每行再按 UTF-8 字节数切块（中文 1 字 = 3 字节），避免超过固件 1200 字节的行缓冲
+     */
+    fun sendText(text: String) {
+        val maxBytes = 800   // 单条 TEXT 的 UTF-8 字节上限（留足前缀/结尾余量）
+        val normalized = text.replace("\r\n", "\n").replace('\r', '\n')
+        val lines = normalized.split('\n')
+        for ((idx, line) in lines.withIndex()) {
+            var remaining = line
+            while (remaining.isNotEmpty()) {
+                val chunk = takeUtf8Bytes(remaining, maxBytes)
+                if (chunk.isEmpty()) break
+                sendCommand("TEXT:$chunk")
+                remaining = remaining.substring(chunk.length)
+            }
+            if (idx != lines.lastIndex) {
+                sendCommand("KEY:ENTER")   // 原来的换行
+            }
+        }
+    }
+
+    /** 取前若干个字符，使其 UTF-8 字节数不超过 maxBytes（不拆开一个字符） */
+    private fun takeUtf8Bytes(s: String, maxBytes: Int): String {
+        var bytes = 0
+        val sb = StringBuilder()
+        for (ch in s) {
+            val b = ch.toString().toByteArray(Charsets.UTF_8).size
+            if (bytes + b > maxBytes) break
+            sb.append(ch)
+            bytes += b
+        }
+        return sb.toString()
+    }
     fun setSpeed(level: Int) = sendCommand("SPEED:$level")
     fun setUnicodeMode(mode: Int) = sendCommand("UMOD:$mode")
     fun sendKey(key: String) = sendCommand("KEY:$key")
