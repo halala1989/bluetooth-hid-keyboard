@@ -19,6 +19,8 @@ import android.text.Editable
 import android.text.Spannable
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
+import android.text.style.AlignmentSpan
+import android.text.Layout
 import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
@@ -89,7 +91,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmNewConversationButton: Button
     private lateinit var llmSendToKeyboardButton: Button
     private lateinit var llmClearButton: Button
-    private lateinit var llmIncludeMeCheck: CheckBox
     private lateinit var llmThinkingRow: android.view.View
     private lateinit var llmThinkingText: TextView
     private lateinit var llmSettingsButton: Button
@@ -306,7 +307,6 @@ class MainActivity : AppCompatActivity() {
         llmStopButton.isEnabled = false
         llmSendToKeyboardButton = findViewById(R.id.llmSendToKeyboardButton)
         llmClearButton = findViewById(R.id.llmClearButton)
-        llmIncludeMeCheck = findViewById(R.id.llmIncludeMeCheck)
         llmThinkingRow = findViewById(R.id.llmThinkingRow)
         llmThinkingText = findViewById(R.id.llmThinkingText)
         llmSettingsButton = findViewById(R.id.llmSettingsButton)
@@ -1179,6 +1179,8 @@ class MainActivity : AppCompatActivity() {
         val editable = llmOutput.text
         editable.getSpans(0, editable.length, ForegroundColorSpan::class.java)
             .forEach { editable.removeSpan(it) }
+        editable.getSpans(0, editable.length, AlignmentSpan::class.java)
+            .forEach { editable.removeSpan(it) }
         val text = editable.toString()
         if (text.isEmpty()) return
         val meColor = ContextCompat.getColor(this, R.color.llm_me)
@@ -1187,18 +1189,24 @@ class MainActivity : AppCompatActivity() {
         var start = 0
         for (line in text.split("\n")) {
             val end = (start + line.length).coerceAtMost(editable.length)
+            val isMe = line.trimStart().startsWith("我：")
+            val isAi = line.trimStart().startsWith("AI：")
             val color = when {
-                line.startsWith("我：") -> meColor
-                line.startsWith("AI：") -> aiColor
+                isMe -> meColor
+                isAi -> aiColor
                 else -> normalColor
             }
             if (start < end) {
                 editable.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // 我的发言靠右，大模型发言靠左
+                editable.setSpan(
+                    AlignmentSpan.Standard(if (isMe) Layout.Alignment.ALIGN_OPPOSITE else Layout.Alignment.ALIGN_NORMAL),
+                    start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
             }
             start = end + 1
         }
     }
-
     // ===== 提示词预设（下拉菜单：无提示词 / 已存预设 / 新建 / 删除） =====
 
     /** 内置提示词预设：通用书面化 + 医疗场景模板（遵循中国《病历书写基本规范》） */
@@ -1823,6 +1831,23 @@ class MainActivity : AppCompatActivity() {
      * 把对话输出框内容发送到蓝牙键盘。
      * 默认不发送“我：”的发言（只发 AI 回复）；勾选“包含我的发言”后才全部发送。
      */
+    /** 从对话输出里取出「大模型最近一次的发言」（去掉 "AI：" 前缀；到下一个 "我：" 行为止） */
+    private fun extractLastAiReply(full: String): String {
+        val lines = full.split("\n")
+        var startIdx = -1
+        for (i in lines.indices.reversed()) {
+            if (lines[i].trimStart().startsWith("AI：")) { startIdx = i; break }
+        }
+        if (startIdx < 0) return ""
+        val sb = StringBuilder()
+        for (i in startIdx until lines.size) {
+            val l = lines[i]
+            if (i > startIdx && l.trimStart().startsWith("我：")) break
+            sb.append(l)
+            if (i != lines.size - 1) sb.append("\n")
+        }
+        return sb.toString().trim().removePrefix("AI：").trim()
+    }
     private fun sendOutputToKeyboard() {
         // 正在发送：再次点击 = 中止发送
         if (llmSendJob?.isActive == true) {
@@ -1832,20 +1857,15 @@ class MainActivity : AppCompatActivity() {
             appendLog("已停止发送对话内容")
             return
         }
-        val full = llmOutput.text.toString().trim()
-        if (full.isEmpty()) {
+        val full = llmOutput.text.toString()
+        if (full.isBlank()) {
             Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
             return
         }
-        val text = if (llmIncludeMeCheck.isChecked) {
-            full
-        } else {
-            full.lines().filterNot { it.trimStart().startsWith("我：") }
-                .joinToString("\n")
-                .trim()
-        }
-        if (text.isEmpty()) {
-            Toast.makeText(this, "没有可发送的内容（已默认排除“我”的发言，可勾选“包含我的发言”）", Toast.LENGTH_SHORT).show()
+        // 只发送大模型最近一次的发言
+        val text = extractLastAiReply(full)
+        if (text.isBlank()) {
+            Toast.makeText(this, "还没有大模型的回复可发送", Toast.LENGTH_SHORT).show()
             return
         }
 
