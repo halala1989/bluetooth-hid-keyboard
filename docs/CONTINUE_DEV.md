@@ -3,6 +3,9 @@
 > 本文件是给“下一台电脑上的 ChatGPT/Codex”读的交接说明：
 > 克隆仓库后先读本文件 + `README.md` + `docs/HISTORY.md`，再按 `docs/ONBOARDING.md` 检查环境，即可接着开发。
 > 家用电脑环境：ChatGPT + CC Switch + DeepSeek API（提供方配置见 `docs/MIGRATION.md`，密钥需从旧电脑拷贝）。
+>
+> **2026-09-12 新增 ESP32-S3 桥接方案**（手机 --BLE--> 板子 --USB HID--> 电脑）：
+> 新硬件线请先读 **`docs/CONTINUE_ESP32.md`**；本文件描述的是"手机自己当蓝牙键盘"的旧方案。
 
 ## 一、当前状态（重要）
 
