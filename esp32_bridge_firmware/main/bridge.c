@@ -220,6 +220,22 @@ static void hid_press(uint8_t modifier, uint8_t usage)
     }
     vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
 }
+/* USB 保活：Windows 空闲会把 USB HID 挂起（挂起后 tud_ready()=false，无法发送）。
+ * 开机后每 5 秒发一个空的键盘报文，保持 USB 有活动、避免被挂起。 */
+static void usb_keepalive_task(void *arg)
+{
+    while (!tud_mounted()) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    while (1) {
+        if (tud_ready()) {
+            tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);  // 空报文（不按任何键）
+        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
+
 /* ASCII -> (modifier, usage)，不支持的返回 false */
 static bool ascii_to_hid(char ch, uint8_t *mod, uint8_t *usage)
 {
@@ -456,6 +472,11 @@ static void handle_command(char *line)
         s_speed = (uint8_t)level;
         s_scale = scales[level - 1];
         notify_status("OK");
+    } else if (!strcasecmp(cmd, "DEBUG")) {
+        char dbuf[96];
+        snprintf(dbuf, sizeof(dbuf), "DBG:mount=%d susp=%d ready=%d hidrdy=%d",
+                 (int)tud_mounted(), (int)tud_suspended(), (int)tud_ready(), (int)tud_hid_n_ready(0));
+        notify_status(dbuf);
     } else if (!strcasecmp(cmd, "STOP")) {
         clear_pending_input("STOP command");
     } else {
@@ -701,6 +722,7 @@ void app_main(void)
     /* 4) 命令解析 + 打字任务 */
     xTaskCreate(data_task, "data_task", 4096, NULL, 5, NULL);
     xTaskCreate(safety_task, "safety_task", 3072, NULL, 6, NULL);   // BOOT 键急停
+    xTaskCreate(usb_keepalive_task, "usb_keepalive", 3072, NULL, 4, NULL);   // USB 保活，防挂起
 
     ESP_LOGI(TAG, "BRIDGE READY: USB HID out + BLE data in (0x1234/0x1235/0x1236), buffer %u KB",
              (unsigned)(s_rb_cap / 1024));
