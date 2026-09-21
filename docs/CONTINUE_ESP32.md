@@ -1,7 +1,8 @@
 # CONTINUE · ESP32-S3 桥接方案（给下一个 AI 的交接文档）
 
-> 最后更新：2026-09-12
-> 相关分支：`esp32-s3-app`（当前主线）
+> 最后更新：2026-09-21
+> 当前主线分支：`multi-target-6`（一套代码出 6 个 APK：bt / pico / esp32 × 完整版 / 简明版）
+> 上一代分支：`esp32-s3-app`（单目标 ESP32 版，保留可用）
 > 更早的「手机自己当蓝牙键盘」方案见 `docs/CONTINUE_DEV.md`（分支 `phone-keyboard`）
 
 ---
@@ -19,6 +20,10 @@
 
 为什么不用「BLE HID 键盘」直接连电脑：Windows 侧会反复连上又断（reason 531），
 所以改成 **USB 当键盘 + BLE 只做数据通道**，稳定可靠。
+
+> **2026-09-21 更新（重要）**：主线已迁到 `multi-target-6` —— 一套代码用 Gradle 双维度 flavor
+> 出 **6 个 APK**（手机蓝牙 / Pico / ESP32 × 完整版 / 简明版），并完成 UI 美化、差异化图标、
+> 速度档解锁。详见本文档第 10 节与 `docs/PARALLEL_DEVELOPMENT.md`。
 
 ---
 
@@ -42,7 +47,8 @@
 
 | 分支 | 用途 | 备注 |
 |---|---|---|
-| `esp32-s3-app` | **当前主线**：ESP32-S3 桥接 App + 桥接固件 | 本文件所在分支 |
+| `multi-target-6` | **当前主线**：一套代码 × 6 个变体（bt/pico/esp32 × full/lite） | 2026-09-21 起 |
+| `esp32-s3-app` | 上一代：单目标 ESP32-S3 桥接 App + 桥接固件 | 保留可用（含固件源码） |
 | `phone-keyboard` | 手机自己当蓝牙键盘 + 大模型（旧主线） | versionCode 21 |
 | `plain-bluetooth` | 普通蓝牙版存档（无 ESP32 桥接） | versionCode 16 |
 
@@ -193,3 +199,64 @@ cd <repo>\android; .\gradlew.bat assembleDebug
 - 新增差异只加在 flavor 配置 / `OutputTransport` 实现 / 各平台固件目录
 - 协议改动先改 `shared_firmware/protocol.h`，App 侧同步改 `BoardTransport`
 - 每次发布三个 flavor 都要编译；更新本文件与 `docs/PARALLEL_DEVELOPMENT.md`
+
+---
+
+## 10. 2026-09-21 进展（6 版本 + UI + 图标 + 速度）
+
+### 10.1 一套代码出 6 个 APK（分支 `multi-target-6`）
+
+Gradle 双维度 flavor：`target`（bt / pico / esp32） × `edition`（full / lite）。
+
+| 变体 | 包名 | 应用名 |
+|---|---|---|
+| btFull | `com.hidble.phonekeyboard` | 手机蓝牙键盘 |
+| btLite | `com.hidble.phonekeyboard.lite` | 手机蓝牙键盘 简明版 |
+| picoFull | `com.hidble.picokeyboard` | Pico 蓝牙键盘 |
+| picoLite | `com.hidble.picokeyboard.lite` | Pico 蓝牙键盘 简明版 |
+| esp32Full | `com.hidble.esp32keyboard` | ESP32 蓝牙键盘 |
+| esp32Lite | `com.hidble.esp32keyboard.lite` | ESP32 蓝牙键盘 简明版 |
+
+代码里的三个开关（`BuildConfig`）：
+
+- `TARGET_MODE`：`"bt"`（手机自己当 BLE HID 键盘）/ `"board"`（Pico 或 ESP32 外接板）
+- `BOARD_HINT`：`"Pico"` / `"ESP32"`（连接页文案与默认设备名匹配）
+- `LITE`：`true` = 简明版（隐藏**全部**大模型入口：大模型卡片 + 顶部“模型设置”按钮）
+
+**简明版保留**：输入文本 → 发送到键盘、常用语、输入速度、中文输入模式（其余全部隐藏）。
+
+### 10.2 UI 美化（用 `ui-ux-pro-max` skill）
+
+- 配色：医疗暗色（主色青 `#0891B2`、强调健康绿 `#059669`；背景 `#0F172A`、卡片 `#111827`、描边 `#334155`）
+- 圆角/描边：卡片 16dp、日志/列表 12dp、气泡 16dp
+- 排版：统一 `SectionTitle`(16sp 粗体) / `HelperText`(12sp+行距) / `FieldLabel`(14sp)
+- 触控：发送按钮 52dp、其余 48dp，间距按 8dp 网格
+- 聊天气泡：我的靠右（深青绿）、AI 靠左（深灰），宽度自适应
+
+### 10.3 6 套差异化图标
+
+- 同一底图（深色圆角 + 键盘），顶部标签区分目标：**BT**（青）/ **PICO**（绿）/ **ESP**（琥珀）
+- 简明版额外带 **LITE** 角标；每套 5 档密度（mdpi→xxxhdpi）
+- Manifest 占位符 `android:icon="${appIcon}"` + `build.gradle` 变体循环注入
+- 生成脚本：`tools/gen_launcher_icons.py`（Pillow，改标签/颜色重跑即可）
+
+### 10.4 速度档解锁（v33）
+
+- `MIN_DELAY_MS` 10ms → **2ms**（原来 7 档以上全被夹到 10ms，导致 8/9/10 无差别）
+- `SPEED_SCALES` → `3078,2539,2078,1616,1231,885,450,260,120,30`（7 档稍快、**8/9/10 各上移一档**）
+- `CHAR_GAP_MS` 0 → 6；新增 `ALT_MIN_DELAY_MS=8ms`（保证 GBK/Alt 码高速下仍能转换）
+- ⚠️ 蓝牙每份报告约 10ms，8-10 档（尤其 GBK）可能丢字，实测为准；丢了就回落 5-7 档
+
+### 10.5 产物
+
+- 6 个 APK：仓库根目录及 `APK-v33/`（v33 为最新，目录已 gitignore）
+- 构建命令：`cd android; .\gradlew.bat assembleDebug --no-parallel`
+- 注意：6 个变体并行编译会 OOM，`gradle.properties` 已设 `-Xmx4096m` + `parallel=false`
+
+### 10.6 下一步（承接第 9 节 Roadmap）
+
+1. 真机验证 8/9/10 档丢字情况，必要时微调 `SPEED_SCALES`
+2. **GBK 移植到桥接固件**（`shared_firmware/` 方案），让 ESP32/Pico 版也支持 GBK
+3. App 端加 `STOP` 按钮（协议已支持）
+4. 可选：简明版做源码级裁剪（进一步减小 APK 体积）
+5. 三目标并行：所有通用改动只改 `src/main`，差异只进 flavor / 传输层 / 各固件目录
