@@ -96,23 +96,19 @@
             android:layout_marginBottom="12dp">
 
             <TextView
+                style="@style/SectionTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="输入文本"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="10dp" />
+                android:text="输入文本" />
 
             <com.hidble.phonekeyboard.ScrollableEditText
                 android:id="@+id/textInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="110dp"
+                android:minHeight="120dp"
                 android:background="@drawable/bg_input"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="输入文字（支持中文/英文/数字，可多行）"
+                android:padding="14dp"
+                android:hint="输入要发送到电脑的文字（中文/英文/数字，可多行）"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_hint"
                 android:textColorHighlight="#334FC3F7"
@@ -130,16 +126,18 @@
                 android:id="@+id/sendButton"
                 style="@style/PrimaryButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="52dp"
+                android:layout_marginTop="12dp"
+                android:textSize="16sp"
                 android:text="发送到键盘" />
 
             <Button
                 android:id="@+id/phraseButton"
                 style="@style/KeyButton"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="48dp"
                 android:layout_marginTop="8dp"
+                android:textSize="14sp"
                 android:text="常用语（长按列表项可编辑/删除）" />
 
             <!-- 输入速度滑块（独占一行，位置直接生效，无需应用按钮） -->
@@ -148,13 +146,13 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="10dp">
+                android:layout_marginTop="16dp">
 
                 <TextView
+                    style="@style/FieldLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="输入速度"
-                    android:textSize="13sp"
                     android:textColor="@color/text_secondary" />
 
                 <SeekBar
@@ -176,20 +174,19 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="5"
-                    android:textSize="15sp"
+                    android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/primary"
-                    android:minWidth="20dp"
+                    android:minWidth="24dp"
                     android:gravity="center" />
             </LinearLayout>
 
             <TextView
+                style="@style/HelperText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="1=最慢最稳，10=最快（默认 5），拖动即生效；8-10 已接近蓝牙物理上限，过快会丢字，推荐 5-7 档稳定使用。GBK 模式需目标电脑开启 NumLock。"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginTop="2dp" />
+                android:layout_marginTop="4dp" />
         </LinearLayout>
 
         <!-- ===== 中文输入模式卡片（下拉菜单，选中项左侧绿色 √） ===== -->
@@ -202,13 +199,10 @@
             android:layout_marginBottom="12dp">
 
             <TextView
+                style="@style/SectionTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="中文输入模式"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="8dp" />
+                android:text="中文输入模式" />
 
             <Spinner
                 android:id="@+id/unicodeModeSpinner"
@@ -219,11 +213,10 @@
                 android:paddingEnd="12dp" />
 
             <TextView
+                style="@style/HelperText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Alt+X（默认）：记事本/Word 等 RichEdit 可用，无需注册表/NumLock；十六进制=Alt+Numpad+（需 EnableHexNumpad+NumLock，记事本无效）；十进制=Alt+0+码点；GBK 仅中文版 Windows。"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
                 android:layout_marginTop="8dp" />
         </LinearLayout>
 
@@ -300,7 +293,7 @@
                 android:id="@+id/llmInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="110dp"
+                android:minHeight="120dp"
                 android:background="@drawable/bg_input"
                 android:padding="12dp"
                 android:hint="输入要问模型的话..."

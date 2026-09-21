@@ -171,3 +171,20 @@ cd <repo>\android
 
 > 注意：`android/gradle.properties` 已加 `org.gradle.jvmargs=-Xmx4096m` 与 `org.gradle.parallel=false`，
 > 否则 6 个变体并行编译会 OOM（Kotlin 编译器 Java heap 不足）。
+
+---
+
+## 8. UI 美化（2026-09-21，v30，用 ui-ux-pro-max skill）
+
+按 `ui-ux-pro-max` skill 的针对性检索结论（极简/瑞士风 + 医疗暗色 + 48dp 触控 + 8dp 网格）统一调整：
+
+- **配色**（`res/values/colors.xml`，医疗暗色：青 + 健康绿）
+  - 主色 `#0891B2`（青）/ 强调 `#059669`（健康绿）/ 危险 `#F87171`
+  - 背景 `#0F172A`、卡片 `#111827`、描边 `#334155`、输入 `#0B1220`
+  - 文字 `#F8FAFC` / `#CBD5E1` / `#94A3B8`（对比度更高）
+- **圆角与描边**：卡片 16dp、日志/列表 12dp、气泡 16dp（带 1dp 描边）
+- **排版层级**：新增统一样式 `SectionTitle`（16sp 粗体）/ `HelperText`（12sp 次要色 + 行距 3dp）/ `FieldLabel`（14sp）
+- **触控**：发送按钮 52dp、常用语/下拉 48dp（满足 Android 48dp 最小触控），间距按 8dp 网格
+- 聊天气泡：我的（右，青绿 `#134E4A`）/ AI（左，`#1E293B`），宽度自适应不占满
+
+改动都在 `src/main`，**6 个变体同时生效**；v30 的 6 个 APK 已构建。
