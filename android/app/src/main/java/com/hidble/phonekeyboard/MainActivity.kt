@@ -324,9 +324,11 @@ class MainActivity : AppCompatActivity() {
         llmAttachButton = findViewById(R.id.llmAttachButton)
         llmNewConversationButton = findViewById(R.id.llmNewConversationButton)
 
-        // 简明版：只保留 输入文本/发送到键盘/常用语/速度/中文输入模式，隐藏大模型卡片
+        // 简明版：只保留 输入文本/发送到键盘/常用语/速度/中文输入模式
+        // 隐藏大模型卡片 + 顶部“模型设置”按钮（及其入口）
         if (BuildConfig.LITE) {
             findViewById<View>(R.id.llmCard).visibility = View.GONE
+            findViewById<View>(R.id.llmSettingsTopButton).visibility = View.GONE
         }
         llmLitCheck = findViewById(R.id.llmLitCheck)
         llmLitInfo = findViewById(R.id.llmLitInfo)
