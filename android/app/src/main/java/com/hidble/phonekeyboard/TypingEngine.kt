@@ -152,16 +152,19 @@ class TypingEngine(
 
         private const val KEY_DOWN_MS = 15
         private const val KEY_UP_MS = 15
-        // 字符抬起后不再额外等待：下一键的按下延迟负责拉开间距
-        private const val CHAR_GAP_MS = 0
+        // 字符抬起后的间隔（随速度档缩放；高速档会触底到 MIN_DELAY_MS）
+        private const val CHAR_GAP_MS = 6
         // Alt 组合收尾：按 Alt+X（或松开 Alt）前先停顿，让宿主应用把最后一位数字写进文档，
         // 避免 Alt+X 来得太早导致不转换/丢字（此停顿随速度缩放，最慢档最稳）
         private const val ALT_PRE_MS = 100
         private const val ALT_FINAL_MS = 40
-        // 蓝牙 HID 报告传输间隔约 10ms：低于此值发送只是往缓冲里堆报告，
-        // 缓冲溢出会静默丢报告 -> 键位/修饰键残留 -> 目标机误操作（全选删除等）。
-        // 因此把所有报告的最小间隔设为 10ms，等于链路物理速率，宁可稳不可丢。
-        private const val MIN_DELAY_MS = 10L
+        // 【2026-09-21 用户要求解锁高速档】蓝牙 HID 报告传输约 10ms/份；低于此值可能
+        // 往缓冲里堆报告、溢出丢报告（键位/修饰键残留）。用户希望在 8-10 档做高速测试，
+        // 故把下限从 10ms 降到 2ms：低速档依旧稳，高速档可能丢字，实测为准。
+        private const val MIN_DELAY_MS = 2L
+        // Alt 码（GBK/十进制/十六进制）松开 Alt 前的最小停顿：保证 Windows 完成转换，
+        // 不随高速档无限缩短（否则末位数字来不及处理 -> 不转换/乱码）。
+        private const val ALT_MIN_DELAY_MS = 8L
         /** 长文本自动分段：每段字符数 */
         const val CHUNK_SIZE = 40
         /** 段间暂停，让蓝牙发送缓冲消化，避免长文本高速发送时丢字 */
@@ -172,9 +175,9 @@ class TypingEngine(
         // 1=最慢 .. 10=最快；最低档更慢、档间差值拉开，慢档更稳（降低随机丢字/转换失败）。
         // 2026-09-02：每档提速 10%（延迟系数 ×0.9）。
         // 2026-09-04：再提速 10%（×0.9）：[3600,2970,...] → [3240,2673,...]。
-        // 注意 MIN_DELAY_MS=10 为蓝牙物理下限，高档位（约 7 档以上）会触底，
-        // 实际速度以链路为准，不要再下调 MIN_DELAY_MS。
-        private val SPEED_SCALES = intArrayOf(3078, 2539, 2078, 1616, 1231, 885, 600, 385, 200, 62)
+        // 2026-09-21（用户要求）：7 档稍提速、8/9/10 各上移一档并解锁下限 10→2ms，
+        // 让 GBK 与高速档能继续提速（可能丢字，实测为准）。
+        private val SPEED_SCALES = intArrayOf(3078, 2539, 2078, 1616, 1231, 885, 450, 260, 120, 30)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -290,7 +293,7 @@ class TypingEngine(
                     queue(0, 0, CHAR_GAP_MS)
                 }
                 // 停顿后再按 Alt+X：保证最后一位数字已被应用写入文档
-                delay(scaled(ALT_PRE_MS))
+                delay(scaledAlt(ALT_PRE_MS))
                 queue(HidKeys.MOD_LEFTALT, HidKeys.KEY_X, KEY_DOWN_MS)
                 queue(0, 0, ALT_FINAL_MS)
             }
@@ -306,7 +309,7 @@ class TypingEngine(
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
-                delay(scaled(ALT_PRE_MS))
+                delay(scaledAlt(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
             MODE_GBK -> {
@@ -323,7 +326,7 @@ class TypingEngine(
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
-                delay(scaled(ALT_PRE_MS))
+                delay(scaledAlt(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
             else -> { // MODE_DECIMAL：Alt+0+十进制（必须带前导 0，否则 Windows 按 ANSI 码页取模）
@@ -334,7 +337,7 @@ class TypingEngine(
                     queue(HidKeys.MOD_LEFTALT, 0, 0)
                 }
                 // 停顿后再松开 Alt：确保 Windows 已完成数字输入并触发转换
-                delay(scaled(ALT_PRE_MS))
+                delay(scaledAlt(ALT_PRE_MS))
                 queue(0, 0, ALT_FINAL_MS)
             }
         }
@@ -437,6 +440,12 @@ class TypingEngine(
         val idx = speedLevel.coerceIn(1, 10) - 1
         val v = ms.toLong() * SPEED_SCALES[idx] / 1000L
         return if (v < MIN_DELAY_MS) MIN_DELAY_MS else v
+    }
+
+    /** Alt 码专用：在通用缩放基础上再保证一个最小停顿，避免高速档转换失败 */
+    private fun scaledAlt(ms: Int): Long {
+        val v = scaled(ms)
+        return if (v < ALT_MIN_DELAY_MS) ALT_MIN_DELAY_MS else v
     }
 
     /** 发送彻底失败（连接中断）时抛出，用于终止长文本输入 */
