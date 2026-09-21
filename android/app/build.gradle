@@ -8,11 +8,43 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.hidble.esp32keyboard"
         minSdk 28
         targetSdk 34
-        versionCode 28
-        versionName "2.0-esp32-beta"
+        versionCode 29
+        versionName "2.0"
+    }
+
+    // ===== 两个维度：target（三个目标） × edition（完整版/简明版） =====
+    flavorDimensions "target", "edition"
+    productFlavors {
+        bt {
+            dimension "target"
+            applicationId "com.hidble.phonekeyboard"
+            buildConfigField "String", "TARGET_MODE", '"bt"'
+            buildConfigField "String", "BOARD_HINT", '""'
+        }
+        pico {
+            dimension "target"
+            applicationId "com.hidble.picokeyboard"
+            buildConfigField "String", "TARGET_MODE", '"board"'
+            buildConfigField "String", "BOARD_HINT", '"Pico"'
+        }
+        esp32 {
+            dimension "target"
+            applicationId "com.hidble.esp32keyboard"
+            buildConfigField "String", "TARGET_MODE", '"board"'
+            buildConfigField "String", "BOARD_HINT", '"ESP32"'
+        }
+        full {
+            dimension "edition"
+            buildConfigField "boolean", "LITE", "false"
+        }
+        lite {
+            dimension "edition"
+            buildConfigField "boolean", "LITE", "true"
+            applicationIdSuffix ".lite"
+            versionNameSuffix "-lite"
+        }
     }
 
     buildTypes {
@@ -33,6 +65,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 }
 
@@ -46,3 +79,10 @@ dependencies {
     implementation 'androidx.activity:activity-ktx:1.8.1'
 }
 
+// 给每个变体计算应用显示名（简明版加后缀）
+android.applicationVariants.all { variant ->
+    def target = variant.productFlavors.find { it.dimension == 'target' }?.name
+    def edition = variant.productFlavors.find { it.dimension == 'edition' }?.name
+    def base = [bt: '手机蓝牙键盘', pico: 'Pico 蓝牙键盘', esp32: 'ESP32 蓝牙键盘'][target] ?: '蓝牙键盘'
+    variant.mergedFlavor.manifestPlaceholders.put('appLabel', edition == 'lite' ? base + ' 简明版' : base)
+}

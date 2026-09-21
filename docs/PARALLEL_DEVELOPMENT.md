@@ -131,3 +131,43 @@ shared_firmware/
 - `docs/CONTINUE_DEV.md`：手机自己当蓝牙键盘方案（旧主线）
 - `docs/BRANCHES.md`：分支/包名/APK 命名约定
 - `esp32_bridge_firmware/README.md`、`esp32_usb_hid_test/README.md`、`pico_firmware/`（Pico 固件）
+---
+
+## 7. 已落地：6 个构建变体（2026-09-21）
+
+分支 **`multi-target-6`** 已用 Gradle **双维度 flavor** 实现「3 目标 × 2 版本 = 6 个 APK」：
+
+| 变体（flavor） | APK 文件名 | 包名 | 应用名 |
+|---|---|---|---|
+| `btFull` | `PhoneBluetoothKeyboard-v29.apk` | `com.hidble.phonekeyboard` | 手机蓝牙键盘 |
+| `btLite` | `PhoneBluetoothKeyboard-Lite-v29.apk` | `com.hidble.phonekeyboard.lite` | 手机蓝牙键盘 简明版 |
+| `picoFull` | `PicoBluetoothKeyboard-v29.apk` | `com.hidble.picokeyboard` | Pico 蓝牙键盘 |
+| `picoLite` | `PicoBluetoothKeyboard-Lite-v29.apk` | `com.hidble.picokeyboard.lite` | Pico 蓝牙键盘 简明版 |
+| `esp32Full` | `Esp32BluetoothKeyboard-v29.apk` | `com.hidble.esp32keyboard` | ESP32 蓝牙键盘 |
+| `esp32Lite` | `Esp32BluetoothKeyboard-Lite-v29.apk` | `com.hidble.esp32keyboard.lite` | ESP32 蓝牙键盘 简明版 |
+
+6 个包名互不相同，**可同时安装**。
+
+### 代码里的两个开关
+
+- `BuildConfig.TARGET_MODE`：`"bt"`（手机自己当蓝牙 HID 键盘）/ `"board"`（Pico 或 ESP32 外接板）
+- `BuildConfig.LITE`：`true` = 简明版（隐藏大模型卡片），`false` = 完整版
+- `BuildConfig.BOARD_HINT`：`"Pico"` 或 `"ESP32"`（连接页/提示文案与默认设备名匹配用）
+
+### 简明版包含什么
+
+只保留：**输入文本框 → 发送到键盘**、**常用语**、**输入速度**、**中文输入模式**；
+隐藏大模型对话卡片（其余功能随 LLM 卡片一起去掉）。
+
+### 构建全部 6 个 APK
+
+```powershell
+$env:JAVA_HOME="D:\jdk17\jdk-17.0.20+8"; $env:ANDROID_HOME="D:\Android"; $env:ANDROID_SDK_ROOT="D:\Android"
+cd <repo>\android
+.\gradlew.bat assembleDebug --no-parallel     # 全部 6 个变体
+# 产物目录：app/build/outputs/apk/<target><Edition>/debug/app-<...>.apk
+# 复制为仓库根目录的规范文件名（见上表）
+```
+
+> 注意：`android/gradle.properties` 已加 `org.gradle.jvmargs=-Xmx4096m` 与 `org.gradle.parallel=false`，
+> 否则 6 个变体并行编译会 OOM（Kotlin 编译器 Java heap 不足）。

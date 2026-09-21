@@ -323,6 +323,11 @@ class MainActivity : AppCompatActivity() {
         llmAttachmentInfo = findViewById(R.id.llmAttachmentInfo)
         llmAttachButton = findViewById(R.id.llmAttachButton)
         llmNewConversationButton = findViewById(R.id.llmNewConversationButton)
+
+        // 简明版：只保留 输入文本/发送到键盘/常用语/速度/中文输入模式，隐藏大模型卡片
+        if (BuildConfig.LITE) {
+            findViewById<View>(R.id.llmCard).visibility = View.GONE
+        }
         llmLitCheck = findViewById(R.id.llmLitCheck)
         llmLitInfo = findViewById(R.id.llmLitInfo)
 
@@ -683,33 +688,43 @@ class MainActivity : AppCompatActivity() {
         val text = textInput.text.toString()
         if (text.isEmpty()) return
 
-        // ESP32-S3 专用版：只发给外接键盘板（板子再输出到电脑），不检查手机是否连电脑
         setKeepScreenOn(true)
         sendButton.text = "停止"
         sendJob = lifecycleScope.launch {
             try {
-                if (!BoardLink.isConnected()) {
-                    if (BoardLink.knownBoardAddress(this@MainActivity) == null ||
-                        !BoardLink.reconnectAndWait(this@MainActivity, 8000)
-                    ) {
-                        throw IllegalStateException("尚未连接外接键盘板：请到“连接管理”页连接 ESP32-S3 Keyboard")
+                if (BuildConfig.TARGET_MODE == "bt") {
+                    // 蓝牙版：手机自己当蓝牙 HID 键盘，直接发给电脑
+                    if (!connected) {
+                        throw IllegalStateException("尚未连接到电脑：请先在“连接管理”里开启模拟蓝牙键盘并完成配对")
                     }
+                    hidProtocol.typeText(text)
+                    appendLog("已把文本发送到电脑（手机蓝牙键盘）")
+                } else {
+                    // 外接键盘板版（Pico / ESP32-S3）：BLE 发给板子，由板子输出
+                    if (!BoardLink.isConnected()) {
+                        if (BoardLink.knownBoardAddress(this@MainActivity) == null ||
+                            !BoardLink.reconnectAndWait(this@MainActivity, 8000)
+                        ) {
+                            throw IllegalStateException("尚未连接外接键盘板：请到“连接管理”页连接")
+                        }
+                    }
+                    BoardLink.setSpeed(savedSpeedLevel)
+                    BoardLink.setUnicodeMode(savedUnicodeMode)
+                    if (!BoardLink.sendText(text)) {
+                        throw IllegalStateException("发送失败（连接已断开）")
+                    }
+                    appendLog("已通过外接键盘板发送 ${text.length} 字")
                 }
-                BoardLink.setSpeed(savedSpeedLevel)
-                BoardLink.setUnicodeMode(savedUnicodeMode)
-                if (!BoardLink.sendText(text)) {
-                    throw IllegalStateException("发送失败（连接已断开）")
-                }
-                appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字")
-                Toast.makeText(this@MainActivity, "已发送 ${text.length} 字到外接键盘板", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "已发送 ${text.length} 字", Toast.LENGTH_SHORT).show()
                 textInput.text.clear()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 appendLog("文本发送已中止")
                 throw e
             } catch (e: Exception) {
-                appendLog("外接板发送失败：${e.message}")
-                Toast.makeText(this@MainActivity, e.message ?: "外接键盘板未连接", Toast.LENGTH_LONG).show()
+                appendLog("发送失败：${e.message}")
+                Toast.makeText(this@MainActivity, e.message ?: "发送失败", Toast.LENGTH_LONG).show()
             } finally {
+                hidProtocol.releaseAll()
                 setKeepScreenOn(false)
                 sendJob = null
                 sendButton.text = "发送到键盘"
@@ -1950,8 +1965,37 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 优先走外接键盘板（ESP32-S3）：板子有 512KB 缓冲 + 控速输出，长文本更稳、丢键更少。
-        // 只要之前连过板子（保存过地址），即使当前 GATT 被系统断开，也会自动重连后再发送。
+        // 蓝牙版：手机自己当蓝牙 HID 键盘，直接发给电脑
+        if (BuildConfig.TARGET_MODE == "bt") {
+            if (!connected) {
+                Toast.makeText(this, "尚未连接到电脑：请先在“连接管理”里开启模拟蓝牙键盘并完成配对", Toast.LENGTH_LONG).show()
+                return
+            }
+            setKeepScreenOn(true)
+            llmSendToKeyboardButton.text = "停止"
+            llmSendJob = lifecycleScope.launch {
+                try {
+                    hidProtocol.typeText(text)
+                    appendLog("已把大模型最近一次发言发送到电脑（${text.length} 字）")
+                    Toast.makeText(this@MainActivity, "已发送 ${text.length} 字到电脑", Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    appendLog("对话发送已中止")
+                    throw e
+                } catch (e: Exception) {
+                    appendLog("发送失败：${e.message}")
+                    Toast.makeText(this@MainActivity, e.message ?: "发送失败", Toast.LENGTH_LONG).show()
+                } finally {
+                    hidProtocol.releaseAll()
+                    setKeepScreenOn(false)
+                    llmSendJob = null
+                    llmSendToKeyboardButton.text = "发送到键盘"
+                }
+            }
+            return
+        }
+
+        // 外接键盘板版（Pico / ESP32-S3）：BLE 发给板子，由板子输出
+        val boardName = if (BuildConfig.BOARD_HINT == "Pico") "Pico" else "ESP32-S3"
         if (BoardLink.isConnected() || BoardLink.knownBoardAddress(this) != null) {
             setKeepScreenOn(true)
             llmSendToKeyboardButton.text = "停止"
@@ -1968,7 +2012,7 @@ class MainActivity : AppCompatActivity() {
                     if (!BoardLink.sendText(text)) {
                         throw IllegalStateException("发送失败（连接已断开）")
                     }
-                    appendLog("已通过外接键盘板（ESP32-S3）发送 ${text.length} 字（板子缓冲后控速输出）")
+                    appendLog("已通过外接键盘板（$boardName）发送 ${text.length} 字（板子缓冲后控速输出）")
                     Toast.makeText(this@MainActivity, "已发送 ${text.length} 字到外接键盘板", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     appendLog("外接板发送失败：${e.message}")
@@ -1981,14 +2025,8 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        // ESP32-S3 专用版：只认蓝牙键盘板，不再检查/要求手机连接电脑
-        Toast.makeText(
-            this,
-            "尚未连接外接键盘板：请到“连接管理”页连接 ESP32-S3 Keyboard",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast.makeText(this, "尚未连接外接键盘板：请到“连接管理”页连接", Toast.LENGTH_LONG).show()
     }
-
     private fun clearLlmConversation() {
         llmOutput.setText("")
         llmHistory.clear()
