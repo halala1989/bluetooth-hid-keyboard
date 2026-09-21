@@ -188,3 +188,23 @@ cd <repo>\android
 - 聊天气泡：我的（右，青绿 `#134E4A`）/ AI（左，`#1E293B`），宽度自适应不占满
 
 改动都在 `src/main`，**6 个变体同时生效**；v30 的 6 个 APK 已构建。
+
+---
+
+## 9. 6 套差异化图标（2026-09-21，v32）
+
+6 个变体共用同一底图（深色圆角 + 键盘图形），**顶部标签区分目标、底部 LITE 标记区分版本**：
+
+| 变体 | 图标资源 | 顶部标签 | 颜色 | LITE 角标 |
+|---|---|---|---|---|
+| `btFull` | `ic_launcher_bt_full` | BT | 青 `#22D3EE` | 无 |
+| `btLite` | `ic_launcher_bt_lite` | BT | 青 `#22D3EE` | 有 |
+| `picoFull` | `ic_launcher_pico_full` | PICO | 绿 `#34D399` | 无 |
+| `picoLite` | `ic_launcher_pico_lite` | PICO | 绿 `#34D399` | 有 |
+| `esp32Full` | `ic_launcher_esp32_full` | ESP | 琥珀 `#FBBF24` | 无 |
+| `esp32Lite` | `ic_launcher_esp32_lite` | ESP | 琥珀 `#FBBF24` | 有 |
+
+- Manifest 用占位符 `android:icon="${appIcon}"` / `roundIcon`，由 `build.gradle` 的变体循环按
+  `"@mipmap/ic_launcher_" + target + "_" + edition` 注入。
+- 图标 PNG 生成脚本：`tools/gen_launcher_icons.py`（Pillow；改颜色/文字后重跑即可，
+  输出到 `res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/`）。
