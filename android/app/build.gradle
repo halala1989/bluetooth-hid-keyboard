@@ -10,11 +10,11 @@ android {
     defaultConfig {
         minSdk 28
         targetSdk 34
-        versionCode 33
+        versionCode 35
         versionName "2.0"
     }
 
-    // ===== 两个维度：target（三个目标） × edition（完整版/简明版） =====
+    // ===== 两个维度：target（四个目标） × edition（完整版/简明版） =====
     flavorDimensions "target", "edition"
     productFlavors {
         bt {
@@ -34,6 +34,12 @@ android {
             applicationId "com.hidble.esp32keyboard"
             buildConfigField "String", "TARGET_MODE", '"board"'
             buildConfigField "String", "BOARD_HINT", '"ESP32"'
+        }
+        yds3 {
+            dimension "target"
+            applicationId "com.hidble.ydesp32s3keyboard"
+            buildConfigField "String", "TARGET_MODE", '"board"'
+            buildConfigField "String", "BOARD_HINT", '"YD-ESP32-S3"'
         }
         full {
             dimension "edition"
@@ -83,7 +89,12 @@ dependencies {
 android.applicationVariants.all { variant ->
     def target = variant.productFlavors.find { it.dimension == 'target' }?.name
     def edition = variant.productFlavors.find { it.dimension == 'edition' }?.name
-    def base = [bt: '手机蓝牙键盘', pico: 'Pico 蓝牙键盘', esp32: 'ESP32 蓝牙键盘'][target] ?: '蓝牙键盘'
+    def base = [
+        bt: '手机蓝牙键盘',
+        pico: 'Pico 蓝牙键盘',
+        esp32: 'ESP32 蓝牙键盘',
+        yds3: 'YD-ESP32-S3 键盘'
+    ][target] ?: '蓝牙键盘'
     variant.mergedFlavor.manifestPlaceholders.put('appLabel', edition == 'lite' ? base + ' 简明版' : base)
     def iconKey = (target ?: 'bt') + '_' + (edition ?: 'full')
     variant.mergedFlavor.manifestPlaceholders.put('appIcon', '@mipmap/ic_launcher_' + iconKey)

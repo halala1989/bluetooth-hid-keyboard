@@ -158,6 +158,7 @@
             android:layout_marginBottom="20dp">
 
             <TextView
+                android:id="@+id/boardCardTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="外接键盘板（ESP32-S3）"
@@ -175,6 +176,7 @@
                 android:textColor="@color/text_secondary" />
 
             <TextView
+                android:id="@+id/boardHintText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="连上后，“发送到键盘”会改走板子：板子用 512KB 缓冲、按速度档控速输出 HID 键盘报文，长文本更稳、丢键更少。"
@@ -192,7 +194,7 @@
                     android:id="@+id/boardScanButton"
                     style="@style/PrimaryButton"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1.2"
                     android:text="扫描并连接" />
 
@@ -200,7 +202,7 @@
                     android:id="@+id/boardDisconnectButton"
                     style="@style/KeyButton"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_weight="0.8"
                     android:layout_marginStart="8dp"
                     android:text="断开" />

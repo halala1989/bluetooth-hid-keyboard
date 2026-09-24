@@ -1,23 +1,24 @@
-# CONTInue · 三版本并行开发方案（蓝牙直连 / ESP32 / Pico）
+# CONTInue · 多版本并行开发方案（蓝牙直连 / ESP32 / Pico / YD-ESP32-S3）
 
-> 目标（用户 2026-09-12 明确）：**三个版本并行开发；任何通用改动一次修改，三端同时生效。**
+> 目标：**多个硬件目标并行开发；任何通用改动一次修改，所有 App 端同时生效。**
 > 本文档说明如何做到这一点，以及从当前"多分支复制"状态迁移过来的步骤。
 
 ---
 
-## 1. 最终要维护的三个目标
+## 1. 维护中的目标
 
 | 目标 | App 包名 | App 名称 | 数据链路 |
 |---|---|---|---|
 | `bt`（普通蓝牙） | `com.hidble.phonekeyboard` | 手机蓝牙键盘 | 手机自己当 BLE HID 键盘 → 电脑 |
 | `esp32` | `com.hidble.esp32keyboard` | ESP32 蓝牙键盘 | 手机 --BLE--> ESP32 板子 --USB HID--> 电脑 |
 | `pico` | `com.hidble.picokeyboard` | Pico 蓝牙键盘 | 手机 --BLE--> Pico 板子 --BLE HID--> 电脑 |
+| `yds3` | `com.hidble.ydesp32s3keyboard` | YD-ESP32-S3 键盘 | 手机 --BLE--> YD N16R8 板子 --USB HID--> 电脑 |
 
-三个 App 可同时安装（包名不同）。
+所有 App 可同时安装（包名不同）。
 
 ---
 
-## 2. 核心原则：一份 Android 代码 + 三个 Gradle flavor
+## 2. 核心原则：一份 Android 代码 + 多个 Gradle flavor
 
 ### 2.1 目录/构建结构
 
@@ -121,7 +122,7 @@ shared_firmware/
 - **通用功能**（对话、提示词、文献、界面…）→ 只改 `src/main`，一次生效三端
 - **新增差异** → 只加在 flavor 配置 / `OutputTransport` 实现 / 各自固件目录里
 - **协议改动**（命令格式、UUID）→ 先改 `shared_firmware/protocol.h`，App 侧同步改 `BoardTransport`
-- **每次发布**：三个 flavor 都要编译；APK 文件名带各自版本号；更新本文件与 `docs/CONTINUE_ESP32.md`
+- **每次发布**：所有目标 flavor 都要编译；APK 文件名带各自版本号；更新本文件与 `docs/CONTINUE_ESP32.md`
 
 ---
 
@@ -159,7 +160,7 @@ shared_firmware/
 只保留：**输入文本框 → 发送到键盘**、**常用语**、**输入速度**、**中文输入模式**；
 隐藏大模型对话卡片（其余功能随 LLM 卡片一起去掉）。
 
-### 构建全部 6 个 APK
+### 构建原有 6 个 APK
 
 ```powershell
 $env:JAVA_HOME="D:\jdk17\jdk-17.0.20+8"; $env:ANDROID_HOME="D:\Android"; $env:ANDROID_SDK_ROOT="D:\Android"
@@ -168,6 +169,27 @@ cd <repo>\android
 # 产物目录：app/build/outputs/apk/<target><Edition>/debug/app-<...>.apk
 # 复制为仓库根目录的规范文件名（见上表）
 ```
+
+---
+
+## 8. 已落地：第四目标 YD-ESP32-S3（2026-09-24）
+
+新增 Gradle target `yds3`，与原 `esp32` 共用 BLE 数据协议和 USB HID 固件逻辑，
+但使用独立包名、应用名、图标以及 N16R8 专用固件配置。
+
+| 项目 | 值 |
+|---|---|
+| 板子丝印 | `YD-ESP32-23-2022-V1.3 v2356` |
+| 模组 | `ESP32-S3-WROOM-1 N16R8` |
+| 存储 | 16 MB QIO Flash + 8 MB OPI PSRAM |
+| USB 口 | 1 个 FT232RQ 串口/烧录口 + 1 个 ESP32-S3 原生 USB/HID 口 |
+| App target | `yds3Full` / `yds3Lite` |
+| 包名 | `com.hidble.ydesp32s3keyboard[.lite]` |
+| 应用名 | `YD-ESP32-S3 键盘[ 简明版]` |
+| 固件配置 | `esp32_bridge_firmware/sdkconfig.yds3.defaults` |
+| 固件构建 | `.\build_yds3_firmware.ps1` |
+
+详细烧录说明见 `docs/YD_ESP32_S3.md`。
 
 > 注意：`android/gradle.properties` 已加 `org.gradle.jvmargs=-Xmx4096m` 与 `org.gradle.parallel=false`，
 > 否则 6 个变体并行编译会 OOM（Kotlin 编译器 Java heap 不足）。

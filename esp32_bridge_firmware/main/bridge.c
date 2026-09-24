@@ -42,6 +42,13 @@
 
 static const char *TAG = "DATA_SVC";
 
+#ifndef BRIDGE_DEVICE_NAME
+#define BRIDGE_DEVICE_NAME "ESP32-S3 Bridge"
+#endif
+#ifndef BRIDGE_USB_PRODUCT_NAME
+#define BRIDGE_USB_PRODUCT_NAME "ESP32-S3 Bridge Keyboard"
+#endif
+
 /* ---------- 协议 UUID（与 Pico / Android App 一致） ---------- */
 #define DATA_SVC_UUID      0x1234
 #define DATA_CMD_UUID      0x1235
@@ -618,7 +625,7 @@ static const uint8_t hid_report_descriptor[] = {
 static const char *hid_string_descriptor[5] = {
     (char[]){0x09, 0x04},              // 语言
     "PhoneKeyboard",                   // 厂商
-    "ESP32-S3 Bridge Keyboard",        // 产品名
+    BRIDGE_USB_PRODUCT_NAME,           // 产品名
     "000001",                          // 序列号
     "USB HID Keyboard",                // HID 接口
 };
@@ -660,7 +667,7 @@ static void start_advertising(void)
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    static const char *name = "ESP32-S3 Bridge";
+    static const char *name = BRIDGE_DEVICE_NAME;
     fields.name = (uint8_t *)name;
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
@@ -727,7 +734,7 @@ void app_main(void)
     ESP_ERROR_CHECK(nimble_port_init());
     ble_svc_gap_init();
     ble_svc_gatt_init();
-    ble_svc_gap_device_name_set("ESP32-S3 Bridge");
+    ble_svc_gap_device_name_set(BRIDGE_DEVICE_NAME);
     int rc = ble_gatts_count_cfg(s_svcs);
     if (rc != 0) { ESP_LOGE(TAG, "gatts_count_cfg: %d", rc); }
     rc = ble_gatts_add_svcs(s_svcs);

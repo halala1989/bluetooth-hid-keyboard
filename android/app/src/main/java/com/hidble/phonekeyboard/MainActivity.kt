@@ -1997,7 +1997,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 外接键盘板版（Pico / ESP32-S3）：BLE 发给板子，由板子输出
-        val boardName = if (BuildConfig.BOARD_HINT == "Pico") "Pico" else "ESP32-S3"
+        val boardName = when (BuildConfig.BOARD_HINT) {
+            "Pico" -> "Pico"
+            "YD-ESP32-S3" -> "YD-ESP32-S3"
+            else -> "ESP32-S3"
+        }
         if (BoardLink.isConnected() || BoardLink.knownBoardAddress(this) != null) {
             setKeepScreenOn(true)
             llmSendToKeyboardButton.text = "停止"
@@ -2240,7 +2244,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-
 
 
 

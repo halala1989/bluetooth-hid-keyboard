@@ -11,6 +11,8 @@ variants = [
     ("pico_lite",  "PICO", (52, 211, 153),  True),
     ("esp32_full", "ESP",  (251, 191, 36),  False),
     ("esp32_lite", "ESP",  (251, 191, 36),  True),
+    ("yds3_full",  "YD",   (124, 58, 237),  False),
+    ("yds3_lite",  "YD",   (124, 58, 237),  True),
 ]
 
 densities = [("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)]

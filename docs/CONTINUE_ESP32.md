@@ -260,3 +260,69 @@ Gradle 双维度 flavor：`target`（bt / pico / esp32） × `edition`（full / 
 3. App 端加 `STOP` 按钮（协议已支持）
 4. 可选：简明版做源码级裁剪（进一步减小 APK 体积）
 5. 三目标并行：所有通用改动只改 `src/main`，差异只进 flavor / 传输层 / 各固件目录
+
+---
+
+## 11. 2026-09-24 进展（第四目标：YD-ESP32-S3 N16R8）
+
+### 11.1 硬件
+
+- 板卡丝印：`YD-ESP32-23-2022-V1.3 v2356`
+- 模组：ESP32-S3-WROOM-1 **N16R8**，16 MB QIO Flash + 8 MB OPI PSRAM
+- 两个 Type-C：COM（FT232RQ，烧录/UART 日志） + USB（ESP32-S3 原生 HID）
+- 与原 ESP32-S3 Super Mini 共用 BLE 协议与 TinyUSB 输出逻辑
+
+### 11.2 App 第四目标
+
+- Gradle target：`yds3` + `full/lite`
+- 包名：`com.hidble.ydesp32s3keyboard[.lite]`
+- 应用名：`YD-ESP32-S3 键盘[ 简明版]`
+- 图标：紫色 `YD` 标签，5 档密度
+- 连接页会动态显示双 Type-C 的使用说明
+
+### 11.3 固件
+
+- 通用源码：`esp32_bridge_firmware/main/bridge.c`
+- 板型配置：`esp32_bridge_firmware/sdkconfig.yds3.defaults`
+- 构建脚本：`build_yds3_firmware.ps1`
+- 广播名：`YD-ESP32-S3 Bridge`
+- USB 产品名：`YD-ESP32-S3 Keyboard`
+- v35/首版构建结果：应用镜像 580,032 B，约 567 KB，1.5 MB 分区余量 62%
+- COM 口实际由 **FT232RQ** 提供，不是 CH343P；开发机枚举为
+  `FTDIBUS\VID_0403+PID_6001`，即 **COM11**。
+- FT232RQ 的 DTR/RTS 自动下载电路可用，无需按 BOOT；实测 `read_mac` 和完整
+  `write_flash + verify_flash` 均成功。ESP32-S3 MAC：`7c:4f:ad:29:9b:f0`。
+- ESP32-S3 原生 USB 的两套身份已实测：
+  - 下载模式：`VID_303A&PID_1001`，出现 USB 串行设备/JTAG COM；
+  - 运行模式：`VID_303A&PID_4004`，Windows 枚举为 `HID Keyboard Device`。
+
+### 11.4 v35 产物
+
+- 8 个 APK：仓库根目录与 `APK-v35/`
+- YD 固件与安装包：`releases/yds3-v35/`、`YD-ESP32-S3-开发产物-v35.zip`
+- 烧录说明：`docs/YD_ESP32_S3.md`
+- 一键烧录：双击 `一键烧录_YD-ESP32-S3.cmd`；自动检测 FT232RQ/CH343 串口、烧录并回读校验
+
+### 11.5 真机验证状态（2026-09-24）
+
+已完成：
+
+1. ✅ 用 COM11（FT232RQ）完成一键烧录，合并固件 645,568 B，回读
+   `verify OK`，自动复位；
+2. ✅ 原生 USB 口正常枚举为 `VID_303A&PID_4004` / `HID Keyboard Device`；
+3. ✅ 一键脚本已支持自动识别 FTDI `VID_0403`，不再把 COM11 误判为无关设备。
+
+待完成：
+
+1. 手机安装 `YD-ESP32-S3-Keyboard-v35.apk`；
+2. BLE 连接广播名 `YD-ESP32-S3 Bridge`；
+3. 验证英文、数字、中文、长文本和高速档；
+4. 验证 BOOT(GPIO0) 紧急停止；
+5. 若需要板载 RGB 状态灯，再增加 GPIO48 状态指示。
+
+### 11.6 烧录方式结论
+
+- 首选：COM 口（FT232RQ）+ `一键烧录_YD-ESP32-S3.cmd`，无需按按钮；
+- 备用：USB 口 + BOOT/RST 手动进入下载模式，脚本同样可识别；
+- 日常运行：USB 口接目标电脑，COM 口可留作烧录/日志；
+- 两个 Type-C 可同时连接，互不冲突。

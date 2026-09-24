@@ -27,7 +27,9 @@ class ConnectionActivity : AppCompatActivity() {
     private lateinit var deviceList: ListView
 
     // 外接键盘板（ESP32-S3）
+    private lateinit var boardCardTitle: TextView
     private lateinit var boardStatusText: TextView
+    private lateinit var boardHintText: TextView
     private lateinit var boardScanButton: android.widget.Button
     private lateinit var boardDisconnectButton: android.widget.Button
     private lateinit var boardManager: BoardBleManager
@@ -55,7 +57,9 @@ class ConnectionActivity : AppCompatActivity() {
         deviceList.adapter = deviceListAdapter
 
         // 外接键盘板
+        boardCardTitle = findViewById(R.id.boardCardTitle)
         boardStatusText = findViewById(R.id.boardStatusText)
+        boardHintText = findViewById(R.id.boardHintText)
         boardScanButton = findViewById(R.id.boardScanButton)
         boardDisconnectButton = findViewById(R.id.boardDisconnectButton)
         boardManager = BoardLink.get(this)
@@ -65,6 +69,8 @@ class ConnectionActivity : AppCompatActivity() {
         findViewById<View>(R.id.phoneHidCard).visibility = if (isBt) View.VISIBLE else View.GONE
         findViewById<View>(R.id.pairedCard).visibility = if (isBt) View.VISIBLE else View.GONE
         findViewById<View>(R.id.boardCard).visibility = if (isBt) View.GONE else View.VISIBLE
+        boardCardTitle.text = "外接键盘板（${boardLabel()}）"
+        boardHintText.text = boardDescription()
         boardScanButton.setOnClickListener { startBoardScan() }
         boardDisconnectButton.setOnClickListener {
             boardManager.disconnect()
@@ -133,7 +139,7 @@ class ConnectionActivity : AppCompatActivity() {
         boardManager.onError = null
     }
 
-    // ===== 外接键盘板（ESP32-S3）=====
+    // ===== 外接键盘板 =====
 
     private fun refreshBoardStatus(connected: Boolean) {
         if (!::boardStatusText.isInitialized) return
@@ -154,7 +160,17 @@ class ConnectionActivity : AppCompatActivity() {
         }
     }
 
-    private fun boardLabel(): String = if (BuildConfig.BOARD_HINT == "Pico") "Pico" else "ESP32-S3"
+    private fun boardLabel(): String = when (BuildConfig.BOARD_HINT) {
+        "Pico" -> "Pico"
+        "YD-ESP32-S3" -> "YD-ESP32-S3"
+        else -> "ESP32-S3"
+    }
+
+    private fun boardDescription(): String = when (BuildConfig.BOARD_HINT) {
+        "Pico" -> "连上后，“发送到键盘”会改走板子：板子用 512KB 缓冲、按速度档控速输出 USB HID 键盘报文，长文本更稳、丢键更少。"
+        "YD-ESP32-S3" -> "连上后，“发送到键盘”会改走板子：N16R8 提供 16MB Flash + 8MB OPI PSRAM，固件使用 512KB 缓冲控速输出。用 COM 口（FT232RQ）烧录/看日志，用 ESP32-S3 原生 USB Type-C 口连接电脑作为键盘。"
+        else -> "连上后，“发送到键盘”会改走板子：板子用 512KB 缓冲、按速度档控速输出 HID 键盘报文，长文本更稳、丢键更少。"
+    }
 
     private fun startBoardScan() {
         if (!boardManager.isBleAvailable()) {
