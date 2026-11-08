@@ -18,3 +18,12 @@ tools/CaptureForm.cs
 tools/WinEnum.cs
 tools/WinFocus.cs
 _alttest.txt
+
+# Imported terminal working copies and redundant intermediate archives
+external-terminals/
+terminals/sources/**/_source.tar
+
+# Intermediate test APKs; published test18 is kept explicitly
+住院全流程管理-v*.apk
+医键住院管理-v4.0-test*.apk
+!医键住院管理-v4.0-test18.apk

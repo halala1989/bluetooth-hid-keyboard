@@ -27,8 +27,8 @@ class HidKeyboardService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("手机蓝牙键盘运行中")
-            .setContentText("正在为电脑提供蓝牙键盘输入，后台连接保持中")
+            .setContentTitle("医键住院管理 · 蓝牙输出运行中")
+            .setContentText("病例可发送到电脑，键盘连接保持中")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .build()

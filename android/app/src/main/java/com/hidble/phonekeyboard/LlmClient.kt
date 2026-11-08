@@ -27,19 +27,7 @@ data class LlmProvider(
 object LlmProviders {
     val list = listOf(
         LlmProvider("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash"),
-        LlmProvider("mimo", "小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2.5"),
-        LlmProvider("volcano", "火山引擎（豆包）", "https://ark.cn-beijing.volces.com/api/v3", "doubao-seed-1-8-251228"),
-        LlmProvider(
-            id = "volcano-agent-plan",
-            displayName = "火山 AI Hub（Agent Plan）",
-            baseUrl = "https://ark.cn-beijing.volces.com/api/plan/v3",
-            defaultModel = "ark-code-latest",
-            hint = "官方推荐模型：ark-code-latest（多模型聚合入口，会自动选套餐内最合适的子模型，最省心）。" +
-                "也可手动填套餐内具体模型强制指定，如 doubao-seed-2.0-lite、doubao-seed-2.0-pro、" +
-                "glm-5.2、kimi-k2.6、deepseek-v4-pro 等。注意“Agent-Plan-Small”是订阅套餐档位，不是模型名。" +
-                "API Token 填火山方舟控制台 Agent Plan 的专用 API Key（ark- 开头）。" +
-                "科学文献检索（对话前勾选）：需先在方舟控制台“使用配置→配置 Harness”开启“专业数据集”才能用，检索用本 Token 即可；设置页另有“科学文献检索专用 Key”一栏可单独填。"
-        )
+        LlmProvider("mimo", "小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2.5")
     )
 
     fun byId(id: String): LlmProvider = list.firstOrNull { it.id == id } ?: list[0]

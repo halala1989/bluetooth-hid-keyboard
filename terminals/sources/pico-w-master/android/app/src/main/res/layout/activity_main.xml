@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- 标题 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌨ BLE HID 键盘"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="手机输入 → 电脑"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+
+        <!-- 文本输入卡片（置顶：输入 + 发送 + 输入速度 + 常用语） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="输入文本"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/textInput"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:hint="输入文字（支持中文/英文/数字）"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textColorHighlight="#334FC3F7"
+                    android:textSize="15sp"
+                    android:singleLine="true"
+                    android:inputType="text"
+                    android:imeOptions="actionSend"
+                    android:importantForAutofill="no" />
+
+                <Button
+                    android:id="@+id/sendButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="0.45"
+                    android:text="发送" />
+            </LinearLayout>
+
+            <!-- 常用语 + 输入速度 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/phraseButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1.2"
+                    android:text="常用语" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+
+                <EditText
+                    android:id="@+id/speedInput"
+                    android:layout_width="58dp"
+                    android:layout_height="46dp"
+                    android:background="@drawable/bg_input"
+                    android:gravity="center"
+                    android:hint="5"
+                    android:inputType="number"
+                    android:maxLength="2"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="15sp"
+                    android:importantForAutofill="no" />
+
+                <Button
+                    android:id="@+id/applySpeedButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1.2"
+                    android:text="应用" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="输入速度 1-10（数字越大越快，默认 5，连接后自动生效）；常用语可保存常用语句，点选插入输入框。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- 中文输入模式卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="中文输入模式"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnModeAltX"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Alt+X" />
+
+                <Button
+                    android:id="@+id/btnModeHex"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="十六进制" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnModeDecimal"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="十进制" />
+
+                <Button
+                    android:id="@+id/btnModeGbk"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="GBK" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="默认 Alt+X（输入十六进制码后按 Alt+X，记事本/Word 等 RichEdit 可用，无需注册表/NumLock）。十六进制=Alt+Numpad+，需 EnableHexNumpad+NumLock，记事本无效；GBK 仅中文版 Windows。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- 功能键卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功能键"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEnter"
+                    style="@style/EnterButton"
+                    android:layout_weight="1"
+                    android:text="回车" />
+
+                <Button
+                    android:id="@+id/btnBackspace"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="退格" />
+
+                <Button
+                    android:id="@+id/btnDelete"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="删除" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnTab"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Tab" />
+
+                <Button
+                    android:id="@+id/btnEscape"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Esc" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 光标控制卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="光标控制"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <!-- 方向键 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginBottom="6dp">
+
+                <Button
+                    android:id="@+id/btnUp"
+                    style="@style/KeyButton"
+                    android:layout_width="56dp"
+                    android:layout_height="46dp"
+                    android:text="↑" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnLeft"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="←" />
+
+                    <Button
+                        android:id="@+id/btnDown"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="↓" />
+
+                    <Button
+                        android:id="@+id/btnRight"
+                        style="@style/KeyButton"
+                        android:layout_width="56dp"
+                        android:layout_height="46dp"
+                        android:text="→" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnHome"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Home" />
+
+                <Button
+                    android:id="@+id/btnEnd"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="End" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 组合键卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="组合键"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlC"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+C" />
+
+                <Button
+                    android:id="@+id/btnCtrlV"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+V" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlX"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+X" />
+
+                <Button
+                    android:id="@+id/btnCtrlA"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+A" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlZ"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+Z" />
+
+                <Button
+                    android:id="@+id/btnCtrlS"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+S" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 命令日志卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="命令日志"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/commandLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="等待连接..."
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="monospace"
+                    android:background="@drawable/bg_log"
+                    android:padding="10dp"
+                    android:lineSpacingExtra="2dp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- 连接状态卡片（移至底部） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="● "
+                    android:textSize="16sp"
+                    android:textColor="@color/disconnected"
+                    android:id="@+id/statusDot" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未连接"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/disconnected" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/deviceNameText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="请扫描并连接设备"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/scanButton"
+                    style="@style/PrimaryButton"
+                    android:layout_weight="1"
+                    android:text="扫描设备" />
+
+                <Button
+                    android:id="@+id/disconnectButton"
+                    style="@style/SecondaryButton"
+                    android:layout_weight="1"
+                    android:text="断开连接"
+                    android:enabled="false" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 设备列表卡片（移至最底部） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="发现的设备"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <ListView
+                android:id="@+id/deviceList"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/bg_list"
+                android:divider="@color/card_stroke"
+                android:dividerHeight="1dp"
+                android:padding="4dp"
+                android:scrollbarStyle="outsideOverlay" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

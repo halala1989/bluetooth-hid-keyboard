@@ -35,6 +35,13 @@
                 android:layout_weight="1" />
 
             <Button
+                android:id="@+id/patientManagerButton"
+                style="@style/KeyButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="住院管理" />
+
+            <Button
                 android:id="@+id/llmSettingsTopButton"
                 style="@style/KeyButton"
                 android:layout_width="wrap_content"
@@ -186,7 +193,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="1=最慢最稳，10=最快（默认 5），拖动即生效；8-10 已接近蓝牙物理上限，过快会丢字，推荐 5-7 档稳定使用。GBK 模式需目标电脑开启 NumLock。"
+                android:text="1=最慢，10=最快（默认 5）。第 8 档为稳定上限；第 9、10 档突破保护下限，最高约为旧版两倍，可能因蓝牙链路丢字。GBK 模式需目标电脑开启 NumLock。"
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="2dp" />

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-08",
+  "terminals": [
+    {
+      "id": "phone_hid",
+      "displayName": "手机蓝牙 HID",
+      "transport": "android_bluetooth_hid",
+      "status": "active",
+      "source": "sources/phone-bluetooth"
+    },
+    {
+      "id": "pico_w",
+      "displayName": "Pico W",
+      "transport": "ble_bridge_to_usb_hid",
+      "status": "active",
+      "source": "sources/pico-w-master"
+    },
+    {
+      "id": "esp32_s3",
+      "displayName": "ESP32-S3 Super Mini",
+      "transport": "ble_bridge_to_usb_hid",
+      "status": "active",
+      "source": "sources/esp32-s3-app"
+    },
+    {
+      "id": "yd_esp32_s3",
+      "displayName": "YD-ESP32-S3 N16R8",
+      "transport": "ble_bridge_to_usb_hid",
+      "status": "active",
+      "source": "sources/multi-target-6"
+    },
+    {
+      "id": "esp32_legacy",
+      "displayName": "ESP32-S3 旧 BLE HID",
+      "transport": "ble_data_plus_ble_hid",
+      "status": "archived",
+      "source": "sources/esp32-s3-app/esp32_firmware"
+    }
+  ],
+  "sources": [
+    {
+      "name": "phone-bluetooth",
+      "repository": "https://github.com/halala1989/bluetooth-hid-keyboard",
+      "ref": "origin/phone-keyboard",
+      "commit": "74da18bb2ce3c2d5f26bbb8450704ecee12ca068"
+    },
+    {
+      "name": "plain-bluetooth",
+      "repository": "https://github.com/halala1989/bluetooth-hid-keyboard",
+      "ref": "origin/plain-bluetooth",
+      "commit": "a91e9b9b090229720bf66dad9ff7d1030cf7ce1d"
+    },
+    {
+      "name": "esp32-s3-app",
+      "repository": "https://github.com/halala1989/bluetooth-hid-keyboard",
+      "ref": "origin/esp32-s3-app",
+      "commit": "ab50f47a5b36b005ecc44e65c14c84dcadf0a69a"
+    },
+    {
+      "name": "multi-target-6",
+      "repository": "https://github.com/halala1989/bluetooth-hid-keyboard",
+      "ref": "origin/multi-target-6",
+      "commit": "f1501b632093807ab91987a1a86d64a0184bdb5c"
+    },
+    {
+      "name": "pico-w-master",
+      "repository": "https://github.com/halala1989/bluetooth-hid-keyboard",
+      "ref": "origin/master",
+      "commit": "0357596e7ae6d2d6c56418ddcbb58b88ebfd0e5a"
+    },
+    {
+      "name": "pico-w-keyboard-android-client",
+      "repository": "https://github.com/halala1989/pico-w-keyboard",
+      "ref": "main",
+      "commit": "0fa5922f76d6be97241eefe5b03ad29ab5c6eb36"
+    },
+    {
+      "name": "pico-w-firmware-independent",
+      "repository": "https://github.com/halala1989/pico-w-firmware",
+      "ref": "main",
+      "commit": "7b5cb60c75b4407e043a6d7dfc5971b044238c91"
+    }
+  ]
+}

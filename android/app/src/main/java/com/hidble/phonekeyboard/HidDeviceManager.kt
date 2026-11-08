@@ -87,6 +87,7 @@ class HidDeviceManager(private val context: Context) {
     private var lastHost: BluetoothDevice? = null
     private var reconnectAttempts = 0
     private var connectRetry = 0
+    private val prefs = context.getSharedPreferences("hidble_prefs", Context.MODE_PRIVATE)
 
     var onAppStatusChanged: ((Boolean) -> Unit)? = null
     var onConnectionStateChanged: ((BluetoothDevice?, Int) -> Unit)? = null
@@ -127,6 +128,10 @@ class HidDeviceManager(private val context: Context) {
             if (state == BluetoothProfile.STATE_CONNECTED) {
                 hostDevice = device
                 lastHost = device
+                prefs.edit()
+                    .putString("last_hid_host_address", device?.address)
+                    .putString("last_hid_host_name", runCatching { device?.name }.getOrNull())
+                    .apply()
                 reconnectAttempts = 0
                 // 连接/重连成功后先清一次键盘状态，避免主机端残留上次的按键
                 try {
@@ -315,6 +320,8 @@ class HidDeviceManager(private val context: Context) {
             emptyList()
         }
     }
+
+    fun lastHostAddress(): String? = prefs.getString("last_hid_host_address", null)
 
     fun cleanup() {
         try {

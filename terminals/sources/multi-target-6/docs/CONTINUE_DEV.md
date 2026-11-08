@@ -1,0 +1,501 @@
+# 继续开发交接（2026-08-28 更新）
+
+> 本文件是给“下一台电脑上的 ChatGPT/Codex”读的交接说明：
+> 克隆仓库后先读本文件 + `README.md` + `docs/HISTORY.md`，再按 `docs/ONBOARDING.md` 检查环境，即可接着开发。
+> 家用电脑环境：ChatGPT + CC Switch + DeepSeek API（提供方配置见 `docs/MIGRATION.md`，密钥需从旧电脑拷贝）。
+>
+> **2026-09-12 新增 ESP32-S3 桥接方案**（手机 --BLE--> 板子 --USB HID--> 电脑）：
+> 新硬件线请先读 **`docs/CONTINUE_ESP32.md`**；本文件描述的是"手机自己当蓝牙键盘"的旧方案。
+
+## 一、当前状态（重要）
+
+- 分支：`phone-keyboard`（默认分支，当前产品线）
+- 版本：**v2.0 Beta（开发版）**（versionCode 16 / versionName "2.0-beta"；自 v1.5 起定名 2.0 Beta，标志功能基本完善）
+  v1.3、v1.4 已正式发布归档：`releases/v1.3/`、`releases/v1.4/` + git tag `v1.3` `v1.4`，`releases/LATEST` = v1.4
+- 应用：包名 `com.hidble.phonekeyboard`，应用名“手机蓝牙键盘”，minSdk 28 / targetSdk 34
+- 2026-08-28 已合入真机 Bug 修复轮（见下文“2.6 真机 Bug 修复”），版本号当时仍为 1.4
+- 2026-08-28 晚新增 **v1.5**：大模型对话「提示词预设下拉」（详见下文“最新一轮”）
+- 2026-09-02 新增：**大模型流式输出 + 对话历史持久化**（详见下文“最新一轮”）
+- 2026-09-02 第二轮：**蓝牙连接保活（前台服务）+ 各档提速 10% + 提示词长按编辑**（详见下文“最新一轮”）
+- 2026-09-02 第四轮：**真机验证完成，未发现新问题**（详见下文“最新一轮”）
+- 2026-09-04：**各档再提速 10% + 缩短“发送给模型”/新增“新对话” + 历史对话下拉（查看/载入/删除）+ “＋”多模态附件**（详见下文“最新一轮”）
+- 2026-09-04（第二轮）：**新增“火山 AI Hub（Agent Plan）”大模型提供方**（详见下文“最新一轮”）
+- 2026-09-05：**流式回复实时显示“思考中…”过程 + 各档提速 5% + 新增“普通模式”预设**（详见下文“最新一轮”）
+- 2026-09-05（第二轮）：**火山 AI Hub（Agent Plan）默认模型改为官方聚合模型 `ark-code-latest`**（详见下文“最新一轮”）
+- 2026-09-05（第三轮）：**按官方文档复核火山 Agent Plan 接入配置，确认与现有实现完全一致（无需改代码）**（详见下文“最新一轮”）
+- 2026-09-06：**大模型对话新增“检索科学文献”（勾选后先查学术文献再让模型回答）**（详见下文“最新一轮”）
+- 2026-09-06（第二轮）：**新增“停止输出”按钮 + 输出期间前台保活（切后台/锁屏也把回复跑完）**（详见下文“最新一轮”）
+- 2026-09-10：**新硬件线启动：ESP32-S3 Super Mini 替代 Pico**（ESP-IDF + NimBLE BLE HID 键盘），已完成编译/烧录/广播（设备名 `ESP32-S3 Keyboard`）。详见 `esp32_firmware/README.md`。
+- 2026-09-10（第二轮）：**ESP32-S3 数据通道打通 + App 接入**：板子提供 1234/1235/1236 服务与 512KB PSRAM 缓冲；App（v17）连接管理页新增“外接键盘板”扫描/连接，“发送到键盘”优先走板子。
+- 仓库根目录 `PhoneBluetoothKeyboard-debug.apk` 是 2026-09-06 最新编译产物
+  （本机调试签名 SHA-256 开头 `042c0c23...`）
+- **输入模式（重要，两台电脑不同）**：本机（家用电脑）测试时目标机用 **Alt+X 模式**；
+  另一台电脑（今早开发的那台）的目标机用 **GBK 模式**（必须 NumLock 开启）。两边代码相同，仅目标机模式/速度档位不同。
+
+### 开发机构建环境（2026-08-27 实测路径，注意在 D 盘）
+
+- JDK 17：`D:\jdk17\jdk-17.0.20+8`（每次编译前设 `JAVA_HOME=D:\jdk17\jdk-17.0.20+8`）
+- Android SDK：`D:\Android`（设 `ANDROID_HOME=D:\Android`、`ANDROID_SDK_ROOT=D:\Android`；platforms=android-34，build-tools 33.0.1 + 34.0.0）
+- **2026-09-04 新增实测**：当前这台电脑（仓库在 `C:\Users\admin\Documents\ChatGPT\蓝牙输入项目`）
+  的环境变量已是 `JAVA_HOME=C:\Program Files\Java\jdk-17`、`ANDROID_HOME=C:\Android\Sdk`，
+  直接 `cd android; .\gradlew.bat assembleDebug --no-daemon` 即可编译，无需手动设 D 盘路径；
+  文档原 D 盘路径属于另一台电脑，两边代码一致、环境各自生效。
+- Pico SDK：`C:\pico\pico-sdk`（仅旧 `master` 产品线编译固件需要，本机未验证）
+- 编译 APK：
+  ```powershell
+  $env:JAVA_HOME="D:\jdk17\jdk-17.0.20+8"; $env:ANDROID_HOME="D:\Android"; $env:ANDROID_SDK_ROOT="D:\Android"
+  cd android; .\gradlew.bat assembleDebug
+  ```
+- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`，复制到仓库根 `PhoneBluetoothKeyboard-debug.apk`
+
+### 签名注意事项（踩过坑）
+
+- 手机上之前装的是“旧电脑调试签名”的包；新电脑重新编译后签名不同，安装会提示“签名不同”。
+- 已通过「卸载重装」解决；之后在同一台机器上继续编译安装不会再冲突。
+- 换新机器后若手机里已装别的签名包，需要卸载重装（或把旧机器 `~/.android/debug.keystore` 拷过来）。
+
+## 最新一轮（2026-08-28 晚 · v1.5：提示词预设下拉）
+
+需求：大模型对话卡片「发送给模型」按钮缩短，同一行右侧新增**提示词下拉菜单**；可新建/删除预设提示词，
+选中后发送前自动把提示词拼到输入前面（例如「书面化整理」：把与患者的交谈转成正式书面语言，去口语/语气词/多余符号制表符）。
+
+- 实现文件：`MainActivity.kt`（逻辑）、`activity_main.xml`（布局）、新增 `item_llm_prompt.xml` / `spinner_bg.xml` / `ic_arrow_down.xml`
+- 下拉项：`无提示词（直接发送）` / 已存预设（按名称显示） / `＋ 新建提示词…` / `✎ 删除提示词…`
+- 新建 = 弹窗填名称+内容；删除 = 点选删除；数据存 SharedPreferences（`llm_prompts`，JSON 数组），
+  当前选中存 `llm_selected_prompt`，重启保留
+- 发送逻辑：`text = 提示词内容 + "\n\n" + 用户输入`；对话框“我：”仍只显示用户原话；命令日志记录“已应用提示词「xxx」”
+- 内置示例预设「书面化整理」，默认不选中（保持“无提示词”）
+- 下拉带 ▼ 箭头指示（`spinner_bg`），避免看起来像普通输入框
+- 版本号升到 v1.5（versionCode 6）；根目录 APK 已更新并推送（commit `612253a`）
+- 内置 6 个医疗场景预设（门诊病历草稿/入院记录草稿/SOAP病历/病历规范书面化/患者沟通解释/随访记录），
+  符合中国《病历书写基本规范》；按 `llm_prompt_preset_version` 增量补齐，不覆盖用户自定义
+
+> **给另一台电脑的 AI：本机（家用电脑）测试用 Alt+X 模式；另一台电脑（今早那台）目标机用 GBK 模式（NumLock 开启）。**
+
+## 最新一轮（2026-09-02 · 大模型流式输出 + 对话历史持久化）
+
+- **流式输出**（`LlmClient.chatStream` + `MainActivity.sendToLlm`）：
+  - 请求体加 `"stream": true`，`Accept: text/event-stream`，逐行读 SSE `data:` 块，
+    解析 `choices[0].delta.content` 增量回调；`data: [DONE]` 结束；
+  - UI：第一段到达前仍显示“AI 正在思考…”动画，首个增量到达后切到 `AI：` 行并逐字/逐段追加；
+  - 流式期间跳过逐字着色与保存（`llmStreaming` 标志），结束后统一 `applyLlmColors()` + 保存，避免卡顿；
+  - 设置页“测试连接”仍走原非流式 `chat()`。
+- **对话历史持久化**（`LlmPrefs.KEY_HISTORY`，JSON 数组）：
+  - 每轮 user/assistant 消息存入 SharedPreferences，重启 App 后 `loadLlmHistory()` 恢复多轮上下文；
+  - 最多保留最近 40 条，防止请求体无限增长；「清空」同时删除历史。
+- 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
+- 实现文件：`LlmClient.kt`、`MainActivity.kt`。
+
+## 最新一轮（2026-09-02 第二轮 · 连接保活 + 提速 + 提示词管理）
+
+用户真机反馈三项，均已修复：
+
+1. **切子页面/切后台蓝牙立刻断线（重要）**
+   - 根因：Android 官方文档明确规定——BluetoothHidDevice 注册的 App **如果不是前台状态，
+     系统会自动注销注册并断开连接**。之前只做了“掉线后自动重连”，连接本身仍会被系统断开。
+   - 修复：新增前台服务 `HidKeyboardService`（`foregroundServiceType="connectedDevice"`，
+     清单加 `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CONNECTED_DEVICE` 权限）。
+     键盘注册成功即 `startForegroundService`，保持进程/UID 前台，系统不再注销 HID；
+     关闭键盘或主界面销毁（未注册时）才停止服务。通知常驻“手机蓝牙键盘运行中”。
+   - 保留自动重连作为兜底。
+2. **各档位输入速度提高 10%**
+   - `SPEED_SCALES` 延迟系数整体 ×0.9：
+     `[4000,3300,2700,2100,1600,1150,780,500,260,80]` →
+     `[3600,2970,2430,1890,1440,1035,702,450,234,72]`。
+   - 注意：`MIN_DELAY_MS=10`（蓝牙物理下限）不动，约 7 档以上会触底，实际速度以链路为准。
+3. **提示词管理：只能添加/删除 + 长按编辑**
+   - 下拉项“✎ 删除提示词…”改为“✎ 管理提示词…”；
+   - 管理弹窗 = 列表：**点按=删除（二次确认），长按=编辑**（新建/编辑共用一个表单，编辑原位更新）；
+   - 选择仍只在主下拉里进行，不可编辑。
+
+- 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
+- 实现文件：`HidKeyboardService.kt`（新增）、`AndroidManifest.xml`、`MainActivity.kt`、`TypingEngine.kt`。
+
+## 最新一轮（2026-09-02 第三轮 · 修复流式回复串入大量 "null"）
+
+- 现象：发送给大模型后，回复正文前后出现一长串 `null`。
+- 根因：`JSONObject.optString("content")` 对 JSON `null`（角色切换/思考阶段/结束标记等无正文增量块）
+  会返回字面量字符串 `"null"`，被当成正文逐块拼进输出。
+- 修复（`LlmClient.kt`）：流式与非流式都改用 `opt("content")` + 类型判断，
+  只接受真正的非空字符串内容，空/null 增量一律跳过；思考阶段只显示“AI 正在思考…”动画，不产生 null。
+- 版本号 versionCode 9 → 10（versionName 仍为 "2.0-beta"），根目录 APK 已更新并推送。
+
+## 最新一轮（2026-09-02 第四轮 · 真机验证结论）
+
+- 用户在本机（家用电脑，目标机 Alt+X 模式）完成真机验证：流式回复无 null、连接保活（切页面/切后台不断连）、
+  各档提速、提示词管理（点按删除/长按编辑）均正常。
+- **未发现新问题**。当前 v2.0 Beta（versionCode 10）为稳定可用状态。
+- 待办保持不变：正式发布归档 v1.5/v2.0-beta（若需要）、Token 加密、流式“停止”按钮、
+  微软拼音 `vuc` 方案、一键 Shift 切换中英文、长文本/高档位压测。
+
+## 最新一轮（2026-09-04 · 再提速 + 新对话 + 历史对话下拉 + 多模态附件）
+
+需求（用户原话摘要）：每个输入速度档位再提速 10%；“发送给模型”按钮缩短、右侧增加“新对话”按钮（遗忘前文，开始新对话）；
+发送按钮下方增加历史对话下拉菜单可查看所有历史对话；部分模型支持图片/音频，增加“＋”添加本地文件随消息发送。
+
+1. **各档位再提速 10%**（`TypingEngine.SPEED_SCALES` 再次 ×0.9）：
+   `[3600,2970,2430,1890,1440,1035,702,450,234,72]` → `[3240,2673,2187,1701,1296,932,632,405,211,65]`。
+   `MIN_DELAY_MS=10`（蓝牙物理下限）保持不动；7 档以上仍会触底，实际速度以链路为准。
+2. **发送行改版**：`llmSendButton` 权重 1.4→0.9（变短），同行右侧新增 `llmNewConversationButton`“新对话”；
+   提示词下拉改为独占一行（避免三个控件挤在一起）。新对话 = 先把当前对话自动存档进历史，再清空上下文/输出框/待发附件。
+3. **历史对话下拉**（新增 `llmHistorySpinner`，位于发送行下方）：
+   - 第一项固定“◉ 当前对话（正在编辑）”；其后为已存档对话（标题 + 时间，最多保留 50 个）；
+   - 点选历史条目弹出对话框查看完整内容（可滚动、可选中复制），可“载入为当前对话”或“删除”；
+   - 载入前会自动把当前正在编辑的内容存档，避免切换丢失；载入后该条目从存档移回“当前对话”。
+   - 持久化：新增 `LlmPrefs.KEY_CONVERSATIONS = "llm_conversations"`（JSON 数组：id/标题/时间/消息/输出文本）。
+4. **“＋”多模态附件**（`llmAttachButton`，位于提问输入框上方）：
+   - 系统文件选择器（`ACTION_GET_CONTENT`，image/* 与 audio/*，可多选；单文件 ≤12MB、一次 ≤4 个），
+     选中后转 Base64 data-URI，随下一条“发送给模型”按 OpenAI 多模态 content 数组发送
+     （图片 `image_url`；音频 `input_audio`，小米 MiMo 原生支持本地音频）；
+   - 输入框上方显示已附文件清单（点＋继续添加、长按＋清空）；
+   - 纯附件（无文字）时自动补一句“请查看我发送的图片/音频，并给出分析或回复。”避免空正文。
+5. **历史持久化兼容与限制**：
+   - `llm_history` 结构向后兼容（仍为 JSON 数组），每条消息新增可选 `files`（kind/name/mime，不含 base64）；
+   - **附件原文件只保留在本次运行内存里**：重启 App 后历史里的附件仅剩名称文字说明，
+     再次发送该旧对话时会给模型注明“重启后无法再次上传”（避免空 data-URI 报错）；输出框文字记录不受影响。
+   - 发送失败（如所选模型不支持图片/音频）会记录到命令日志；请确认所选模型具备对应多模态能力。
+6. 实现文件：`MainActivity.kt`、`LlmClient.kt`（新增 `LlmPart`/`LlmMessage`，`chatStream` 支持 content 数组）、
+   `activity_main.xml`、`TypingEngine.kt`。版本号 versionCode 10 → 11（versionName 仍为 "2.0-beta"），
+   根目录 APK 已更新（2026-09-04）。
+7. **尚未真机验证**：历史下拉载入/删除、＋附件发送（尤其音频格式在小米 MiMo、图片在所选视觉模型上的表现）。
+
+## 最新一轮（2026-09-04 第二轮 · 新增“火山 AI Hub（Agent Plan）”提供方）
+
+需求（用户原话）：大模型增加对**火山 AI Hub** 的支持，我使用的是 **Agent-Plan-Small**。
+
+- **调研结论（重要，避免再踩坑）**：“Agent-Plan-Small”是**火山方舟 Agent Plan 个人版的套餐档位**
+  （Small/Medium/Large/Max），**不是模型名**。火山方舟文档与多个实测来源一致：
+  - Agent Plan 使用**专属 OpenAI 兼容端点**：Base URL `https://ark.cn-beijing.volces.com/api/plan/v3`
+    （即接口 `.../api/plan/v3/chat/completions`），鉴权仍是 `Authorization: Bearer <API Key>`；
+  - `model` 字段必须填**套餐内的具体模型名**（如 `doubao-seed-2.0-lite`、`doubao-seed-2.0-pro`、
+    `glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）；把 `Agent-Plan-Small` 当模型名会返回 400/模型不存在；
+  - Agent Plan API **不提供 `/models` 列表接口**（404），所以设置页必须手动/预设填模型名，不能自动拉取；
+  - 普通火山方舟 Key（`/api/v3`）与 Agent Plan Key 不通用，Token 要填控制台 Agent Plan 专用 API Key。
+- 实现（`LlmClient.kt` + `LlmSettingsActivity.kt` + `activity_llm_settings.xml`）：
+  - `LlmProviders.list` 新增第 4 个提供方：
+    `id="volcano-agent-plan"`、显示名 **火山 AI Hub（Agent Plan）**、
+    Base URL `https://ark.cn-beijing.volces.com/api/plan/v3`、默认模型 `doubao-seed-2.0-lite`
+    （Small 档可用、快/省燃料；可自行改成 pro / glm / kimi 等）；
+  - `LlmProvider` 新增 `hint` 字段，设置页在“模型”输入框下方显示该提供方的说明：
+    明确提示“Agent-Plan-Small 是套餐档位不是模型名，模型框应填具体模型名”，并列出常用模型示例。
+- 版本号 versionCode 11 → 12（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-04 第二轮）。
+- **待真机验证**：用真实 Agent Plan API Key + 套餐内模型名测试“测试连接”与流式对话；
+  若个别模型对 Chat Completions/流式不兼容（社区反馈个别模型走 Responses 更稳），在日志中看报错并换模型。
+
+## 最新一轮（2026-09-05 · 流式显示思考过程 + 提速 5% + 普通模式）
+
+需求：① 发给大模型后要能看到“输出过程”（逐字/逐步），不能憋到最后一次性给，以确认没卡住；
+② 每个输入速度档位再提速 5%；③ 提示词预设新增「普通模式」：不套医学/病历模板，正常聊天直答。
+
+1. **流式“看不到过程”的修复**：代码本身逐块 SSE 更新无误，主因是不少模型在“思考”阶段只返回
+   `reasoning_content`（正文 content 为空，要等想完才一次性给）。处理：
+   - `LlmClient.chatStream` 增加 `onReasoning` 回调，解析 `delta.reasoning_content` / `delta.reasoning`；
+   - 思考阶段把实时思考内容显示在原“AI 正在思考”行（“思考中：…”滚动显示，最多 250 字尾部预览），
+     正文第一个字到达后自动隐藏并切换为正文逐字输出；
+   - 等待时显示“已等待 N 秒”（`thinkingStartMs`），长时间无字也能确认没卡死；
+   - 思考内容不写入对话正文/历史（避免 CoT 进入病历），仅作过程提示。
+2. **各档提速 5%**：`SPEED_SCALES` 延迟 ×0.95 →
+   `[3240,2673,2187,1701,1296,932,632,405,211,65]` → `[3078,2539,2078,1616,1231,885,600,385,200,62]`
+   （`MIN_DELAY_MS=10` 不动，7 档以上仍触底，实际速度以链路为准）。
+3. **新增「普通模式」预设**：内容=不套医学/病历模板、不润色，像平时聊天一样直接回复；
+   预设版本号 2→3（老用户自动增量补齐，不覆盖自定义）。
+- 版本号 versionCode 12 → 13（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-05）。
+- 实现文件：`LlmClient.kt`、`MainActivity.kt`、`activity_main.xml`、`TypingEngine.kt`。
+
+## 最新一轮（2026-09-05 第二轮 · 火山 Agent Plan 默认模型改为 ark-code-latest）
+
+用户按火山官方文档确认：Agent Plan 的模型应填 **`ark-code-latest`**（多模型聚合入口，
+会自动选择套餐内最合适的子模型），而不是写死某个具体模型。
+
+- `LlmClient.kt`：`volcano-agent-plan` 提供方 `defaultModel` 由 `doubao-seed-2.0-lite` 改为 `ark-code-latest`；
+  设置页 `hint` 同步更新（推荐聚合模型，仍可手动填具体模型强制指定）。
+- `MainActivity.loadLlmPrefs()`：自动迁移——仅当提供方是 volcano-agent-plan 且已存模型恰为旧默认
+  `doubao-seed-2.0-lite` 时替换为 `ark-code-latest`；不覆盖用户手动指定的其它具体模型。
+- 版本号 versionCode 13 → 14（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-05 第二轮）。
+
+## 最新一轮（2026-09-05 第三轮 · 官方文档复核 Agent Plan 接入配置）
+
+用户发来火山方舟官方文档页（Agent Plan 个人版 · 快速开始，另核对了同目录《其他工具》页），要求阅读其配置说明。
+结论：**现有实现与官方文档完全一致，本轮不改代码、不升版本号、不重编 APK**，仅把官方核对结论与链接归档。
+
+- 官方《快速开始》要点（<https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373738?lang=zh>）：
+  - Agent Plan 用**专属 Base URL + 专属 API Key**（其他方舟 Key 不可用）；
+  - 模型名可填 **`ark-code-latest`**（官方示例：“更新文本生成模型的名称，如 ark-code-latest”）——
+    它是“控制台可切换的聚合模型”：在开通管理页选子模型后 3–5 分钟生效，最省心；
+    也可填套餐内具体 Model Name 强制指定。
+- 官方《其他工具（OpenAI 兼容接入）》要点
+  （<https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2373746?lang=zh>，本 App 属此类）：
+  - Agent Plan 兼容两种协议：Anthropic（Base URL `.../api/plan`）与 **OpenAI（Base URL `.../api/plan/v3`）**；
+  - OpenAI 兼容类工具（Cline/Cursor/Roo Code/Kilo Code/Codex CLI 等）配置 =
+    Base URL `https://ark.cn-beijing.volces.com/api/plan/v3` + Agent Plan 专用 Key +
+    Model ID 填 **`ark-code-latest`** 或具体 Model Name——与本 App 预设逐项一致。
+- 逐项对照现有实现（`LlmClient.kt` 的 `volcano-agent-plan`）：
+  `baseUrl=https://ark.cn-beijing.volces.com/api/plan/v3`、`defaultModel=ark-code-latest`、
+  `endpoint=…/chat/completions`、hint 提示 Agent Plan 专用 Key——**全部与官方一致**。
+- 归档：`docs/LLM_PROVIDERS.md` §3.1/§3.3 已补官方核对说明与两个官方链接。
+
+## 最新一轮（2026-09-06 · 大模型对话新增“检索科学文献”）
+
+用户希望：在手机 App 跟模型对话时，勾选一个“检索科学文献”选项就能启用 Agent Plan 的专业数据集（科学文献检索），
+让模型先查文献再回答（医疗/科普场景：给病人解释时能引用真实文献）。
+
+背景/原理（重要）：火山 Agent Plan 的“科学文献检索”不是对话开关，而是官方以 **MCP Server** 提供的
+“专业数据集”Harness（工具 `dataPro_search`，入参 `query`）。App 的做法 = 发消息给模型前先调该 MCP 把文献取回，
+拼成参考上下文塞给模型，让模型据此回答并标注来源。
+
+- 新文件 `LlmLiterature.kt`：MCP Streamable HTTP JSON-RPC 客户端（HttpURLConnection，零新依赖）。
+  - 端点 `https://datapro.hqd.cn-beijing.volces.com/mcp`，鉴权头 `X-Agent-Plan-Key`（网关也认 `X-Hqd-Api-Key`）；
+  - 流程 initialize → notifications/initialized → tools/list → tools/call；协议版本 2025-06-18；
+  - 返回 structuredContent/content[].text = `{code,msg,query,total,items}`；code==0 成功，**code==4011** =
+    Key 无效/额度不足/未开启专业数据集 Harness（服务端返回中文提示，直接展示给用户）；
+  - 宽容解析 items 字段（title/url/date/author/journal/abstract 中英文键名都试），raw 留档便于排查；
+  - 实测覆盖：学术文献库含 CNKI、万方、维普、arxiv、PubMed、MDPI、Biorxiv 等（服务端能力说明原文）。
+- 主界面：发送行下方新增勾选框 **“🔬 检索科学文献”**（`llmLitCheck`，状态存 `llm_lit_search`）；
+  勾选后发送流程 = 先检索（显示“正在检索科学文献…”），成功后：
+  - 文献作为额外上下文插到最新提问前（**不写入对话历史**，避免上下文膨胀/重复检索）；
+  - 输出区上方出现结果条“已检索到 N 篇学术文献 · 点按查看”，点按弹出本次命中条目，点条目复制链接；
+  - 检索失败不阻断对话：结果条红字提示 + 写命令日志，按普通问答继续。
+  - 检索词生成：用户话里没带“论文/文献/期刊…”等词时自动补“请检索近5年相关学术论文与文献”以便路由到学术库。
+- 设置页：新增 **“科学文献检索专用 Key（可选）”**（`llm_datapro_key`，仅火山 AI Hub 提供方显示）；
+  留空 = 使用上方 Agent Plan Token；也可单独填，便于“用别家模型对话 + 用 Agent Plan 检索”解耦。
+  勾选框可用条件 = 有该专用 Key 或当前提供方是火山 AI Hub(Agent Plan) 且有 Token。
+- `LlmProvider.hint` 同步加了“需在控制台开启专业数据集”的提示。
+- 使用前提（用户需自己在控制台做一次）：已购 Agent Plan 套餐 → 「使用配置 → 配置 Harness」打开
+  **专业数据集**抵扣开关 → 拿到 Agent Plan 专属 Key。文档见
+  <https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2479086?lang=zh>。
+- 版本号 versionCode 14 → 15（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-06）。
+- **待真机验证**：真实 Key + 控制台开启 Harness 后，勾选“检索科学文献”发一条医疗/科普问题，看结果条命中条数、
+  模型是否按文献回答并给参考来源；若报 4011，按提示去控制台开 Harness 或确认 Key/额度。
+
+## 最新一轮（2026-09-06 第二轮 · “停止输出”按钮 + 切后台继续输出）
+
+需求：① 在“发送给模型”和“新对话”之间加一个**停止输出**按钮，点击后立即停止大模型回复；
+② 只要不点停止，无论普通提问还是勾选了“检索科学文献”，切后台/锁屏都要继续把这次回复跑完。
+
+实现要点：
+
+- **停止按钮**（`llmStopButton`，位于发送行中间，未请求时禁用、请求中启用）：
+  - LLM 请求改为持有独立协程 `llmRequestJob`（与“发送到键盘”的 `llmSendJob` 互不干扰）；
+  - 点“停止输出” → `llmRequestJob.cancel()`；
+  - 流式读取循环与文献检索每步都加 `coroutineContext.ensureActive()`，点停止后能及时打断（收到下一个数据块即生效）；
+  - `CancellationException` 单独处理：只写日志（“已手动停止输出”/“输出已中断”），不弹“模型调用失败”，已生成内容保留在输出框；
+  - 整个请求包在 `try/finally`，成功/失败/停止/中断都统一复位按钮、清 Job。
+- **切后台继续输出**（新文件 `LlmRunService.kt`，前台服务 + 唤醒锁）：
+  - 请求一开始启动前台服务（通知“大模型输出中”，`dataSync` 类型），切后台/锁屏后进程不被系统回收；
+  - 持有一把 `PARTIAL_WAKE_LOCK`（最长 15 分钟兜底），锁屏后 CPU 继续跑，回复能一直流完；
+  - 请求结束/停止/页面销毁时停服务；通知消失即表示本次回复已完成或已停止。
+  - 说明：如果用户把 App 从最近任务里**划掉关闭**（finish Activity），系统会取消本次请求并停服务——这属于“主动关闭页面”，不在“切后台继续”范围内。
+- 版本号 versionCode 15 → 16（versionName 仍为 "2.0-beta"），根目录 APK 已更新（2026-09-06 第二轮）。
+- **待真机验证**：发送长回复后按 Home 切后台/锁屏，回来应看到完整回复；请求中点“停止输出”应很快停下且状态条消失。
+
+## 二、本次开发会话内容（2026-08-27 对话整理）
+
+### 1. GBK / 中文输入提速
+
+- 分析：GBK 每个汉字要打 4-5 位 Alt 码数字，原来每个数字都要等“按下+抬起”两次延迟，
+  加上蓝牙链路与 Windows 逐位解析，是慢的主因。
+- 实现（`TypingEngine.kt`）：
+  - Alt 与第一位数字合并为同一份报告（GBK/十进制/十六进制每字省 1 个报告）；
+  - 数字抬起后不再额外等待（下一键的按下延迟负责节奏）；
+  - 速度曲线整体更激进：`SPEED_SCALES = [2000,1550,1200,900,650,450,300,180,100,60]`，最小间隔 1ms；
+  - Alt 收尾延迟 40ms，字符间隔 0ms。
+- 应用侧每字延迟：默认 5 档约 71ms，8 档约 17ms，10 档约 7ms（英文/数字 1-9ms）。
+- 物理下限提醒：速度 8+ 后瓶颈是蓝牙链路传输 + Windows 解析 Alt 码（每字约 100ms），App 内无法再压。
+
+### 2. 长文本自动分段（防输入中断）
+
+- 背景：单次文本没有硬性字数上限，但高速长文本会撑爆蓝牙发送缓冲导致丢字/中断。
+- 实现（`TypingEngine.kt` + `MainActivity.kt`）：
+  - 每 80 字暂停 20ms，让蓝牙缓冲消化积压报告；
+  - 报告发送失败自动重试（20ms 间隔，最多约 1 秒），自动贴合链路实际速度；
+  - 连接中断时停止发送并提示“发送中断：蓝牙连接可能已断开（已发送 X 字）”。
+
+### 3. 大模型接入（类 CC Switch：选提供方 + 填 Token）
+
+- 新增 `LlmClient.kt`：OpenAI 兼容 Chat Completions 客户端（HttpURLConnection，无新增依赖）。
+- 提供方预设（`LlmProviders`）现有四个：**DeepSeek**（`deepseek-v4-flash`）、
+  **小米 MiMo**（`mimo-v2.5`）、**火山引擎豆包**（`doubao-seed-1-8-251228`，
+  地址 `https://ark.cn-beijing.volces.com/api/v3`）、**火山 AI Hub（Agent Plan）**
+  （默认 `doubao-seed-2.0-lite`，地址 `https://ark.cn-beijing.volces.com/api/plan/v3`，
+  2026-09-04 第二轮新增，详见上文“最新一轮”）。
+- 模型设置二级页面（`LlmSettingsActivity`）：下拉选提供方 → 模型自动填预设 → 只填 API Token →
+  测试连接 → 保存自动返回。主界面右上角新增常驻“模型设置”按钮。
+- 大模型对话卡片：提问输入框、“发送给模型”、可编辑输出框（显示“我/AI”对话）、“发送到键盘”、“清空”。
+- 配置存 `SharedPreferences`（`hidble_prefs`）；主界面 `onResume` 重新读取配置，
+  已修复“设置页保存后主界面仍提示未填 Token”的问题。
+- 注意：API Token 明文存在本地，个人自用可接受；需要更安全可换 EncryptedSharedPreferences。
+
+### 4. 版本与文档
+
+- 版本号递增到 v1.3（versionCode 4 / versionName "1.3"）。
+- 修复 `tools/setup_check.ps1` 编码问题（加 UTF-8 BOM），Windows PowerShell 5.1 也能运行。
+- `README.md` 当前版本描述更新为 v1.4。
+
+
+### 5. 界面美化（v1.4，2026-08-27）
+
+- 新应用图标（自适应图标矢量重绘）：手机 → 蓝牙 → 键盘，深色渐变背景 + 青色点缀，
+  与 App 暗色主题一致（`ic_launcher_foreground.xml` + `ic_launcher_background.xml`）。
+- **发送 HID 时阻止锁屏**：`sendText` / `sendOutputToKeyboard` / 按键页 HID 动作执行期间
+  设置 `FLAG_KEEP_SCREEN_ON`，发送完自动释放（清单已加 `WAKE_LOCK` 权限）。
+- 主界面大瘦身：
+  - 光标控制、组合键、功能键 → 新二级页「更多按键」（`KeysActivity`，经 `MainActivity.performHid` 转发）；
+  - 模拟蓝牙键盘开关 + 已配对设备 + 状态 → 新二级页「连接管理」（`ConnectionActivity`，状态实时同步）；
+  - 命令日志 → 新二级页「命令日志」（`LogActivity` + 共享 `LogStore`，最多保留 200 条）；
+  - 主界面只留：输入/发送、常用语、速度滑块、中文模式下拉、大模型对话、二级页入口。
+- 中文输入模式改为**下拉菜单**（`Spinner`）：选中项左侧显示绿色 “✓”（自定义 adapter）。
+- 输入速度改为**横向滑块**（`SeekBar` 1-10 独占一行）：拖动即生效，取消“应用”按钮，自动保存。
+- 大模型对话：
+  - 提问输入框放大到 4 行，右侧上下滑块可看长文本；
+  - 输出框右侧滚动条常显（`fadeScrollbars=false`）；
+  - “我：”发言默认绿色、“AI：”回复默认白色（`Spannable` 着色，编辑后自动重刷）；
+  - “发送到键盘”默认**不发送“我：”的发言**，可勾选“包含我的发言”后全部发送；
+  - **AI 思考状态**：请求发出后输出框上方显示“AI 正在思考…”动画（点号循环），回复/失败后隐藏；
+  - **文本框优先内部滚动**：`llmInput` / `llmOutput` 改为 `ScrollableEditText`，内容溢出时滑动文本框优先滚动内容，不带动整个页面。
+- **发送可中止**：主输入区的「发送到键盘」按钮与「大模型对话」的「发送到键盘」按钮，点击发送后按钮变成「停止」，再点一次即可中止本次发送（输入框内容保留，不自动清空）。
+- **顶部状态条可点击**：点击主界面顶部的连接状态（含红色“未启动”文字，整条可点）直接进入「连接管理」二级页。
+- **主输入框改为 4 行**：主界面文本输入框放大到 4 行多行输入（`ScrollableEditText`），右侧滚动条常显，可上下滚动查看长文本。
+- **随机乱码进一步加固（重要）**：加了 `U+` 前缀后仍偶发随机乱码（如 `U+7E`、丢字 `53EF→ϯ`），
+  原因是最后一位数字刚抬起就按 Alt+X（间隙仅 1ms，与速度无关），宿主应用还没把数字写进文档就触发转换，
+  加上蓝牙链路偶尔丢报告。修复：新增 `ALT_PRE_MS=100` 的“按 Alt+X 前停顿”（随速度缩放），
+  并对 HEX/GBK/十进制模式在松开 Alt 前同样加停顿；速度档位重排为
+  `[4000,3300,2700,2100,1600,1150,780,500,260,80]`——最低档更慢更稳、档间差值拉开。
+- **修复 Alt+X 中文乱码（重要）**：Word/记事本会把光标前**所有相邻十六进制字符**读成一个码点，
+  前面有数字/字母时（如日期 `2025`+`5E74`）会被合并成超长无效码点导致不转换/乱码。
+  修复：每个中文字先打 `U+` 前缀再打十六进制码再 Alt+X（微软官方消歧写法，转换时被应用吃掉）。
+  已在 Win11 记事本实测：`2025年8月27日`、`可靠程度：可靠`、`伤后24小时内局部冷敷` 均正确。
+
+### 6. 真机 Bug 修复（2026-08-28，重要）
+
+真机测试反馈三个 bug，均已修复（代码在 phone-keyboard 分支最新提交）：
+
+1. **长文本输入时目标机“删除前面所有内容”并继续输入（GBK 模式复现）**
+   - 根因链：GBK 模式用 Alt+小键盘数字码，**目标机 NumLock 未开启时小键盘数字会变成方向键**
+     （7=Home、1=End、9=PageUp…）；若再叠加一个“卡住没松开”的 Shift（高速发送丢报告导致），
+     就变成 Shift+Home/End/PageUp 把整篇文本选中，后续打字全部覆盖删除。
+   - 使能条件：之前速度 8-10 档把报告间隔压到 1-2ms，低于蓝牙链路 ~10ms/份的物理速率，
+     报告在手机端堆积溢出后**静默丢失**，丢的正是 Shift/Alt 的“抬起”报告 → 键卡住。
+   - 修复（`TypingEngine.kt`）：
+     - **`MIN_DELAY_MS` 从 1ms 改为 10ms**：所有报告按蓝牙物理速率发送，不再堆积、不再丢报告。
+       速度 8-10 档现在就是真实物理上限（之前“快”只是把报告堆在缓冲里最后丢掉，目标机并没更快）；
+     - **NumLock 检测**：通过键盘 LED 输出报告读取目标机 NumLock（bit0）/CapsLock（bit1）；
+       GBK 模式下 NumLock 未开启时回调 `onGbkNumLockWarning`（每次发送最多提示一次），
+       MainActivity 会写日志提示“请先按一次 NumLock”；
+     - **`releaseAll()`**：每次发送前/发送后/中止/中断时发一份全释放报告，清掉目标端残留按键；
+     - 分段保持 40 字/40ms。
+2. **切换页面或程序后蓝牙频繁掉线**
+   - 修复（`HidDeviceManager.kt` + `AndroidManifest.xml`）：
+     - 掉线自动重连：`lastHost` 记录最近主机，`STATE_DISCONNECTED` 后最多自动重连 3 次（间隔 2s）；
+     - 回到前台（`MainActivity.onResume`）主动 `reconnectIfNeeded()`；
+     - HID 系统服务重启（`onServiceDisconnected`）后自动重新 init + 注册；
+     - 所有 Activity 加 `configChanges`，旋转屏幕不再销毁重建（避免注册被 cleanup 清掉）；
+     - 重连成功连接建立后先发一份空报告清键盘状态。
+3. **已配对设备点击“连接”没反应**
+   - 修复：`connect()` 未注册时自动先 `register()`，服务未就绪自动重试（最多约 3 秒）；
+     `ConnectionActivity` 点击后立即 Toast“正在连接…”，主界面未运行也明确提示。
+   - 现在连接流程：开启键盘开关 →（自动注册）→ 连接电脑；配对后多数电脑会自动连接，掉线会自动恢复。
+
+## 三、已知限制 / 待办
+
+- [x] 正式发布 v1.3 / v1.4（2026-08-28 已完成：`releases/v1.3/`、`releases/v1.4/` + `releases/LATEST`=v1.4 + git tag `v1.3` `v1.4`）。
+- [ ] 正式发布 v1.5（若需要）：按 `releases/README.md` 归档 `releases/v1.5/`（APK + RELEASE_NOTES.md）、更新 `releases/LATEST`=v1.5、打 git tag `v1.5`。
+- [x] 真机复测（2026-09-02）：连接保活 / 各档提速 / 提示词管理 / 流式 null 修复均完成真机验证，未发现新问题。
+      **不要为了“提速”再把 MIN_DELAY_MS 调回 10ms 以下**——那是丢报告/卡键/误全选删除的根源。
+- [x] 2026-09-04 已实现：各档再提速 10%、发送行缩短 + “新对话”按钮、历史对话下拉（查看/载入/删除）、
+      “＋”本地图片/音频多模态附件（versionCode 11，APK 已更新）；**尚未真机验证**。
+- [x] 2026-09-04（第二轮）已实现：新增“火山 AI Hub（Agent Plan）”提供方预设（versionCode 12，
+      APK 已更新）；**尚未真机验证**——需真实 Agent Plan Key + 套餐内模型名验证“测试连接”与流式对话。
+- [ ] 大模型：Token 换 EncryptedSharedPreferences（个人自用可暂缓）；流式可加“停止”按钮；
+      各家用模型名可能更新，需在设置页改。
+- [ ] 真机验证 2026-09-04 新功能；多模态附件能否成功取决于所选模型/提供方是否支持（不支持会在日志报错，属模型能力限制）。
+- [ ] 真机验证“火山 AI Hub（Agent Plan）”：确认所选套餐档位（如 Small）下模型可用、流式输出正常；
+      若某模型报错，按报错信息在模型框换一个套餐内模型。
+- [ ] 历史规划（`HISTORY.md` 待办）：微软拼音 `vuc` 方案、一键 Shift 切换中英文等，尚未实现。
+
+## 四、给“家用电脑 ChatGPT”的提示
+
+1. 先读：本文件、`README.md`、`docs/HISTORY.md`、`docs/MIGRATION.md`、`docs/ONBOARDING.md`
+   （大模型提供方细节见 `docs/LLM_PROVIDERS.md`）。
+2. 克隆后运行 `tools/setup_check.ps1` 检查环境（Windows PowerShell 5.1 / 7 均可）。
+3. 编译 APK 需要 JDK 17 + Android SDK；CC Switch 配置从旧电脑拷贝（见 `MIGRATION.md`）。
+4. 开始前先 `git pull`，确认在 `phone-keyboard` 分支。
+
+## 五、给下一个 AI 的提示（2026-08-27 收尾时整理，重要）
+
+### 1. 代码架构速览（改代码前先看）
+
+- `MainActivity.kt` 是唯一持有 `HidDeviceManager` + `HidProtocol`（打字引擎）的地方；
+  三个二级页（`KeysActivity` 更多按键 / `ConnectionActivity` 连接管理 / `LogActivity` 命令日志）
+  都通过 `MainActivity.instance`（companion 单例，onCreate 赋值/onDestroy 清空）转发操作：
+  - `performHid { it.xxx() }`：按键页发按键（发送期间自动 `FLAG_KEEP_SCREEN_ON`）
+  - `setKeyboardEnabled(true/false)`、`connectToDevice(device)`、`getBondedDevices()`：连接页用
+  - `connectionActivity` 字段：连接页 onResume 挂接、onPause 摘除，主界面状态变化时 `refreshAllState()` 会同步刷新它
+- `LogStore.kt`：跨页面共享命令日志（最多 200 条），`LogActivity` 订阅 `listener` 实时刷新
+- `ScrollableEditText.kt`：内容溢出时优先内部滚动、不让外层 ScrollView 抢手势（用于主输入框和 LLM 两个文本框）
+- `TypingEngine.kt`：中文输入的四种模式都在这里；`Mutex` 串行发送，`send()` 返回 false 会自动重试 50 次
+
+### 2. Alt+X 中文输入机制（花了大半天踩坑，务必理解）
+
+- Word/记事本的 Alt+X 会把光标前**所有相邻的 0-9A-F 字符**连起来读成一个码点（不是固定 4 位），
+  前面有数字/字母时会合并成超长无效码点 → 不转换/乱码（这就是“日期后面中文必乱”的原因）。
+- 官方消歧办法：**`U+` 前缀**（如打 `U+5E74` 再 Alt+X → 年，`U+` 会被应用吃掉）；
+  本机 Win11 记事本已实测有效。**`x` 前缀是 ASCII 专用**（`x20`→空格），不要用来输中文。
+- 另一种官方办法是**先选中十六进制**再 Alt+X（实现复杂、慢，未采用）。
+- 随机乱码（`U+` 残留、丢数字）原因：最后一位数字抬起后仅 1ms 就按 Alt+X，宿主来不及写入文档；
+  蓝牙链路偶尔丢报告。已修复：`ALT_PRE_MS=100` 在按 Alt+X/松开 Alt 前停顿（随速度缩放）。
+- 速度档位 `SPEED_SCALES` 已经历两轮 ×0.9，当前
+  `[3078,2539,2078,1616,1231,885,600,385,200,62]`（1 最慢最稳、10 最快；
+  2026-08-28 起各档已提速约 19%，再提速只会更接近 10ms 物理下限，高档位收益递减）。
+- **目标电脑输入法最好处于英文模式**（中文输入法会拦截按键导致类似乱码）。
+
+### 3. 本机验证 Alt+X 的技巧（如果还要测）
+
+- 本机 Win11 有记事本。用 PowerShell `SendKeys` 模拟按键时，**必须先把微软拼音切到英文**：
+  ```powershell
+  Add-Type -AssemblyName System.Windows.Forms
+  # 用 keybd_event 发右侧 Shift（VK=0xA1）切换输入法
+  $sig='[DllImport("user32.dll")] public static extern void keybd_event(byte,byte,uint,UIntPtr);'
+  Add-Type -MemberDefinition $sig -Name W -Namespace N -PassThru
+  ```
+  然后开记事本 → 发按键 → `^a` `^c` 读剪贴板验证。
+- 真机验证建议：手机连电脑实际打字，1 档起逐步升档，确认各速度下中文无乱码。
+
+### 4. GBK 模式与“长文本删光内容”的结论（2026-08-28，重要，改代码前必读）
+
+- **目标电脑中文输入用的是 GBK 模式**（Alt+小键盘十进制 GBK 机内码）。
+- GBK 输入**必须目标机 NumLock 开启**：NumLock 关时小键盘数字键变成方向键
+  （7=Home、1=End、9=PageUp、4=Left、6=Right…），叠加残留 Shift 就会全选文本 → 打字覆盖删除。
+- **报告发送速率不能超过蓝牙链路物理速率**（约 10ms/份）。低于此值，报告会在手机端缓冲里堆积，
+  溢出后静默丢失；丢失“抬起”报告 = 修饰键/按键卡住，是各种玄学问题的总根源
+  （乱码、丢字、误全选删除、Alt 卡住跨字累积数字等）。
+- 已落地约束：`TypingEngine.MIN_DELAY_MS = 10`（全报告最小间隔）、`releaseAll()` 前后清理、
+  NumLock LED 检测 + GBK 警告回调、掉线自动重连、Activity 防重建。
+- 若再遇到“输入变乱/被删”，先检查：①目标机 NumLock；②目标机输入法是否英文模式；
+  ③速度是否 ≤7 档；④日志里有没有“发送中断”或“NumLock 未开启”提示。
+
+### 4. 待办（下次继续做的方向）
+
+- ~~正式发布 v1.3 + v1.4~~（已完成，2026-08-28）。
+- ~~大模型流式输出~~（已完成，2026-09-02）；~~对话历史持久化~~（已完成，2026-09-02）。
+- ~~2026-09-04：各档再提速 10%、发送行缩短 + “新对话”、历史对话下拉、＋多模态附件~~（已实现，待真机验证）。
+- ~~2026-09-04（第二轮）：新增“火山 AI Hub（Agent Plan）”提供方~~（已实现，待真机验证）。
+- 正式发布 v1.5 / v2.0-beta（若需要）：归档 `releases/v1.5/`（或按 2.0 定名）+ 更新 `releases/LATEST` + 打 git tag。
+- 大模型：Token 换 EncryptedSharedPreferences（个人自用可暂缓）；流式可加“停止”按钮；家用模型名可能更新。
+- 历史规划：微软拼音 `vuc` 方案、一键 Shift 切换中英文（见 `HISTORY.md`）。
+- 真机压测：GBK/十六进制模式 8-10 档正确率；长文本发送时中止按钮是否即时。
+
+### 5. Git 习惯
+
+- 直接在本分支 `phone-keyboard` 上提交并 `git push origin phone-keyboard`（与历史一致）。
+- 提交信息用中文、带 `feat(v1.x)` / `fix(v1.x)` 前缀；每次改完都重新编译 + 更新根目录 APK。
+- 版本号规则见 `releases/README.md`（当前开发版定名 **v2.0 Beta**，versionName "2.0-beta"）。
+
+### 6. 火山 AI Hub / Agent Plan 接入要点（2026-09-04，重要）
+
+- **“Agent-Plan-Small”是套餐档位，不是模型名**；模型框推荐填 **`ark-code-latest`**
+  （多模型聚合入口，自动选套餐内最合适子模型，2026-09-05 起默认），
+  也可填套餐内具体模型（`doubao-seed-2.0-lite/pro`、`glm-5.2`、`kimi-k2.6`、`deepseek-v4-pro` 等）。
+- 专属 Base URL：`https://ark.cn-beijing.volces.com/api/plan/v3`；接口 `.../chat/completions`；
+  鉴权 `Bearer <Agent Plan 专用 Key>`；普通火山 Key 不通用；无 `/models` 列表接口。
+- 本 App 已用 Chat Completions（含 SSE 流式）接入；若用户反馈某模型 4xx/不兼容，
+  优先建议在模型框换模型，其次才考虑个别模型是否需走 Responses API（社区反馈个别模型有差异）。

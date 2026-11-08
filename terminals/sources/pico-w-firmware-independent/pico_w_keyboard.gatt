@@ -1,0 +1,14 @@
+// Pico W keyboard injector - BLE GATT service definition.
+//
+// Mirrors the Android client (BleManager.kt):
+//   Service UUID:        19B10000-E8F2-537E-4F6C-D104768A1214
+//   TX Characteristic:   19B10001-E8F2-537E-4F6C-D104768A1214
+//                        (WRITE / WRITE_WITHOUT_RESPONSE)
+//
+// The Android app writes application-layer frames (TYPE/MESSAGE_ID/SEQ/PAYLOAD)
+// to the TX characteristic; this firmware receives them and injects the
+// resulting characters over USB HID. The value is DYNAMIC: BTstack forwards
+// every write to att_write_callback() at runtime.
+
+PRIMARY_SERVICE, 19B10000-E8F2-537E-4F6C-D104768A1214
+CHARACTERISTIC, 19B10001-E8F2-537E-4F6C-D104768A1214, READ | WRITE | WRITE_WITHOUT_RESPONSE | DYNAMIC, , TX

@@ -26,7 +26,9 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application
-        android:allowBackup="true"
+        android:name=".InpatientApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -37,6 +39,13 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".PatientListActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.HIDBLEKeyboard">
@@ -45,6 +54,39 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".PatientDetailActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".NoteEditorActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".TerminalSettingsActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".WritingRulesActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
+
+        <activity
+            android:name=".MedicalRecordWorkspaceActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:hardwareAccelerated="true"
+            android:screenOrientation="sensorPortrait"
+            android:theme="@style/Theme.HIDBLEKeyboard" />
 
         <activity
             android:name=".LlmSettingsActivity"

@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌨ 更多按键"
+                android:textSize="21sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功能键 · 光标 · 组合键"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+
+        <!-- 功能键 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功能键"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEnter"
+                    style="@style/EnterButton"
+                    android:layout_weight="1"
+                    android:text="回车" />
+
+                <Button
+                    android:id="@+id/btnBackspace"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="退格" />
+
+                <Button
+                    android:id="@+id/btnDelete"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="删除" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnTab"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Tab" />
+
+                <Button
+                    android:id="@+id/btnEscape"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Esc" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 光标控制 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="光标控制"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginBottom="6dp">
+
+                <Button
+                    android:id="@+id/btnUp"
+                    style="@style/KeyButton"
+                    android:layout_width="60dp"
+                    android:layout_height="48dp"
+                    android:text="↑" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnLeft"
+                        style="@style/KeyButton"
+                        android:layout_width="60dp"
+                        android:layout_height="48dp"
+                        android:text="←" />
+
+                    <Button
+                        android:id="@+id/btnDown"
+                        style="@style/KeyButton"
+                        android:layout_width="60dp"
+                        android:layout_height="48dp"
+                        android:text="↓" />
+
+                    <Button
+                        android:id="@+id/btnRight"
+                        style="@style/KeyButton"
+                        android:layout_width="60dp"
+                        android:layout_height="48dp"
+                        android:text="→" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnHome"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Home" />
+
+                <Button
+                    android:id="@+id/btnEnd"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="End" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 组合键 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="组合键"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlC"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+C" />
+
+                <Button
+                    android:id="@+id/btnCtrlV"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+V" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlX"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+X" />
+
+                <Button
+                    android:id="@+id/btnCtrlA"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+A" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnCtrlZ"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+Z" />
+
+                <Button
+                    android:id="@+id/btnCtrlS"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="Ctrl+S" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

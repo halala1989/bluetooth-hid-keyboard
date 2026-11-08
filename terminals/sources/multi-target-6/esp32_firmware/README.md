@@ -1,0 +1,104 @@
+# ESP32-S3 Super Mini · BLE HID 键盘固件（移植自 Pico 方案）
+
+## 一、这块板子实测规格（2026-09-10）
+
+- 芯片：ESP32-S3 (QFN56) rev v0.2
+- 无线：Wi-Fi + BT 5 (LE)
+- 核心：双核 + LP 核，240MHz
+- 存储：**4MB Flash (XMC) + 2MB PSRAM (AP_3v3)**
+- 串口：ESP32-S3 原生 USB-Serial/JTAG（本机 COM10，VID_303A:PID_1001）
+- MAC：28:84:85:6D:74:50（BLE 地址末位 +2 = 28:84:85:6D:74:52）
+
+## 二、目标 / 与 Pico 方案的关系
+
+把 `pico_firmware/`（Pico W + BTstack，C）那套「BLE HID 键盘 + 手机发命令」的能力移植到 ESP32-S3：
+
+1. **对电脑**：板子作为 BLE HID 键盘被配对使用（电脑蓝牙里显示 **"ESP32-S3 Keyboard"**）。
+2. **对手机**：板子同时作为 BLE GATT Server，暴露与 Pico 相同的自定义服务，手机 App 无需改协议：
+   - Service  `00001234-0000-1000-8000-00805f9b34fb`
+   - Command  `00001235-0000-1000-8000-00805f9b34fb`（Write，收手机命令）
+   - Status   `00001236-0000-1000-8000-00805f9b34fb`（Notify，回 OK/ERR/STATUS）
+   - 命令格式：`TEXT:` `KEY:` `MOD:` `UNI:` `UMOD:` `SPEED:`，行尾 `\n`
+3. **大缓冲**：用板载 2MB PSRAM 做输入缓冲（Pico 只有 264KB SRAM），手机可快速把长文本/整段病历灌进来，
+   固件按可配置速度稳定「滴灌」成 HID 报文，减少丢键。
+4. 中文输入逻辑（Alt+X / GBK 机内码 / 十六进制 / 十进制）沿用 `pico_firmware/usb_hid.c` 的按键序列思路，
+   码表可复用 `pico_firmware/gbk_table.c`。
+
+## 三、当前进度（2026-09-10）
+
+- [x] 工程骨架：基于 ESP-IDF 官方 `examples/bluetooth/esp_hid_device`（Apache-2.0），
+      配置为 **NimBLE + 键盘角色**（`CONFIG_EXAMPLE_KBD_ENABLE=y`）。
+- [x] 目标 ESP32-S3、4MB Flash、2MB PSRAM 已启用（开机日志实测 PSRAM 内存测试 OK）。
+- [x] 编译、烧录到 COM10 成功；开机稳定不重启。
+- [x] 电脑 BLE 扫描能发现 **"ESP32-S3 Keyboard"**，广播含标准 HID 服务 `00001812`。
+- [x] 无屏幕配对：改为 Just Works（`BLE_SM_IO_CAP_NO_IO` + `sm_mitm=0`），Windows 可直接配对。
+- [x] 自定义服务 1234/1235/1236 + `TEXT/KEY/MOD/UNI/UMOD/SPEED` 命令解析（固件自检通过，待重新配对后端到端验证）
+- [x] PSRAM 512KB 环形缓冲 + 按速度档控速输出（数据先入缓冲，独立任务“滴灌”成 HID 报文）
+- [~] Unicode 已支持 Alt+X 模式（默认，Win11 记事本/Word 可用）；GBK/十六进制小键盘模式待移植（gbk_table.c）
+- [x] 数据通道端到端实测通过（电脑端 BLE 客户端发 SPEED/TEXT → 收到 STATUS:READY/OK，键盘报文已发出）
+- [x] 手机 App 侧接入：连接管理页新增“外接键盘板（ESP32-S3）”卡片（扫描/连接/断开）；“发送到键盘”已优先走板子输出（App versionCode 17）
+
+## 四、构建与烧录（本机实测）
+
+```powershell
+# 1) 载入 ESP-IDF 环境（本机已装 IDF v5.2.2 + 工具链）
+. $env:USERPROFILE\esp\v5.2.2\esp-idf\export.ps1
+
+# 2) 首次编译前，先打 IDF 的 HID 任务栈补丁（见下方“踩坑”）
+powershell -ExecutionPolicy Bypass -File <repo>\esp32_firmware\patch_idf_nimble_hid_stack.ps1
+
+# 3) 设定目标芯片（只需一次）
+cd <repo>\esp32_firmware
+idf.py set-target esp32s3
+
+# 4) 编译（注意：build 目录必须放在纯英文路径，否则中文路径会导致 ldgen 失败）
+idf.py -B C:\esp32_fw_build build
+
+# 5) 烧录（串口按实际改，本机 COM10）
+idf.py -B C:\esp32_fw_build -p COM10 flash
+```
+
+## 五、踩坑与修复（重要）
+
+1. **中文路径导致编译失败**：工程路径含中文时，`ldgen` 调用 objdump 读不到中文路径下的 `libxtensa.a`。
+   → 解决：用 `idf.py -B C:\esp32_fw_build` 把 **build 输出目录** 放到纯英文路径（源码路径可保持中文）。
+2. **NimBLE HID 事件任务栈溢出 → 板子反复重启，广播扫不到**：
+   日志 `***ERROR*** A stack overflow in task ble_hidd_events has been detected.`
+   IDF v5.2.2 的 `components/esp_hid/src/nimble_hidd.c` 里该任务栈硬编码 2048 字节。
+   → 解决：运行 `patch_idf_nimble_hid_stack.ps1` 改成 6144 字节后重新编译烧录。
+   （换电脑/换 IDF 版本时都要再打一次这个补丁。）
+3. **无屏幕开发板如何配对**：官方示例默认 `BLE_SM_IO_CAP_DISP_ONLY` + MITM（需要显示配对码），
+   这块板没有屏幕，Windows 会卡在输入配对码。
+   → 解决：改为 `BLE_SM_IO_CAP_NO_IO`（Just Works）+ `sm_mitm = 0`，Windows 直接配对。
+4. **Windows 要“显示更多设备”才能看到它**：广播数据里漏了 Appearance（设备类型），Windows 只当它是普通 BLE 设备。
+   → 解决：`fields.appearance = appearance`（0x03C1=键盘），同时把设备名挪到 scan response——否则主广播包
+   （flags+tx+UUID+Appearance+名字）超过 31 字节，NimBLE 会报 `error setting advertisement data; rc=4` 直接不广播。
+5. **被电脑连上后板子就搜不到了**：默认连接后停止广播，手机无法再发现它；且广播默认 180 秒后自动停。
+   → 解决：在 `BLE_GAP_EVENT_CONNECT` 里重新 `esp_hid_ble_gap_adv_start()`（连上电脑也继续广播），
+   并把广播时长改成 `BLE_HS_FOREVER` 永久广播。
+6. **App 扫描不到板子**：板子若已被手机系统蓝牙连着（或正连电脑），就不再广播，扫描自然也扫不到（App 会误报“板子没上电”）。
+   → 解决：App 连接页扫描 8 秒后，会把**手机系统里已配对的 ESP32-S3 Keyboard** 一并列出来（标记“已配对/可直接连”），可直接连接；并记忆上次连过的板子地址；主界面“发送到键盘”若发现板子掉线，会按记住的地址自动重连（最多 8 秒）后再发送，不再要求手机先连电脑。
+7. **Flash 大小**：工程默认按 2MB 编译，实际板子是 4MB。
+   → 已在 `sdkconfig.defaults` 固定 `CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y`。
+
+## 六、说明
+
+- 固件基于 Espressif ESP-IDF 官方示例修改（Apache-2.0），后续在 `main/` 加入本项目的自定义服务与输入缓冲逻辑。
+- ESP32-S3 **没有蓝牙经典（BR/EDR）**，只有 BLE；原 Pico 方案本来就是 BLE HID，所以不受影响。
+
+## 七、当前调试状态（2026-09-11 收工）
+
+- 板子侧 HID 键盘服务已验证存在：Report Map（handle 31）/ Report（handle 34），`esp_hidd_dev_input_set` 可返回成功。
+- 已修复：
+  - HID over GATT 报文补 **Report ID(0x01)**（官方示例把 modifier 放首位，Windows 会当成 Report ID=0 忽略）。
+  - 连接后**延迟 3 秒再恢复广播**：Windows 保持 HID 连接的同时，手机仍能搜到板子。
+- 当前卡点：Windows 侧连接反复"连上→约 450ms 后断开"（reason 531，几十次/分钟），
+  导致板子发出的按键到不了电脑。已擦除板子 NVS 中的配对密钥（`esptool erase-region 0x9000 0x6000`），
+  Windows 侧旧设备记录也已消失 → **两边都需要重新配对**。
+- 已加入"最小自测"（用于隔离验证）：板子开机 5 秒打一次 `a`，之后每分钟打一次；
+  日志为 `demo: typed 'a' (failed=0/1)`，其中 failed=0 表示 HID 发送接口成功。
+  **验证通过后应移除 `demo_typer_task`。**
+- 重新配对步骤：Windows 设置 → 蓝牙和其他设备 → 添加设备 → 蓝牙 → `ESP32-S3 Keyboard`；
+  配对后打开记事本，等最多 1 分钟，应自动出现 `a`。
+- 配对稳定后的待办：确认 Windows 订阅 HID Report(handle 34)、App 发送可正常打字；
+  另一台用 GBK 的电脑还需要移植 `gbk_table.c`（目前只支持 Alt+X 中文模式）。

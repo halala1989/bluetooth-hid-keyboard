@@ -63,5 +63,17 @@
     <color name="check_green">#4CAF50</color>
     <color name="llm_me">#66BB6A</color>
     <color name="llm_ai">#FFFFFF</color>
+
+    <!-- 住院管理 -->
+    <color name="clinical_teal">#35D7C4</color>
+    <color name="clinical_blue">#65A9FF</color>
+    <color name="clinical_navy">#10202A</color>
+    <color name="clinical_mint_bg">#12302E</color>
+    <color name="clinical_blue_bg">#17283F</color>
+    <color name="clinical_warning">#FFB86B</color>
+    <color name="clinical_warning_bg">#3A291B</color>
+    <color name="clinical_danger">#FF7C86</color>
+    <color name="clinical_danger_bg">#3B2025</color>
+    <color name="clinical_line">#263740</color>
 </resources>
 

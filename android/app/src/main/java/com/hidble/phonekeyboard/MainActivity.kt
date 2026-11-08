@@ -114,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     private var connected = false
     private var savedSpeedLevel = DEFAULT_SPEED_LEVEL
     private var savedUnicodeMode = TypingEngine.MODE_ALTX
+    private var keyboardStateListener: ((KeyboardSnapshot) -> Unit)? = null
     private val phrases = mutableListOf<String>()
     private lateinit var prefs: android.content.SharedPreferences
 
@@ -271,8 +272,8 @@ class MainActivity : AppCompatActivity() {
         LlmRunService.stop(this)
         super.onDestroy()
         if (instance === this) instance = null
-        hidManager.cleanup()
-        if (!registered) stopHidService()
+        keyboardStateListener?.let { KeyboardRuntime.removeStateListener(it) }
+        keyboardStateListener = null
     }
 
     private fun initViews() {
@@ -345,70 +346,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initHid() {
-        hidManager = HidDeviceManager(this)
-        hidManager.init()
-        val engine = TypingEngine(
-            send = { data -> hidManager.sendReport(data) },
-            onSendInterrupted = { sent ->
-                appendLog("发送中断：蓝牙连接可能已断开（已发送 $sent 字），请检查连接后重试")
-            }
-        )
-        engine.onGbkNumLockWarning = {
-            appendLog("提示：目标电脑 NumLock 未开启，GBK 输入会变成方向键并可能误选/误删文本；请先在电脑上按一次 NumLock 再发送")
-        }
-        hidProtocol = HidProtocol(
-            engine
-        )
+        KeyboardRuntime.initialize(this)
+        hidManager = KeyboardRuntime.hidManager()
+            ?: throw IllegalStateException("蓝牙键盘服务初始化失败")
+        hidProtocol = KeyboardRuntime.hidProtocol()
+            ?: throw IllegalStateException("打字引擎初始化失败")
         hidProtocol.setSpeed(savedSpeedLevel)
         hidProtocol.setUnicodeMode(savedUnicodeMode)
 
-        hidManager.onAppStatusChanged = { reg ->
+        val listener: (KeyboardSnapshot) -> Unit = { snapshot ->
             runOnUiThread {
+                val wasRegistered = registered
+                val wasConnected = connected
+                val reg = snapshot.registered
                 registered = reg
-                if (reg) {
-                    startHidService()
+                connected = snapshot.connected
+                if (reg && !wasRegistered) {
                     appendLog("蓝牙键盘已启动：请确认“对附近设备可见”，然后到电脑上搜索并配对")
                     requestDiscoverable()
-                } else {
-                    stopHidService()
+                } else if (!reg && wasRegistered) {
                     appendLog("蓝牙键盘已停止")
                 }
-                refreshAllState()
-            }
-        }
-
-        hidManager.onConnectionStateChanged = { device, state ->
-            runOnUiThread {
-                when (state) {
-                    BluetoothProfile.STATE_CONNECTED -> {
-                        connected = true
-                        hidProtocol.setSpeed(savedSpeedLevel)
-                        appendLog("已连接：${device?.name ?: "电脑"}（输入速度 $savedSpeedLevel）")
-                    }
-                    BluetoothProfile.STATE_DISCONNECTED -> {
-                        connected = false
-                        appendLog("连接已断开")
-                    }
+                if (snapshot.connected && !wasConnected) {
+                    hidProtocol.setSpeed(savedSpeedLevel)
+                    appendLog(
+                        "已连接：${snapshot.deviceName ?: "电脑"}（输入速度 $savedSpeedLevel）"
+                    )
+                } else if (!snapshot.connected && wasConnected) {
+                    appendLog("连接已断开")
                 }
                 refreshAllState()
             }
         }
-
-        hidManager.onError = { error ->
-            runOnUiThread {
-                appendLog("错误: $error")
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
-                // 注册失败时复位
-                if (!hidManager.isRegistered()) {
-                    registered = false
-                    refreshAllState()
-                }
-            }
-        }
-
-        hidManager.onLedState = { led ->
-            hidProtocol.onLedReport(led)
-        }
+        keyboardStateListener = listener
+        KeyboardRuntime.addStateListener(listener)
     }
 
     private fun setupListeners() {
@@ -483,6 +454,10 @@ class MainActivity : AppCompatActivity() {
         // ===== 大模型对话 =====
         llmSettingsButton.setOnClickListener { openLlmSettings() }
         llmSettingsTopButton.setOnClickListener { openLlmSettings() }
+        findViewById<Button>(R.id.patientManagerButton).setOnClickListener {
+            startActivity(Intent(this, PatientListActivity::class.java))
+            finish()
+        }
 
         llmSendButton.setOnClickListener { sendToLlm() }
         llmStopButton.setOnClickListener { stopLlmOutput() }
@@ -533,11 +508,9 @@ class MainActivity : AppCompatActivity() {
                 registerKeyboard()
             }
         } else {
-            hidManager.unregister()
-            hidManager.disconnect()
+            KeyboardRuntime.disable()
             connected = false
             registered = false
-            stopHidService()
             appendLog("蓝牙键盘已关闭")
             refreshAllState()
         }
@@ -566,7 +539,7 @@ class MainActivity : AppCompatActivity() {
             appendLog("键盘未启动，先启动蓝牙键盘再连接...")
             registerKeyboard()
         }
-        hidManager.connect(device)
+        KeyboardRuntime.connect(device)
     }
 
     /** 已配对设备快照：(名称+地址, device) 列表 */
@@ -668,8 +641,9 @@ class MainActivity : AppCompatActivity() {
         }
         val text = textInput.text.toString()
         if (text.isNotEmpty()) {
-            if (!connected) {
-                Toast.makeText(this, "尚未连接到电脑", Toast.LENGTH_SHORT).show()
+            val terminal = OutputRouter.selected(this)
+            if (!OutputRouter.isConnected(this, terminal)) {
+                Toast.makeText(this, "${terminal.displayName} 尚未连接", Toast.LENGTH_SHORT).show()
                 return
             }
             setKeepScreenOn(true)
@@ -679,9 +653,14 @@ class MainActivity : AppCompatActivity() {
                     if (text.length > TypingEngine.CHUNK_SIZE) {
                         appendLog("文本较长（${text.length} 字），已自动分段发送")
                     }
-                    hidProtocol.typeText(text)
-                    appendLog("发送文本: $text")
-                    textInput.text.clear()
+                    val (success, message) = OutputRouter.sendTextAwait(this@MainActivity, text)
+                    if (success) {
+                        appendLog("通过 ${terminal.displayName} 发送文本: $text")
+                        textInput.text.clear()
+                    } else {
+                        appendLog(message)
+                        Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                    }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     appendLog("文本发送已中止")
                     throw e
@@ -1824,6 +1803,11 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "对话输出为空", Toast.LENGTH_SHORT).show()
             return
         }
+        val terminal = OutputRouter.selected(this)
+        if (!OutputRouter.isConnected(this, terminal)) {
+            Toast.makeText(this, "${terminal.displayName} 尚未连接", Toast.LENGTH_SHORT).show()
+            return
+        }
         val text = if (llmIncludeMeCheck.isChecked) {
             full
         } else {
@@ -1877,8 +1861,13 @@ class MainActivity : AppCompatActivity() {
                 if (text.length > TypingEngine.CHUNK_SIZE) {
                     appendLog("对话内容较长（${text.length} 字），已自动分段发送")
                 }
-                hidProtocol.typeText(text)
-                appendLog("已把对话内容发送到电脑")
+                val (success, message) = OutputRouter.sendTextAwait(this@MainActivity, text)
+                if (success) {
+                    appendLog("已通过 ${terminal.displayName} 发送对话内容")
+                } else {
+                    appendLog(message)
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 appendLog("对话发送已中止")
                 throw e

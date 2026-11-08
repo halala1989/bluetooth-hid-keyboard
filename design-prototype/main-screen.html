@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>住院管理 · 主界面</title>
+  <style>
+    :root {
+      --bg: #f3f6f4;
+      --card: #ffffff;
+      --ink: #172521;
+      --muted: #70807b;
+      --faint: #9ba9a5;
+      --line: #e1e8e5;
+      --primary: #176c5b;
+      --primary-deep: #0e5144;
+      --primary-soft: #e2f1ec;
+      --primary-pale: #f1f8f5;
+      --blue: #4479ad;
+      --blue-soft: #eaf2fa;
+      --amber: #a56b27;
+      --amber-soft: #fff1dc;
+      --red: #b94c47;
+      --shadow: 0 18px 48px rgba(28, 61, 52, .10);
+      --shadow-soft: 0 8px 24px rgba(28, 61, 52, .06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 6% 0%, rgba(188, 221, 211, .46), transparent 31%),
+        radial-gradient(circle at 95% 98%, rgba(206, 224, 217, .55), transparent 30%),
+        var(--bg);
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid rgba(23, 108, 91, .17);
+      outline-offset: 2px;
+    }
+
+    .phone-shell {
+      width: min(430px, 100vw);
+      min-height: 100vh;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+      background: rgba(250, 252, 251, .92);
+      box-shadow: 0 0 70px rgba(29, 57, 50, .1);
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 30px;
+      padding: 6px 20px 0;
+      color: #334944;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .status-icons { display: flex; align-items: center; gap: 5px; }
+    .signal { display: flex; align-items: flex-end; gap: 2px; height: 9px; }
+    .signal i { display: block; width: 2px; background: currentColor; border-radius: 2px; }
+    .signal i:nth-child(1) { height: 3px; }
+    .signal i:nth-child(2) { height: 5px; }
+    .signal i:nth-child(3) { height: 7px; }
+    .signal i:nth-child(4) { height: 9px; }
+    .battery {
+      width: 17px;
+      height: 8px;
+      padding: 1px;
+      border: 1px solid currentColor;
+      border-radius: 2px;
+    }
+    .battery::after {
+      content: "";
+      display: block;
+      width: 82%;
+      height: 100%;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .page {
+      min-height: calc(100vh - 30px);
+      padding: 8px 18px 118px;
+    }
+
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 7px 1px 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--primary);
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 27px;
+      line-height: 1.2;
+      letter-spacing: -.04em;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .doctor {
+      flex: 0 0 auto;
+      width: 43px;
+      height: 43px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #c8dbd4;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px;
+      border: 1px solid #cfe0da;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #edf8f4, #f7fbf9);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .summary-number {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: var(--primary);
+      color: white;
+      font-size: 21px;
+      font-weight: 900;
+      box-shadow: 0 9px 20px rgba(23, 108, 91, .2);
+    }
+
+    .summary strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .summary span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .list-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin: 22px 1px 10px;
+    }
+
+    .list-heading h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -.02em;
+    }
+
+    .list-heading span {
+      color: var(--faint);
+      font-size: 9.5px;
+    }
+
+    .patient-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .patient-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 23px;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 76px;
+      padding: 13px 13px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: var(--card);
+      color: var(--ink);
+      text-align: left;
+      box-shadow: 0 6px 20px rgba(32, 64, 55, .035);
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+      animation: rowIn .25s ease both;
+    }
+
+    .patient-row:hover {
+      transform: translateY(-1px);
+      border-color: #c8dbd4;
+      box-shadow: 0 10px 26px rgba(32, 64, 55, .07);
+    }
+
+    .patient-row.selected {
+      border-color: #a8cec2;
+      background: var(--primary-pale);
+      box-shadow: inset 3px 0 0 var(--primary), 0 8px 24px rgba(23, 108, 91, .07);
+    }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(7px); }
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .patient-row.selected .avatar {
+      background: var(--primary);
+      color: white;
+    }
+
+    .patient-name-line {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .patient-name {
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 900;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .selected-tag {
+      display: none;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 8px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .patient-row.selected .selected-tag { display: inline-flex; }
+
+    .patient-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 10.5px;
+    }
+
+    .gender {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #f0f4f2;
+      color: #5d716b;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .chevron {
+      color: #9cadA7;
+      font-size: 20px;
+      text-align: center;
+    }
+
+    .empty-state {
+      display: none;
+      padding: 48px 20px;
+      border: 1px dashed #cfdbd7;
+      border-radius: 18px;
+      background: rgba(255,255,255,.65);
+      color: var(--muted);
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .fab {
+      position: fixed;
+      z-index: 20;
+      right: max(22px, calc((100vw - 430px) / 2 + 22px));
+      bottom: 30px;
+      width: 62px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 15px 32px rgba(15, 81, 68, .3), 0 4px 12px rgba(15, 81, 68, .18);
+      transition: transform .18s ease, background .18s ease;
+    }
+
+    .fab:hover {
+      transform: translateY(-2px) scale(1.02);
+      background: var(--primary-deep);
+    }
+
+    .fab svg {
+      width: 27px;
+      height: 27px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      fill: none;
+      stroke-linecap: round;
+    }
+
+    .fab::before {
+      content: "新建病人";
+      position: absolute;
+      right: 70px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      background: rgba(22, 48, 41, .9);
+      color: white;
+      font-size: 9px;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(5px);
+      pointer-events: none;
+      transition: .18s ease;
+    }
+
+    .fab:hover::before { opacity: 1; transform: translateX(0); }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(17, 36, 31, .32);
+      backdrop-filter: blur(4px);
+    }
+
+    .overlay.open { display: flex; }
+
+    .sheet {
+      width: min(440px, 100%);
+      padding: 8px 19px 20px;
+      border-radius: 25px;
+      background: var(--card);
+      box-shadow: 0 28px 70px rgba(17, 44, 36, .26);
+      animation: sheetIn .24s ease-out;
+    }
+
+    @keyframes sheetIn {
+      from { opacity: .5; transform: translateY(26px); }
+    }
+
+    .grabber {
+      width: 36px;
+      height: 4px;
+      margin: 1px auto 15px;
+      border-radius: 999px;
+      background: #d8e1de;
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .sheet-head h2 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: -.035em;
+    }
+
+    .sheet-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .close {
+      width: 35px;
+      height: 35px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .field {
+      display: block;
+      margin-bottom: 13px;
+    }
+
+    .field > span {
+      display: block;
+      margin: 0 0 6px 2px;
+      color: #52665f;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .input {
+      width: 100%;
+      height: 47px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfcfc;
+      color: var(--ink);
+      font-size: 14px;
+      transition: border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: #91beb0;
+      box-shadow: 0 0 0 3px rgba(23, 108, 91, .08);
+    }
+
+    .input::placeholder { color: #a5b2ae; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 11px;
+    }
+
+    .gender-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .gender-option {
+      height: 47px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfcfc;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .gender-option.active {
+      border-color: #9fc9bc;
+      background: var(--primary-soft);
+      color: var(--primary-deep);
+    }
+
+    .error {
+      min-height: 16px;
+      margin: -4px 0 4px 2px;
+      color: var(--red);
+      font-size: 9.5px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      gap: 9px;
+      margin-top: 4px;
+    }
+
+    .button {
+      height: 49px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .button.secondary {
+      border-color: var(--line);
+      background: white;
+      color: #546861;
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 10px 22px rgba(23,108,91,.2);
+    }
+
+    .button.primary:hover { background: var(--primary-deep); }
+
+    .toast {
+      position: fixed;
+      z-index: 70;
+      left: 50%;
+      bottom: 108px;
+      transform: translate(-50%, 14px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #163d34;
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+      box-shadow: 0 12px 30px rgba(12, 42, 34, .22);
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (min-width: 700px) {
+      .phone-shell {
+        min-height: calc(100vh - 28px);
+        height: calc(100vh - 28px);
+        margin-top: 14px;
+        border: 1px solid rgba(255,255,255,.95);
+        border-radius: 31px;
+        box-shadow: 0 28px 90px rgba(30, 59, 50, .15);
+      }
+
+      .page { min-height: calc(100vh - 58px); }
+      .fab { bottom: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="phone-shell">
+    <div class="status-bar" aria-hidden="true">
+      <span>08:30</span>
+      <span class="status-icons">
+        <span class="signal"><i></i><i></i><i></i><i></i></span>
+        <span>5G</span>
+        <span class="battery"></span>
+      </span>
+    </div>
+
+    <div class="page">
+      <header class="top">
+        <div>
+          <p class="eyebrow">INPATIENT CARE</p>
+          <h1>住院病人</h1>
+          <p class="subtitle">选择病人继续管理，或新建一位住院病人</p>
+        </div>
+        <div class="doctor" title="李医生">李</div>
+      </header>
+
+      <section class="summary" aria-label="病人数量">
+        <div class="summary-number" id="patientCount">3</div>
+        <div>
+          <strong>当前住院病人</strong>
+          <span>名单按添加顺序排列，可随时切换</span>
+        </div>
+      </section>
+
+      <div class="list-heading">
+        <h2>病人列表</h2>
+        <span id="listHint">最近添加的在下方</span>
+      </div>
+
+      <section class="patient-list" id="patientList" aria-label="病人列表"></section>
+      <div class="empty-state" id="emptyState">还没有病人<br>点击右下角加号创建第一位病人</div>
+    </div>
+
+    <button class="fab" id="addButton" aria-label="新建病人" onclick="openSheet()">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </main>
+
+  <div class="overlay" id="overlay" onclick="closeSheet()">
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" onclick="event.stopPropagation()">
+      <div class="grabber"></div>
+      <div class="sheet-head">
+        <div>
+          <h2 id="sheetTitle">新建病人</h2>
+          <p>填写基础信息后即可加入病人列表</p>
+        </div>
+        <button class="close" onclick="closeSheet()" aria-label="关闭">×</button>
+      </div>
+
+      <form id="patientForm" onsubmit="addPatient(event)">
+        <label class="field">
+          <span>病人姓名</span>
+          <input class="input" id="nameInput" autocomplete="off" placeholder="请输入姓名" maxlength="20">
+        </label>
+
+        <div class="form-row">
+          <label class="field">
+            <span>年龄</span>
+            <input class="input" id="ageInput" type="number" min="0" max="130" inputmode="numeric" placeholder="岁">
+          </label>
+          <div class="field">
+            <span>性别</span>
+            <div class="gender-picker" id="genderPicker">
+              <button type="button" class="gender-option active" data-gender="男" onclick="pickGender(this)">男</button>
+              <button type="button" class="gender-option" data-gender="女" onclick="pickGender(this)">女</button>
+              <button type="button" class="gender-option" data-gender="其他" onclick="pickGender(this)">其他</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="error" id="formError"></div>
+
+        <div class="actions">
+          <button type="button" class="button secondary" onclick="closeSheet()">取消</button>
+          <button type="submit" class="button primary">确定添加</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "careflow-main-patients-v1";
+    const defaultPatients = [
+      { id: 1, name: "王建国", age: 67, gender: "男" },
+      { id: 2, name: "刘秀兰", age: 72, gender: "女" },
+      { id: 3, name: "赵明", age: 54, gender: "男" }
+    ];
+
+    let patients = loadPatients();
+    let selectedId = patients[0]?.id ?? null;
+    let selectedGender = "男";
+
+    const patientList = document.getElementById("patientList");
+    const emptyState = document.getElementById("emptyState");
+    const patientCount = document.getElementById("patientCount");
+    const listHint = document.getElementById("listHint");
+
+    function loadPatients() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return Array.isArray(saved) ? saved : defaultPatients;
+      } catch {
+        return defaultPatients;
+      }
+    }
+
+    function savePatients() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+    }
+
+    function renderPatients() {
+      patientList.innerHTML = patients.map((patient, index) => `
+        <button class="patient-row ${patient.id === selectedId ? "selected" : ""}"
+                style="animation-delay:${Math.min(index * 24, 140)}ms"
+                onclick="selectPatient(${patient.id})">
+          <span class="avatar">${patient.name.slice(0, 1)}</span>
+          <span>
+            <span class="patient-name-line">
+              <span class="patient-name">${escapeHtml(patient.name)}</span>
+              <span class="selected-tag">当前选择</span>
+            </span>
+            <span class="patient-meta">
+              <span>${patient.age}岁</span>
+              <span class="gender">${escapeHtml(patient.gender)}</span>
+            </span>
+          </span>
+          <span class="chevron">›</span>
+        </button>
+      `).join("");
+
+      patientCount.textContent = patients.length;
+      emptyState.style.display = patients.length ? "none" : "block";
+      listHint.textContent = patients.length ? `当前共 ${patients.length} 位` : "等待添加";
+    }
+
+    function selectPatient(id) {
+      selectedId = id;
+      renderPatients();
+      const patient = patients.find(item => item.id === id);
+      if (patient) showToast(`已选择 ${patient.name}，可继续进入病人详情`);
+    }
+
+    function openSheet() {
+      document.getElementById("overlay").classList.add("open");
+      document.getElementById("formError").textContent = "";
+      document.getElementById("patientForm").reset();
+      selectedGender = "男";
+      document.querySelectorAll(".gender-option").forEach(button => {
+        button.classList.toggle("active", button.dataset.gender === "男");
+      });
+      setTimeout(() => document.getElementById("nameInput").focus(), 80);
+    }
+
+    function closeSheet() {
+      document.getElementById("overlay").classList.remove("open");
+    }
+
+    function pickGender(button) {
+      selectedGender = button.dataset.gender;
+      document.querySelectorAll(".gender-option").forEach(item => item.classList.remove("active"));
+      button.classList.add("active");
+    }
+
+    function addPatient(event) {
+      event.preventDefault();
+      const name = document.getElementById("nameInput").value.trim();
+      const age = Number(document.getElementById("ageInput").value);
+      const error = document.getElementById("formError");
+
+      if (!name) {
+        error.textContent = "请填写病人姓名";
+        document.getElementById("nameInput").focus();
+        return;
+      }
+      if (!Number.isFinite(age) || age < 0 || age > 130) {
+        error.textContent = "请填写 0–130 岁之间的有效年龄";
+        document.getElementById("ageInput").focus();
+        return;
+      }
+
+      const patient = {
+        id: Date.now(),
+        name,
+        age: Math.round(age),
+        gender: selectedGender
+      };
+      patients.push(patient);
+      selectedId = patient.id;
+      savePatients();
+      renderPatients();
+      closeSheet();
+      showToast(`${name} 已添加到病人列表`);
+
+      setTimeout(() => {
+        const rows = patientList.querySelectorAll(".patient-row");
+        rows[rows.length - 1]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 60);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeSheet();
+    });
+
+    renderPatients();
+  </script>
+</body>
+</html>

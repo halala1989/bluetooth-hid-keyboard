@@ -1,0 +1,2245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>病历书写 · 双栏工作台</title>
+  <style>
+    :root {
+      --bg: #f2f5f3;
+      --surface: #ffffff;
+      --soft: #f7faf8;
+      --ink: #172621;
+      --muted: #6b7e77;
+      --faint: #98a7a2;
+      --line: #dfe7e3;
+      --primary: #176c5b;
+      --primary-deep: #0f5144;
+      --primary-soft: #e1f1ec;
+      --primary-pale: #f0f8f5;
+      --blue: #477bad;
+      --blue-soft: #eaf2fa;
+      --amber: #a66b24;
+      --amber-soft: #fff1dc;
+      --red: #ba4c47;
+      --red-soft: #fceceb;
+      --shadow: 0 18px 52px rgba(28, 61, 52, .09);
+      --shadow-soft: 0 7px 22px rgba(28, 61, 52, .05);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 4% 1%, rgba(186, 220, 209, .43), transparent 28%),
+        radial-gradient(circle at 98% 98%, rgba(206, 224, 217, .51), transparent 31%),
+        var(--bg);
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, textarea:focus-visible, input:focus-visible {
+      outline: 3px solid rgba(23,108,91,.16);
+      outline-offset: 2px;
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 11px;
+    }
+
+    .topbar {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 18px;
+      border: 1px solid rgba(255,255,255,.92);
+      border-radius: 20px;
+      background: rgba(255,255,255,.88);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px);
+    }
+
+    .back {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      color: var(--ink);
+    }
+    .back svg { width: 18px; height: 18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    .patient-context { min-width: 210px; }
+    .eyebrow { margin: 0 0 3px; color: var(--primary); font-size: 8.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+    .patient-line { display:flex; align-items:baseline; gap:8px; }
+    .patient-line h1 { margin:0; font-size:18px; letter-spacing:-.03em; }
+    .patient-line span { color:var(--muted); font-size:9.5px; }
+
+    .top-divider { width:1px; height:32px; background:var(--line); }
+    .doc-title { font-size:12px; font-weight:850; }
+    .doc-subtitle { margin-top:4px; color:var(--muted); font-size:9px; }
+    .top-spacer { flex:1; }
+
+    .connection {
+      display:flex;
+      align-items:center;
+      gap:7px;
+      padding:7px 10px;
+      border:1px solid #cce0d9;
+      border-radius:999px;
+      background:var(--primary-pale);
+      color:var(--primary-deep);
+      font-size:9px;
+      font-weight:800;
+    }
+    .connection-dot { width:7px; height:7px; border-radius:50%; background:#30a278; box-shadow:0 0 0 4px rgba(48,162,120,.11); }
+
+    .button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:39px;
+      padding:0 13px;
+      border:1px solid transparent;
+      border-radius:11px;
+      font-size:10.5px;
+      font-weight:850;
+    }
+    .button svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .button.primary { background:var(--primary); color:white; box-shadow:0 8px 18px rgba(23,108,91,.18); }
+    .button.primary:hover { background:var(--primary-deep); }
+    .button.secondary { border-color:var(--line); background:white; color:var(--muted); }
+    .button.secondary:hover { border-color:#b9d1c9; background:var(--primary-pale); }
+    .button.danger-soft { border-color:#ecd1cf; background:var(--red-soft); color:var(--red); }
+
+    .workspace {
+      flex:1;
+      min-height:0;
+      display:grid;
+      grid-template-columns:minmax(360px, .82fr) minmax(540px, 1.18fr);
+      gap:11px;
+    }
+
+    .pane {
+      position:relative;
+      min-width:0;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.94);
+      border-radius:22px;
+      background:rgba(255,255,255,.92);
+      box-shadow:var(--shadow-soft);
+    }
+
+    .pane-head {
+      display:flex;
+      align-items:center;
+      gap:11px;
+      min-height:64px;
+      padding:0 18px;
+      border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.8);
+    }
+    .pane-icon {
+      width:35px;
+      height:35px;
+      display:grid;
+      place-items:center;
+      border-radius:11px;
+      background:var(--primary-soft);
+      color:var(--primary);
+    }
+    .pane-icon.output { background:var(--blue-soft); color:var(--blue); }
+    .pane-icon svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .pane-title { min-width:0; flex:1; }
+    .pane-title h2 { margin:0; font-size:15px; }
+    .pane-title p { margin:4px 0 0; color:var(--muted); font-size:9px; }
+    .count-badge { padding:5px 8px; border-radius:999px; background:var(--soft); color:var(--muted); font-size:9px; font-weight:800; }
+
+    .pane-scroll {
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      padding:14px 14px 102px;
+      scrollbar-width:thin;
+      scrollbar-color:#c9d8d2 transparent;
+    }
+
+    .input-card {
+      position:relative;
+      padding:13px 14px;
+      margin-bottom:9px;
+      border:1px solid var(--line);
+      border-radius:15px;
+      background:var(--surface);
+      box-shadow:0 4px 14px rgba(30,65,55,.025);
+      animation:cardIn .22s ease both;
+      cursor:pointer;
+    }
+    @keyframes cardIn { from { opacity:0; transform:translateY(6px); } }
+
+    .input-meta { display:flex; align-items:center; gap:7px; }
+    .type-tag { padding:3px 7px; border-radius:6px; background:var(--primary-soft); color:var(--primary); font-size:8px; font-weight:900; }
+    .type-tag.exam { background:var(--blue-soft); color:var(--blue); }
+    .type-tag.result { background:var(--amber-soft); color:var(--amber); }
+    .input-time { margin-left:auto; color:var(--faint); font-size:8px; }
+    .input-title { margin:9px 0 5px; font-size:11.5px; font-weight:900; }
+    .input-content { margin:0; color:#536760; font-size:10px; line-height:1.72; white-space:pre-wrap; }
+    .input-tools { display:flex; justify-content:flex-end; gap:5px; margin-top:8px; }
+    .mini-button { border:0; background:transparent; color:var(--faint); font-size:8.5px; padding:3px 5px; }
+    .mini-button:hover { color:var(--primary); }
+
+    .composer {
+      display:none;
+      margin-bottom:9px;
+      padding:13px;
+      border:1px solid #a8ccbf;
+      border-radius:15px;
+      background:var(--primary-pale);
+      box-shadow:0 8px 22px rgba(23,108,91,.08);
+    }
+    .composer.open { display:block; }
+    .composer-label { display:block; margin-bottom:7px; color:var(--primary-deep); font-size:9px; font-weight:900; }
+    .composer textarea {
+      width:100%;
+      min-height:148px;
+      resize:vertical;
+      padding:11px;
+      border:1px solid #c6ddd5;
+      border-radius:11px;
+      background:white;
+      color:var(--ink);
+      font-size:11px;
+      line-height:1.7;
+    }
+    .composer textarea::placeholder { color:var(--faint); }
+    .composer-actions { display:flex; justify-content:flex-end; gap:6px; margin-top:8px; }
+
+    .fab {
+      position:absolute;
+      bottom:17px;
+      width:51px;
+      height:51px;
+      display:grid;
+      place-items:center;
+      border:0;
+      border-radius:50%;
+      color:white;
+      box-shadow:0 12px 27px rgba(15,81,68,.26);
+    }
+    .fab svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+    .fab.input-add { left:17px; background:var(--primary); }
+    .fab.output-add { right:17px; background:var(--blue); box-shadow:0 12px 27px rgba(71,123,173,.25); }
+    .fab:hover { transform:translateY(-1px); }
+
+    .source-links { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+    .source-chip { padding:4px 7px; border:1px solid var(--line); border-radius:999px; background:var(--soft); color:var(--muted); font-size:7.5px; }
+
+    .empty-output {
+      min-height:370px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+      color:var(--muted);
+      text-align:center;
+    }
+    .empty-illustration {
+      width:76px;
+      height:76px;
+      display:grid;
+      place-items:center;
+      border-radius:24px;
+      background:var(--blue-soft);
+      color:var(--blue);
+    }
+    .empty-illustration svg { width:34px; height:34px; fill:none; stroke:currentColor; stroke-width:1.4; }
+    .empty-output h3 { margin:16px 0 7px; color:var(--ink); font-size:14px; }
+    .empty-output p { max-width:300px; margin:0; font-size:10px; line-height:1.7; }
+
+    .document {
+      display:none;
+      border:1px solid var(--line);
+      border-radius:17px;
+      background:var(--surface);
+      box-shadow:0 7px 24px rgba(30,65,55,.04);
+      overflow:hidden;
+    }
+    .document.active { display:block; animation:cardIn .22s ease both; }
+    .document-head {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:14px 16px;
+      background:linear-gradient(135deg,#f3f8f6,#fbfcfc);
+      border-bottom:1px solid var(--line);
+    }
+    .document-heading { flex:1; min-width:0; }
+    .document-heading h3 { margin:0; font-size:14px; }
+    .document-heading p { margin:4px 0 0; color:var(--muted); font-size:8.5px; }
+    .document-actions { display:flex; gap:5px; }
+    .icon-action {
+      width:30px;
+      height:30px;
+      display:grid;
+      place-items:center;
+      border:1px solid var(--line);
+      border-radius:9px;
+      background:white;
+      color:var(--muted);
+    }
+    .icon-action svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .output-document-button {
+      min-height:30px;
+      padding:0 10px;
+      border:0;
+      border-radius:9px;
+      background:var(--primary);
+      color:white;
+      font-size:8.5px;
+      font-weight:900;
+      box-shadow:0 6px 14px rgba(23,108,91,.16);
+    }
+    .output-document-button:hover { background:var(--primary-deep); }
+    .output-document-button:disabled { background:#c7d5d0; color:#f6faf8; box-shadow:none; cursor:not-allowed; }
+
+    .doc-note {
+      display:flex;
+      gap:8px;
+      margin:12px 14px 0;
+      padding:9px 10px;
+      border:1px solid #d6e5df;
+      border-radius:10px;
+      background:var(--primary-pale);
+      color:#4d6d63;
+      font-size:8.5px;
+      line-height:1.5;
+    }
+    .doc-note svg { width:14px; height:14px; flex:0 0 auto; fill:none; stroke:var(--primary); stroke-width:1.8; }
+
+    .section-block {
+      padding:14px 15px;
+      border-bottom:1px solid var(--line);
+    }
+    .section-block:last-of-type { border-bottom:0; }
+    .section-title-row { display:flex; align-items:center; gap:8px; }
+    .section-title { margin:0; font-size:11.5px; font-weight:900; }
+    .required { padding:2px 5px; border-radius:5px; background:var(--red-soft); color:var(--red); font-size:7px; font-weight:900; }
+    .section-copy {
+      margin:8px 0 0;
+      color:#344943;
+      font-size:10.5px;
+      line-height:1.8;
+      white-space:pre-wrap;
+    }
+    .section-copy .placeholder { color:var(--faint); }
+    .prompt-row {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      margin-top:10px;
+      padding:7px 9px;
+      border:1px dashed #c9d8d2;
+      border-radius:9px;
+      background:var(--soft);
+    }
+    .prompt-row svg { width:13px; height:13px; fill:none; stroke:var(--primary); stroke-width:1.8; }
+    .prompt-row input {
+      flex:1;
+      min-width:0;
+      border:0;
+      outline:0;
+      background:transparent;
+      color:var(--ink);
+      font-size:9px;
+    }
+    .prompt-row input::placeholder { color:var(--faint); }
+    .apply-prompt { border:0; background:transparent; color:var(--primary); font-size:8px; font-weight:900; }
+
+    .output-tabs {
+      display:flex;
+      gap:6px;
+      padding:9px 14px;
+      border-bottom:1px solid var(--line);
+      overflow-x:auto;
+      scrollbar-width:none;
+      background:rgba(255,255,255,.84);
+    }
+    .output-tabs::-webkit-scrollbar { display:none; }
+    .output-tab { flex:0 0 auto; padding:6px 9px; border:1px solid var(--line); border-radius:999px; background:white; color:var(--muted); font-size:8.5px; font-weight:800; }
+    .output-tab.active { border-color:#abcabf; background:var(--primary-soft); color:var(--primary-deep); }
+
+    .consent-editor {
+      margin:12px 14px 0;
+      padding:13px;
+      border:1px solid #bed7cf;
+      border-radius:13px;
+      background:var(--primary-pale);
+    }
+    .consent-editor-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .consent-editor h4 { margin:0; font-size:11.5px; }
+    .consent-editor p { margin:4px 0 0; color:var(--muted); font-size:8.5px; line-height:1.5; }
+    .recommended-badge { padding:4px 7px; border-radius:6px; background:var(--primary); color:white; font-size:7.5px; font-weight:900; white-space:nowrap; }
+    .plan-field label { display:block; margin:0 0 5px 1px; color:var(--muted); font-size:8px; font-weight:800; }
+    .plan-field input {
+      width:100%;
+      height:39px;
+      padding:0 9px;
+      border:1px solid var(--line);
+      border-radius:9px;
+      background:white;
+      color:var(--ink);
+      font-size:9.5px;
+    }
+    .consent-tools { display:flex; align-items:center; gap:9px; margin-top:9px; }
+    .web-toggle { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:8px; }
+    .web-toggle input { accent-color:var(--primary); }
+    .consent-tools .button { margin-left:auto; min-height:34px; font-size:9px; }
+    .dependency {
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+      margin:12px 14px 0;
+      padding:9px 10px;
+      border:1px solid #ecd9ba;
+      border-radius:10px;
+      background:var(--amber-soft);
+      color:#7e5a29;
+      font-size:8.5px;
+      line-height:1.55;
+    }
+    .dependency.ready { border-color:#cde1da; background:var(--primary-pale); color:#4d6d63; }
+    .dependency svg { width:14px; height:14px; flex:0 0 auto; fill:none; stroke:currentColor; stroke-width:1.8; }
+    .source-strip { display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:8px 14px 0; }
+    .source-strip span { color:var(--faint); font-size:7.5px; }
+    .source-strip b { padding:3px 6px; border-radius:999px; background:var(--soft); color:var(--muted); font-size:7.5px; font-weight:800; }
+    .char-target { margin-left:auto; padding:3px 6px; border-radius:5px; background:var(--blue-soft); color:var(--blue); font-size:7px; font-weight:900; }
+    .consent-output { display:none; }
+    .consent-output.ready { display:block; }
+
+    .overlay {
+      position:fixed;
+      inset:0;
+      z-index:30;
+      display:none;
+      place-items:center;
+      padding:20px;
+      background:rgba(16,34,29,.32);
+      backdrop-filter:blur(4px);
+    }
+    .overlay.open { display:grid; }
+    .type-dialog { width:min(670px, calc(100vw - 34px)); padding:19px; border-radius:21px; background:white; box-shadow:0 28px 80px rgba(17,44,36,.24); animation:cardIn .22s ease both; }
+    .dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:15px; }
+    .dialog-head h2 { margin:0; font-size:18px; letter-spacing:-.03em; }
+    .dialog-head p { margin:5px 0 0; color:var(--muted); font-size:9.5px; }
+    .close { width:34px; height:34px; border:1px solid var(--line); border-radius:10px; background:var(--soft); color:var(--muted); font-size:18px; }
+    .type-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+    .type-option { min-height:76px; padding:11px; border:1px solid var(--line); border-radius:12px; background:var(--soft); color:var(--ink); text-align:left; transition:.16s ease; }
+    .type-option:hover { border-color:#a8c9be; background:var(--primary-pale); transform:translateY(-1px); }
+    .type-option strong { display:block; font-size:10.5px; }
+    .type-option span { display:block; margin-top:5px; color:var(--muted); font-size:8px; line-height:1.4; }
+    .type-option.disabled { opacity:.48; cursor:not-allowed; }
+    .type-option.disabled:hover { transform:none; border-color:var(--line); background:var(--soft); }
+
+    .config-dialog {
+      width:min(760px, calc(100vw - 34px));
+      max-height:calc(100vh - 40px);
+      overflow:auto;
+      padding:20px;
+      border-radius:21px;
+      background:white;
+      box-shadow:0 28px 80px rgba(17,44,36,.25);
+      animation:cardIn .22s ease both;
+    }
+    .config-type { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+    .config-type-badge { padding:5px 8px; border-radius:7px; background:var(--primary-soft); color:var(--primary); font-size:8.5px; font-weight:900; }
+    .config-type-source { color:var(--faint); font-size:8.5px; }
+    .config-section { margin-top:13px; }
+    .config-section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
+    .config-section-title strong { font-size:11px; }
+    .config-section-title span { color:var(--faint); font-size:8px; }
+    .module-options { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .module-check { display:flex; align-items:center; gap:7px; padding:8px 9px; border:1px solid var(--line); border-radius:9px; background:var(--soft); color:var(--ink); font-size:9px; cursor:pointer; }
+    .module-check input { accent-color:var(--primary); }
+    .preset-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .preset-chip { padding:7px 9px; border:1px solid var(--line); border-radius:999px; background:white; color:var(--muted); font-size:8.5px; font-weight:800; }
+    .preset-chip.active { border-color:#9ec8ba; background:var(--primary-soft); color:var(--primary-deep); }
+    .custom-prompt {
+      width:100%;
+      min-height:74px;
+      resize:vertical;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:var(--soft);
+      color:var(--ink);
+      font-size:9.5px;
+      line-height:1.6;
+    }
+    .custom-prompt:focus { outline:none; border-color:#9ec8ba; box-shadow:0 0 0 3px rgba(23,108,91,.07); }
+    .remember-row { display:flex; align-items:center; gap:6px; margin-top:7px; color:var(--muted); font-size:8.5px; }
+    .remember-row input { accent-color:var(--primary); }
+    .research-row { display:flex; align-items:flex-start; gap:7px; margin-top:9px; padding:9px; border:1px solid #d7e4df; border-radius:9px; background:var(--primary-pale); color:#4d6d63; font-size:8.5px; line-height:1.5; }
+    .research-row input { margin-top:2px; accent-color:var(--primary); }
+    .config-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; padding-top:13px; border-top:1px solid var(--line); }
+    .import-tools { display:grid; grid-template-columns:1fr; gap:8px; }
+    .import-button {
+      min-height:42px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:var(--soft);
+      color:var(--ink);
+      font-size:9px;
+      font-weight:850;
+    }
+    .import-button:hover { border-color:#a7c9be; background:var(--primary-pale); }
+    .import-status { margin-top:7px; color:var(--muted); font-size:8px; line-height:1.5; }
+    .import-status.error { color:var(--red); }
+    .import-status.success { color:var(--primary); }
+
+    .output-dialog {
+      width:min(520px, calc(100vw - 34px));
+      padding:20px;
+      border-radius:22px;
+      background:white;
+      box-shadow:0 30px 85px rgba(16,43,35,.27);
+      animation:cardIn .22s ease both;
+    }
+    .output-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .output-dialog-head h2 { margin:0; font-size:19px; letter-spacing:-.03em; }
+    .output-dialog-head p { margin:5px 0 0; color:var(--muted); font-size:9px; }
+    .output-dialog-close { width:34px; height:34px; border:1px solid var(--line); border-radius:10px; background:var(--soft); color:var(--muted); font-size:18px; }
+    .output-dialog-close:disabled { opacity:.35; cursor:not-allowed; }
+    .output-target {
+      display:flex;
+      align-items:center;
+      gap:9px;
+      margin-top:15px;
+      padding:11px;
+      border:1px solid #cde0da;
+      border-radius:12px;
+      background:var(--primary-pale);
+    }
+    .output-target-dot { width:9px; height:9px; border-radius:50%; background:#2d9e75; box-shadow:0 0 0 4px rgba(45,158,117,.11); }
+    .output-target-copy { flex:1; }
+    .output-target-copy strong { display:block; font-size:10.5px; }
+    .output-target-copy span { display:block; margin-top:2px; color:var(--muted); font-size:8px; }
+    .output-target-mode { color:var(--primary); font-size:8px; font-weight:900; }
+    .output-state {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:14px;
+    }
+    .output-state-icon {
+      width:43px;
+      height:43px;
+      display:grid;
+      place-items:center;
+      border-radius:13px;
+      background:var(--primary-soft);
+      color:var(--primary);
+    }
+    .output-state-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .output-state-icon.paused { background:var(--amber-soft); color:var(--amber); }
+    .output-state-icon.stopped { background:var(--red-soft); color:var(--red); }
+    .output-state-copy { flex:1; }
+    .output-state-copy strong { display:block; font-size:12px; }
+    .output-state-copy span { display:block; margin-top:3px; color:var(--muted); font-size:8.5px; }
+    .progress-meta { display:flex; justify-content:space-between; margin-top:15px; color:var(--muted); font-size:8.5px; }
+    .progress-meta strong { color:var(--ink); }
+    .progress-track { height:8px; margin-top:7px; overflow:hidden; border-radius:999px; background:#e8efec; }
+    .progress-fill { width:0; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--primary),#4db89f); transition:width .1s linear; }
+    .output-speed {
+      margin-top:15px;
+      padding:11px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:var(--soft);
+    }
+    .output-speed-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .output-speed-head strong { font-size:10px; }
+    .output-speed-value { padding:4px 7px; border-radius:6px; background:var(--primary-soft); color:var(--primary); font-size:8.5px; font-weight:900; }
+    .output-speed input { width:100%; margin:10px 0 1px; accent-color:var(--primary); }
+    .speed-range-labels { display:flex; justify-content:space-between; color:var(--faint); font-size:7.5px; }
+    .speed-warning { margin-top:5px; color:var(--amber); font-size:7.5px; line-height:1.45; }
+    .output-controls { display:grid; grid-template-columns:1fr 1.2fr 1fr; gap:8px; margin-top:15px; }
+    .output-controls .button { min-height:43px; font-size:10px; }
+    .output-controls .button.primary:disabled, .output-controls .button.secondary:disabled { opacity:.4; cursor:not-allowed; }
+    .generation-dialog {
+      width:min(500px, calc(100vw - 34px));
+      padding:20px;
+      border-radius:21px;
+      background:white;
+      box-shadow:0 30px 85px rgba(16,43,35,.27);
+      animation:cardIn .22s ease both;
+    }
+    .generation-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .generation-head h2 { margin:0; font-size:19px; letter-spacing:-.03em; }
+    .generation-head p { margin:5px 0 0; color:var(--muted); font-size:9px; }
+    .generation-close { width:34px; height:34px; border:1px solid var(--line); border-radius:10px; background:var(--soft); color:var(--muted); font-size:18px; }
+    .generation-close:disabled { opacity:.35; cursor:not-allowed; }
+    .generation-model {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:15px;
+      padding:11px;
+      border:1px solid #d4e4de;
+      border-radius:11px;
+      background:var(--primary-pale);
+    }
+    .generation-model-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:var(--primary-soft); color:var(--primary); }
+    .generation-model-icon svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .generation-model-copy strong { display:block; font-size:10.5px; }
+    .generation-model-copy span { display:block; margin-top:2px; color:var(--muted); font-size:8.5px; }
+    .generation-progress-head { display:flex; justify-content:space-between; margin-top:16px; color:var(--muted); font-size:9px; }
+    .generation-progress-head strong { color:var(--ink); }
+    .generation-track { height:9px; margin-top:7px; overflow:hidden; border-radius:999px; background:#e8efec; }
+    .generation-fill { width:0; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--primary),#59c4a9); transition:width .3s ease; }
+    .generation-stage { margin-top:12px; padding:10px; border-radius:10px; background:var(--soft); color:var(--muted); font-size:9px; line-height:1.55; }
+    .generation-stage.error { background:var(--red-soft); color:var(--red); }
+    .generation-ready-bar {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin:10px 14px 0;
+      padding:9px 10px;
+      border:1px solid #c9e2d9;
+      border-radius:10px;
+      background:var(--primary-pale);
+      color:var(--primary-deep);
+      font-size:8.5px;
+      font-weight:800;
+    }
+    .generation-ready-bar svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }
+
+    .toast {
+      position:fixed;
+      z-index:50;
+      left:50%;
+      bottom:25px;
+      transform:translate(-50%, 13px);
+      padding:9px 13px;
+      border-radius:9px;
+      background:#153e35;
+      color:white;
+      font-size:9.5px;
+      font-weight:800;
+      opacity:0;
+      pointer-events:none;
+      transition:.2s ease;
+      box-shadow:0 12px 28px rgba(13,44,35,.22);
+    }
+    .toast.show { opacity:1; transform:translate(-50%, 0); }
+
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns:minmax(320px, .9fr) minmax(420px, 1.1fr); }
+      .patient-context { min-width:180px; }
+      .topbar { padding:0 12px; gap:9px; }
+    }
+
+    @media (max-width: 760px) {
+      html, body { height:100%; overflow:hidden; }
+      .app { height:100vh; height:100dvh; min-height:0; padding:7px; gap:7px; }
+      .topbar {
+        min-height:54px;
+        flex:0 0 54px;
+        padding:6px 9px;
+        gap:7px;
+        border-radius:16px;
+        flex-wrap:nowrap;
+      }
+      .back { width:36px; height:36px; border-radius:10px; }
+      .patient-context { min-width:0; flex:1; }
+      .eyebrow { display:none; }
+      .patient-line h1 { font-size:16px; }
+      .patient-line span { display:block; max-width:180px; overflow:hidden; font-size:8px; white-space:nowrap; text-overflow:ellipsis; }
+      .top-divider { display:none; }
+      .doc-title-block, .connection { display:none; }
+      .top-spacer { display:none; }
+      .topbar > .button { min-height:35px; padding:0 9px; font-size:9px; }
+      .workspace {
+        flex:1;
+        min-height:0;
+        display:flex;
+        flex-direction:column;
+        gap:7px;
+        padding:0;
+      }
+      .pane {
+        min-height:0;
+        margin:0;
+        border-radius:16px;
+      }
+      .input-pane { flex:0.9; }
+      .output-pane { flex:1.1; }
+      .pane-head { min-height:48px; padding:0 11px; gap:8px; }
+      .pane-icon { width:30px; height:30px; border-radius:9px; }
+      .pane-title h2 { font-size:13px; }
+      .pane-title p { display:none; }
+      .count-badge { padding:4px 6px; font-size:8px; }
+      .pane-scroll { padding:9px 9px 65px; }
+      .fab { width:44px; height:44px; bottom:11px; }
+      .fab.input-add { left:11px; }
+      .fab.output-add { right:11px; }
+      .fab svg { width:20px; height:20px; }
+      .input-card { padding:10px 11px; margin-bottom:7px; border-radius:12px; }
+      .input-title { margin:6px 0 4px; font-size:10.5px; }
+      .input-content { font-size:9px; line-height:1.55; }
+      .empty-output { min-height:170px; padding:16px; }
+      .empty-illustration { width:52px; height:52px; border-radius:17px; }
+      .empty-illustration svg { width:25px; height:25px; }
+      .empty-output h3 { margin:11px 0 5px; font-size:12px; }
+      .empty-output p { font-size:8.5px; }
+      .document-head { padding:10px 11px; }
+      .document-heading h3 { font-size:12px; }
+      .document-heading p { font-size:7.5px; }
+      .output-document-button { min-height:27px; padding:0 7px; font-size:7.5px; }
+      .section-block { padding:10px 11px; }
+      .section-title { font-size:10px; }
+      .section-copy { font-size:9px; line-height:1.6; }
+      .prompt-row { margin-top:7px; padding:6px 7px; }
+      .type-grid { grid-template-columns:1fr 1fr; }
+      .config-dialog, .type-dialog, .output-dialog { max-height:calc(100vh - 24px); overflow:auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <button class="back" onclick="returnToPatientDetail()" aria-label="返回">
+        <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="patient-context">
+        <p class="eyebrow">MEDICAL RECORD WORKSPACE</p>
+        <div class="patient-line"><h1 id="workspacePatientName">王建国</h1><span id="workspacePatientMeta">男 · 67岁 · 内科一病区 08床</span></div>
+      </div>
+      <div class="top-divider"></div>
+      <div class="doc-title-block">
+        <div class="doc-title">病历书写</div>
+        <div class="doc-subtitle">原始资料与结构化文书并行编辑</div>
+      </div>
+      <div class="top-spacer"></div>
+      <div class="connection"><span class="connection-dot"></span> 手机蓝牙 HID 已连接</div>
+      <button class="button secondary" onclick="showToast('草稿已保存')">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        保存草稿
+      </button>
+    </header>
+
+    <section class="workspace">
+      <article class="pane input-pane">
+        <header class="pane-head">
+          <span class="pane-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+          </span>
+          <div class="pane-title">
+            <h2>输入资料</h2>
+            <p>对话、查体、检验与会诊结论，按时间顺序记录</p>
+          </div>
+          <span class="count-badge" id="inputCount">3 条资料</span>
+        </header>
+
+        <div class="pane-scroll" id="inputScroll">
+          <div id="inputList">
+            <article class="input-card">
+              <div class="input-meta"><span class="type-tag">对话</span><span class="input-time">今天 08:16</span></div>
+              <div class="input-title">患者主诉与现病史</div>
+              <p class="input-content">患者诉 3 天前受凉后出现发热、咳嗽，最高体温 38.6℃，伴咳黄白色黏痰，活动后轻度气促。无胸痛、咯血。自服感冒药后症状无明显缓解。</p>
+            </article>
+            <article class="input-card">
+              <div class="input-meta"><span class="type-tag exam">查体</span><span class="input-time">今天 08:21</span></div>
+              <div class="input-title">专科查体</div>
+              <p class="input-content">神清，精神一般。双肺呼吸音粗，右下肺可闻及少量湿啰音。舌红，苔薄黄腻，脉滑数。</p>
+            </article>
+            <article class="input-card">
+              <div class="input-meta"><span class="type-tag result">检验检查</span><span class="input-time">今天 08:24</span></div>
+              <div class="input-title">辅助检查结果</div>
+              <p class="input-content">胸部 CT：右肺下叶斑片状高密度影，考虑感染性病变。血常规：白细胞 11.8×10⁹/L，中性粒细胞比例 78%。</p>
+            </article>
+          </div>
+
+          <section class="composer" id="inputComposer">
+            <label class="composer-label" id="composerLabel" for="inputText">新增患者相关资料</label>
+            <textarea id="inputText" placeholder="可输入：与病人的对话、现病史、查体描述、即将录入的检验检查结果、既往史等任何相关资料。"></textarea>
+            <div class="composer-actions">
+              <button class="button secondary" onclick="cancelInput()">取消</button>
+              <button class="button primary" id="saveInputButton" onclick="saveInput()">保存为一条资料</button>
+            </div>
+          </section>
+        </div>
+
+        <button class="fab input-add" onclick="openInputComposer()" aria-label="新增输入资料">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </article>
+
+      <article class="pane output-pane">
+        <header class="pane-head">
+          <span class="pane-icon output">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>
+          </span>
+          <div class="pane-title">
+            <h2>病历输出</h2>
+            <p>根据左侧原始资料生成规范文书</p>
+          </div>
+          <span class="count-badge" id="outputCount">未生成</span>
+        </header>
+
+        <div class="output-tabs" id="outputTabs" style="display:none"></div>
+
+        <div class="pane-scroll" id="outputScroll">
+          <section class="empty-output" id="emptyOutput">
+            <div class="empty-illustration">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+            </div>
+            <h3>还没有生成病历文书</h3>
+            <p>点击右下角蓝色加号，选择需要生成的文书类型。系统会读取左侧已保存的患者资料。</p>
+          </section>
+
+          <section class="document" id="admissionDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3>入院记录</h3>
+                <p>基于 3 条输入资料 · 中医住院病历规范</p>
+              </div>
+              <div class="document-actions">
+                <button class="icon-action" title="复制" onclick="showToast('已复制入院记录')">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <button class="icon-action" title="发送到电脑" onclick="showToast('入院记录已发送到电脑')">
+                  <svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 21h14"/></svg>
+                </button>
+              </div>
+            </header>
+            <div class="doc-note">
+              <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+              依据《病历书写基本规范》《中医病历书写基本规范》组织字段。生成内容需由医师核对后签名。
+            </div>
+            <div id="admissionSections"></div>
+          </section>
+
+          <section class="document" id="firstCourseDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3>首次病程记录</h3>
+                <p>住院大病例 · 中医辨病辨证与西医诊断并行</p>
+              </div>
+              <div class="document-actions">
+                <button class="icon-action" title="复制" onclick="showToast('已复制首次病程记录')">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <button class="icon-action" title="发送到电脑" onclick="showToast('首次病程记录已发送到电脑')">
+                  <svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 21h14"/></svg>
+                </button>
+              </div>
+            </header>
+            <div class="doc-note">
+              <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+              每个栏目可分别追加生成要求，例如“言简意赅”“引经据典”“增加鉴别诊断”。
+            </div>
+            <div id="firstCourseSections"></div>
+          </section>
+
+          <section class="document" id="consentDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3>手术同意书</h3>
+                <p>医生确认手术方案 · 汇总全部资料后生成告知内容</p>
+              </div>
+              <div class="document-actions">
+                <button class="icon-action" title="打印预览" onclick="showToast('手术同意书打印预览')">
+                  <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                </button>
+              </div>
+            </header>
+            <div class="doc-note">
+              <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+              本模块只生成知情告知文本，不代替医生说明、患者自主选择和签字确认。
+            </div>
+            <section class="consent-editor">
+              <div class="consent-editor-head">
+                <div>
+                  <h4>AI 从自然语言资料中提取手术方案</h4>
+                  <p>在左侧对话框直接描述推荐方案和备选方案，可提供一个、两个、三个或更多；数量和名称由模型自动识别。</p>
+                </div>
+                <span class="recommended-badge">自然语言提取</span>
+              </div>
+              <div class="source-strip" style="margin:10px 0 0">
+                <span>示例：</span><b>推荐某手术，备选某方法，同时考虑另一方案</b>
+              </div>
+              <div class="consent-tools">
+                <label class="web-toggle"><input type="checkbox" id="onlineResearch" checked> 联网检索指南与风险信息</label>
+                <button class="button primary" onclick="generateConsent()">汇总资料并生成</button>
+              </div>
+            </section>
+            <div class="source-strip">
+              <span>引用来源：</span><b>左侧全部输入</b><b>已生成文书</b><b id="consentSourceCount">3 条原始资料</b>
+            </div>
+            <div class="consent-output" id="consentOutput">
+              <div class="section-block">
+                <div class="section-title-row"><h4 class="section-title">疾病介绍</h4><span class="required">200–300 字</span><span class="char-target" id="diseaseCharCount">0 字</span></div>
+                <p class="section-copy" id="diseaseIntro"></p>
+                <div class="prompt-row">
+                  <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                  <input placeholder="附加要求：如面向非医学背景患者、语言更通俗">
+                  <button class="apply-prompt" onclick="showToast('已记录疾病介绍的附加要求')">应用</button>
+                </div>
+              </div>
+              <div id="surgeryPlanSections"></div>
+              <div class="section-block">
+                <div class="section-title-row"><h4 class="section-title">手术相关风险</h4><span class="required">重点风险</span></div>
+                <p class="section-copy" id="surgeryRisks"></p>
+                <div class="source-strip" style="margin:8px 0 0"><span>检索依据：</span><b>患者资料</b><b>手术方案</b><b id="researchSourceLabel">联网资料待核对</b></div>
+                <div class="prompt-row">
+                  <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                  <input placeholder="附加要求：如按严重程度分层、补充麻醉和输血风险">
+                  <button class="apply-prompt" onclick="showToast('已记录手术风险的附加要求')">应用</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="document" id="preopSummaryDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3>术前小结</h3>
+                <p>汇总全部输入、已生成文书及手术同意书</p>
+              </div>
+            </header>
+            <div class="dependency" id="summaryDependency">
+              <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+              <span>需先完成手术同意书。当前只引用已给出的患者资料和已生成内容。</span>
+            </div>
+            <div class="source-strip"><span>引用来源：</span><b>全部原始输入</b><b>既往输出文书</b><b>手术同意书</b></div>
+            <div id="preopSummarySections"></div>
+          </section>
+
+          <section class="document" id="preopDiscussionDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3>术前讨论</h3>
+                <p>仅生成术中术后风险与特殊术前准备</p>
+              </div>
+            </header>
+            <div class="dependency" id="discussionDependency">
+              <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+              <span>术前讨论依赖术前小结和手术同意书；缺失的内容会明确提示，不自动编造。</span>
+            </div>
+            <div class="source-strip"><span>引用来源：</span><b>术前小结</b><b>手术同意书</b><b>患者全部资料</b></div>
+            <div id="preopDiscussionSections"></div>
+          </section>
+
+          <section class="document" id="genericDoc">
+            <header class="document-head">
+              <div class="document-heading">
+                <h3 id="genericTitle">普通病程记录</h3>
+                <p id="genericDescription">根据左侧资料生成</p>
+              </div>
+            </header>
+            <div id="genericSections"></div>
+          </section>
+        </div>
+
+        <button class="fab output-add" onclick="openTypeDialog()" aria-label="新建病历输出">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </article>
+    </section>
+  </main>
+
+  <div class="overlay" id="typeOverlay" onclick="closeTypeDialog()">
+    <section class="type-dialog" onclick="event.stopPropagation()">
+      <div class="dialog-head">
+        <div><h2>新建病历文书</h2><p>选择需要根据左侧资料生成的文书类型</p></div>
+        <button class="close" onclick="closeTypeDialog()">×</button>
+      </div>
+      <div class="type-grid">
+        <button class="type-option" onclick="createDocument('admission')"><strong>入院记录</strong><span>主诉、病史、查体与辅助检查</span></button>
+        <button class="type-option" onclick="createDocument('first')"><strong>首次病程记录</strong><span>中医辨证、西医诊断与诊疗计划</span></button>
+        <button class="type-option" onclick="createDocument('progress')"><strong>普通病程记录</strong><span>病情变化、查体与处理计划</span></button>
+        <button class="type-option" onclick="createDocument('preop-discussion')"><strong>术前讨论</strong><span>术中术后风险与特殊术前准备</span></button>
+        <button class="type-option" onclick="createDocument('preop-summary')"><strong>术前小结</strong><span>手术困难、并发症预防与术前查看</span></button>
+        <button class="type-option" onclick="createDocument('operation')"><strong>手术记录</strong><span>手术经过、术中所见与标本</span></button>
+        <button class="type-option" onclick="createDocument('consent')"><strong>手术同意书</strong><span>方案比较、疾病介绍与相关风险</span></button>
+        <button class="type-option" onclick="createDocument('discharge')"><strong>出院小结</strong><span>诊疗经过、出院诊断与医嘱</span></button>
+        <button class="type-option" onclick="createDocument('difficult')"><strong>疑难病例讨论</strong><span>讨论目的、意见与结论</span></button>
+        <button class="type-option disabled" disabled><strong>其他</strong><span>暂不开放</span></button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="configOverlay" onclick="closeOutputConfig()">
+    <section class="config-dialog" onclick="event.stopPropagation()">
+      <div class="dialog-head">
+        <div>
+          <h2>生成设置</h2>
+          <p>选择本次输出范围和提示词，确认后才会生成文书</p>
+        </div>
+        <button class="close" onclick="closeOutputConfig()">×</button>
+      </div>
+      <div class="config-type">
+        <span class="config-type-badge" id="configTypeLabel">首次病程记录</span>
+        <span class="config-type-source">将读取左侧已保存的患者资料和依赖文书</span>
+      </div>
+
+      <section class="config-section">
+        <div class="config-section-title"><strong>本次输出栏目</strong><span>取消勾选后不输出该栏目</span></div>
+        <div class="module-options" id="configModules"></div>
+        <div class="source-strip" style="margin:9px 0 0">
+          <span>资料使用：</span><b>全部时间线可用</b><b>模型按当前文书筛选相关内容</b>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <div class="config-section-title"><strong>当前书写规范</strong><span>在主界面“书写规范”中统一设置</span></div>
+        <div class="import-status success" id="globalWritingSkill">未配置 Markdown Skill</div>
+      </section>
+
+      <section class="config-section">
+        <div class="config-section-title"><strong>预设提示词</strong><span>可多选</span></div>
+        <div class="preset-chips" id="presetChips"></div>
+      </section>
+
+      <section class="config-section">
+        <div class="config-section-title"><strong>补充自然语言资料</strong><span>与左侧全部资料一起作为本次事实来源</span></div>
+        <textarea class="custom-prompt" id="supplementalNarrativeInput" placeholder="例如生成手术同意书时：我想优先做某某手术，备选方案是某某方法；患者家属更关心恢复时间和再次手术风险。这里写的所有内容仍会和左侧已保存资料一起分析。"></textarea>
+      </section>
+
+      <section class="config-section">
+        <div class="config-section-title"><strong>附加输出要求</strong><span>仅作用于本次文书</span></div>
+        <textarea class="custom-prompt" id="customPromptInput" placeholder="例如：只保留与本次诊疗相关的内容；中医辨证需要引经据典；鉴别诊断至少列出三项。"></textarea>
+        <label class="remember-row"><input type="checkbox" id="rememberPromptCheck"> 记住此文书类型的栏目和提示词</label>
+        <label class="research-row"><input type="checkbox" id="onlineResearchToggle"> <span>允许联网检索医学指南、综述和公开病例，仅用于补充鉴别诊断参考。检索结果会标注为外部资料，仍需医生核对。</span></label>
+      </section>
+
+      <div class="config-actions">
+        <button class="button secondary" onclick="closeOutputConfig()">取消</button>
+        <button class="button primary" onclick="confirmOutputConfig()">
+          <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+          按设置生成
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="generationOverlay">
+    <section class="generation-dialog">
+      <div class="generation-head">
+        <div>
+          <h2 id="generationTitle">正在生成病历</h2>
+          <p id="generationDocumentName">正在读取左侧患者资料</p>
+        </div>
+        <button class="generation-close" id="generationCloseButton" onclick="closeGenerationDialog()" disabled>×</button>
+      </div>
+      <div class="generation-model">
+        <span class="generation-model-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+        </span>
+        <span class="generation-model-copy"><strong id="generationModelName">DeepSeek / 小米 MiMo</strong><span>使用键盘与模型设置中的 API Token</span></span>
+      </div>
+      <div class="generation-progress-head"><span>生成进度</span><strong id="generationPercent">0%</strong></div>
+      <div class="generation-track"><div class="generation-fill" id="generationFill"></div></div>
+      <div class="generation-stage" id="generationStage">正在汇总患者资料…</div>
+    </section>
+  </div>
+
+  <div class="overlay" id="outputOverlay">
+    <section class="output-dialog">
+      <div class="output-dialog-head">
+        <div>
+          <h2 id="outputDialogTitle">正在输出</h2>
+          <p id="outputDocumentName">正在把病历发送到目标终端</p>
+        </div>
+        <button class="output-dialog-close" id="outputCloseButton" onclick="closeOutputDialog()" disabled>×</button>
+      </div>
+      <div class="output-target">
+        <span class="output-target-dot"></span>
+        <span class="output-target-copy">
+          <strong id="outputTargetName">手机蓝牙 HID</strong>
+          <span>目标终端来自主界面的“键盘与模型设置”</span>
+        </span>
+        <span class="output-target-mode">已连接</span>
+      </div>
+      <div class="output-state">
+        <span class="output-state-icon" id="outputStateIcon">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 21h14"/></svg>
+        </span>
+        <span class="output-state-copy">
+          <strong id="outputStateTitle">正在输出</strong>
+          <span id="outputStateDetail">内容将按当前速度写入目标电脑</span>
+        </span>
+      </div>
+      <div class="progress-meta">
+        <span>输出进度</span>
+        <span><strong id="outputProgressText">0 / 0 字</strong> · <strong id="outputProgressPercent">0%</strong></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="outputProgressFill"></div></div>
+      <div class="output-speed">
+        <div class="output-speed-head"><strong>输出速度</strong><span class="output-speed-value" id="outputSpeedValue">5</span></div>
+        <input type="range" id="outputSpeedRange" min="1" max="10" value="5" oninput="updateOutputSpeed(this.value)">
+        <div class="speed-range-labels"><span>稳定</span><span>默认</span><span>快速</span></div>
+        <div class="speed-warning">第 8 档为稳定上限；第 9、10 档突破保护下限，最高约为旧版两倍，可能因蓝牙链路丢字。</div>
+      </div>
+      <div class="output-controls">
+        <button class="button secondary" id="pauseButton" onclick="togglePause()">暂停</button>
+        <button class="button danger-soft" id="stopButton" onclick="stopOutput()">完全停止</button>
+        <button class="button primary" id="restartButton" onclick="startOutputSession()">重新输出</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const admissionSections = [
+      ["主诉", "患者因“发热、咳嗽伴咳痰 3 天”入院。"],
+      ["现病史", "患者 3 天前受凉后出现发热，最高体温 38.6℃，伴咳嗽、咳黄白色黏痰，活动后轻度气促，无胸痛、咯血。自服感冒药后症状无明显缓解，为进一步诊治来院。发病以来精神一般，食欲减退，睡眠尚可，二便无明显异常。"],
+      ["既往史", "既往史内容尚待从左侧原始资料补充。若有高血压、糖尿病、手术、输血及药物过敏史，应逐项列明。"],
+      ["个人史", "长期居住地、职业及生活习惯按已录入资料整理。"],
+      ["家族史", "家族史按已录入资料整理；未提及明确阳性家族史时不展开相关疾病。"],
+      ["月经史", "男性患者，月经史不适用。"],
+      ["生育史", "生育史按已录入资料整理。"],
+      ["专科查体", "神清，精神一般。双肺呼吸音粗，右下肺可闻及少量湿啰音。"],
+      ["辅助检查", "胸部 CT 示右肺下叶斑片状高密度影，考虑感染性病变；血常规示白细胞 11.8×10⁹/L，中性粒细胞比例 78%。"]
+    ];
+
+    const firstCourseSections = [
+      ["中医辨病辨证依据", "患者以发热、咳嗽、咳痰为主症，可归属于中医“咳嗽”范畴。结合受凉后起病、咳黄白黏痰、舌红苔薄黄腻、脉滑数，辨证考虑痰热壅肺。病位在肺，病性属实，当前以痰热为主要病理因素。"],
+      ["中医鉴别诊断", "需与肺痨、肺胀、喘证等鉴别。肺痨多病程迁延并伴潮热、盗汗、消瘦；肺胀多有长期咳喘及桶状胸；喘证以呼吸困难为主症。本例急性起病，需结合影像和病原学检查进一步鉴别。"],
+      ["西医诊断依据", "1. 急性起病，发热、咳嗽、咳黄白痰并活动后气促；2. 右下肺可闻及湿啰音；3. 白细胞及中性粒细胞比例升高；4. 胸部 CT 见右肺下叶斑片状感染性病变。"],
+      ["西医鉴别诊断", "需与肺结核、肺栓塞、肺部肿瘤及非感染性间质性病变鉴别。结合发热、炎症指标升高和影像表现，当前首先考虑社区获得性肺炎，后续依据病原学、影像演变及治疗反应进一步排除其他疾病。"],
+      ["诊疗计划", "1. 完善血培养、痰病原学及炎症指标等检查；2. 评估氧合及病情严重程度；3. 按规范制定抗感染方案；4. 中医以清热化痰、宣肺止咳为治法，具体方药由医师辨证确定；5. 监测体温、呼吸症状及药物不良反应，及时调整诊疗方案。"]
+    ];
+
+    const preopSummarySections = [
+      ["手术困难和预防并发症的措施及注意事项", "结合已录入术式与患者全部资料，手术难点主要包括患者基础状况、重要脏器功能、局部解剖条件和围术期耐受性。应完成术前风险评估，纠正可逆性异常，准备血液制品并核对抗菌药物过敏史。术中注意精细止血、保护重要神经血管，维持体温与循环稳定；术后重点预防感染、深静脉血栓、坠积性肺炎和康复延迟，并制定具体监测频次与应急预案。"],
+      ["手术者术前查看患者相关情况", "手术者已于术前查看患者，核对身份、手术部位与侧别、诊断和影像资料，确认手术指征、推荐术式及备选方案。已了解过敏史、既往病史、当前用药、实验室检查与重要脏器功能，查看知情同意书和术前准备完成情况。"]
+    ];
+
+    const preopDiscussionSections = [
+      ["术中及术后可能出现的风险及应对措施", "术中可能发生麻醉意外、出血量增加、邻近神经血管或组织损伤、局部解剖变异导致操作困难及术式调整。术后可能出现感染、血肿、血栓栓塞、重要脏器功能异常、疼痛控制不佳、功能恢复延迟及再次手术风险。应对措施包括术前充分评估与备血、术中精细操作和实时监测、术后按风险分层开展生命体征监测、感染和血栓预防、疼痛管理及康复评估；出现异常时及时启动多学科处置。"],
+      ["特殊的术前准备内容", "根据最终术式与患者合并症，需核对影像和植入物规格，确认血液制品、抗菌药物使用时机和过敏替代方案，评估抗凝或抗血小板药物调整，完成麻醉与重要脏器功能评估。术前向患者及家属说明推荐方案、备选方案、预期获益和主要风险，确认特殊设备、耗材和术后监护资源。具体准备项目需由手术团队结合本院规范确认。"]
+    ];
+
+    const genericSpecs = {
+      progress: {
+        title: "普通病程记录",
+        description: "病情变化、查体、分析与处理",
+        sections: ["病情变化", "查体与生命体征", "辅助检查", "病情分析", "诊疗计划"]
+      },
+      "preop-discussion": {
+        title: "术前讨论",
+        description: "手术指征、风险、术式与讨论结论",
+        sections: []
+      },
+      "preop-summary": {
+        title: "术前小结",
+        description: "术前评估、准备与患者知情情况",
+        sections: []
+      },
+      operation: {
+        title: "手术记录",
+        description: "手术经过、术中所见与标本处理",
+        sections: ["一般项目", "术前诊断", "术中诊断", "手术名称", "术者及助手", "麻醉方式", "手术经过", "术中所见", "标本处理", "术后处理"]
+      },
+      discharge: {
+        title: "出院小结",
+        description: "住院经过、出院诊断与随访计划",
+        sections: ["入院情况", "入院诊断", "诊疗经过", "出院诊断", "出院情况", "出院医嘱", "复诊建议"]
+      },
+      difficult: {
+        title: "疑难病例讨论",
+        description: "讨论目的、意见与最终结论",
+        sections: ["讨论时间与地点", "参加人员", "病例摘要", "讨论目的", "各发言人意见", "讨论结论", "后续诊疗计划"]
+      }
+    };
+
+    let inputSequence = 3;
+    let editingInputId = null;
+    let demoInputSequence = 100;
+    const createdDocuments = new Set();
+    let consentGenerated = false;
+    const pendingGenerations = new Map();
+    let generationTimer = null;
+    let generationProgress = 0;
+    let generationBusy = false;
+    let pendingOutputType = null;
+    const outputConfigs = {};
+    const rememberedConfigs = loadRememberedConfigs();
+    let activeOutputDocId = null;
+    let activeOutputText = "";
+    let outputCharIndex = 0;
+    let activeOutputTotal = 0;
+    let activeOutputCallbackId = null;
+    let outputStatusMessage = "";
+    let outputTimer = null;
+    let outputState = "idle";
+
+    const outputTypeLabels = {
+      admission:"入院记录",
+      first:"首次病程记录",
+      progress:"普通病程记录",
+      "preop-discussion":"术前讨论",
+      "preop-summary":"术前小结",
+      operation:"手术记录",
+      consent:"手术同意书",
+      discharge:"出院小结",
+      difficult:"疑难病例讨论"
+    };
+    const workspaceParams = new URLSearchParams(location.search);
+    const workspacePatientId = workspaceParams.get("patientId");
+    const workspacePatientName = workspaceParams.get("patientName");
+    const workspacePatientMeta = workspaceParams.get("patientMeta");
+    const workspaceOpenType = workspaceParams.get("openType");
+    const workspaceInputKey = workspacePatientId ? `careflow-record-inputs-${workspacePatientId}` : null;
+    const workspaceDocumentsKey = workspacePatientId ? `careflow-record-documents-${workspacePatientId}` : null;
+    if (workspacePatientName) {
+      document.getElementById("workspacePatientName").textContent = workspacePatientName;
+    }
+    if (workspacePatientMeta) {
+      document.getElementById("workspacePatientMeta").textContent = workspacePatientMeta;
+    }
+
+    function loadWorkspaceInputs() {
+      if (!workspaceInputKey) return;
+      try {
+        let saved = JSON.parse(localStorage.getItem(workspaceInputKey) || "[]");
+        if (!Array.isArray(saved)) return;
+        saved = saved.map((item, index) => {
+          const parsedTime = Date.parse(item.time || "");
+          return {
+            id: item.id || `input-${Date.now()}-${index}`,
+            title: item.title || `资料 ${index + 1}`,
+            content: String(item.content || ""),
+            timestamp: Number(item.timestamp) || (Number.isFinite(parsedTime) ? parsedTime : Date.now() + index),
+            time: item.time || new Date(Number(item.timestamp) || Date.now() + index).toLocaleString("zh-CN")
+          };
+        }).sort((a, b) => a.timestamp - b.timestamp);
+        localStorage.setItem(workspaceInputKey, JSON.stringify(saved));
+        document.getElementById("inputList").innerHTML = "";
+        saved.forEach(item => {
+          appendWorkspaceInputCard(item);
+        });
+        updateInputCount();
+      } catch { }
+    }
+
+    function appendWorkspaceInputCard(item) {
+      const card = document.createElement("article");
+      card.className = "input-card";
+      card.dataset.inputId = item.id;
+      card.dataset.timestamp = String(item.timestamp);
+      card.innerHTML = `
+        <div class="input-meta"><span class="type-tag">补充资料</span><span class="input-time">${escapeHtml(item.time)}</span></div>
+        <div class="input-title">${escapeHtml(item.title)}</div>
+        <p class="input-content">${escapeHtml(item.content)}</p>
+        <div class="input-tools"><button class="mini-button" onclick="event.stopPropagation();editInput('${item.id}')">编辑</button><button class="mini-button" onclick="event.stopPropagation();deleteInput('${item.id}')">删除</button></div>
+      `;
+      card.addEventListener("click", () => editInput(item.id));
+      document.getElementById("inputList").appendChild(card);
+    }
+
+    function persistWorkspaceInput(item) {
+      if (!workspaceInputKey) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem(workspaceInputKey) || "[]");
+        const index = saved.findIndex(existing => existing.id === item.id);
+        if (index >= 0) saved[index] = item;
+        else saved.push(item);
+        saved.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+        localStorage.setItem(workspaceInputKey, JSON.stringify(saved));
+      } catch { }
+    }
+
+    function loadWorkspaceDocuments() {
+      if (!workspaceDocumentsKey) return {};
+      try {
+        const saved = JSON.parse(localStorage.getItem(workspaceDocumentsKey) || "{}");
+        return saved && typeof saved === "object" ? saved : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function persistWorkspaceDocument(type, config, sections, extra = {}) {
+      if (!workspaceDocumentsKey) return;
+      try {
+        const saved = loadWorkspaceDocuments();
+        saved[type] = {
+          config,
+          sections,
+          extra,
+          generatedAt: Date.now()
+        };
+        localStorage.setItem(workspaceDocumentsKey, JSON.stringify(saved));
+        syncGeneratedDocumentsToNative();
+      } catch { }
+    }
+
+    function syncGeneratedDocumentsToNative() {
+      if (!workspaceDocumentsKey ||
+          typeof AndroidMedicalBridge === "undefined" ||
+          typeof AndroidMedicalBridge.syncGeneratedDocuments !== "function") {
+        return;
+      }
+      const saved = loadWorkspaceDocuments();
+      const documents = Object.entries(saved).map(([type, record]) => ({
+        type,
+        title: outputTypeLabels[type] || type,
+        sections: record.sections || [],
+        updatedAt: record.generatedAt || Date.now()
+      }));
+      AndroidMedicalBridge.syncGeneratedDocuments(JSON.stringify(documents));
+    }
+
+    const outputModuleOptions = {
+      admission: admissionSections.map(([title]) => title),
+      first: firstCourseSections.map(([title]) => title),
+      progress: ["病情变化", "查体与生命体征", "辅助检查", "病情分析", "诊疗计划"],
+      "preop-discussion": ["术中及术后可能出现的风险及应对措施", "特殊的术前准备内容"],
+      "preop-summary": ["手术困难和预防并发症的措施及注意事项", "手术者术前查看患者相关情况"],
+      operation: ["一般项目", "术前诊断", "术中诊断", "手术名称", "术者及助手", "麻醉方式", "手术经过", "术中所见", "标本处理", "术后处理"],
+      consent: ["疾病介绍", "方案比较", "手术相关风险"],
+      discharge: ["入院情况", "入院诊断", "诊疗经过", "出院诊断", "出院情况", "出院医嘱", "复诊建议"],
+      difficult: ["讨论时间与地点", "参加人员", "病例摘要", "讨论目的", "各发言人意见", "讨论结论", "后续诊疗计划"]
+    };
+
+    const builtInPrompts = [
+      ["concise", "言简意赅"],
+      ["tcm", "强化中医辨证"],
+      ["citation", "引经据典"],
+      ["differential", "增加鉴别诊断"],
+      ["risk", "按严重程度分层风险"],
+      ["patient", "面向患者通俗解释"],
+      ["onlyNew", "仅输出本次新增资料"]
+    ];
+
+    function openInputComposer() {
+      editingInputId = null;
+      document.getElementById("composerLabel").textContent = "新增患者相关资料";
+      document.getElementById("saveInputButton").textContent = "保存为一条资料";
+      document.getElementById("inputComposer").classList.add("open");
+      document.getElementById("inputText").value = "";
+      document.getElementById("inputText").focus();
+      document.getElementById("inputText").scrollIntoView({behavior:"smooth", block:"center"});
+    }
+
+    function cancelInput() {
+      document.getElementById("inputComposer").classList.remove("open");
+      document.getElementById("inputText").value = "";
+      editingInputId = null;
+      document.getElementById("composerLabel").textContent = "新增患者相关资料";
+      document.getElementById("saveInputButton").textContent = "保存为一条资料";
+    }
+
+    function saveInput() {
+      const value = document.getElementById("inputText").value.trim();
+      if (!value) {
+        showToast("请先输入患者相关资料");
+        return;
+      }
+      if (editingInputId) {
+        const saved = JSON.parse(localStorage.getItem(workspaceInputKey) || "[]");
+        const item = saved.find(entry => entry.id === editingInputId);
+        if (item) {
+          item.content = value;
+          persistWorkspaceInput(item);
+          const card = document.querySelector(`.input-card[data-input-id="${editingInputId}"]`);
+          if (card) card.querySelector(".input-content").textContent = value;
+          const originalTime = item.time;
+          cancelInput();
+          updateInputCount();
+          showToast(`内容已修改，原记录时间 ${originalTime} 保持不变`);
+          return;
+        }
+      }
+      inputSequence++;
+      const timestamp = Date.now();
+      const item = {
+        id: `input-${timestamp}-${Math.random().toString(16).slice(2)}`,
+        title: `患者相关资料 ${inputSequence}`,
+        content: value,
+        timestamp,
+        time: new Date(timestamp).toLocaleString("zh-CN")
+      };
+      persistWorkspaceInput(item);
+      appendWorkspaceInputCard(item);
+      cancelInput();
+      updateInputCount();
+      showToast("已保存为独立资料行");
+      document.querySelector(`.input-card[data-input-id="${item.id}"]`)?.scrollIntoView({behavior:"smooth", block:"nearest"});
+    }
+
+    function editInput(id) {
+      editingInputId = id;
+      const saved = workspaceInputKey
+        ? JSON.parse(localStorage.getItem(workspaceInputKey) || "[]")
+        : [];
+      const item = saved.find(entry => entry.id === id);
+      if (!item) {
+        showToast("该资料无法编辑，请重新录入");
+        return;
+      }
+      document.getElementById("inputText").value = item.content;
+      document.getElementById("composerLabel").textContent = `修改 ${item.time} 的资料（保留原时间）`;
+      document.getElementById("saveInputButton").textContent = "保存修改";
+      document.getElementById("inputComposer").classList.add("open");
+      document.getElementById("inputText").focus();
+      document.getElementById("inputComposer").scrollIntoView({behavior:"smooth", block:"center"});
+    }
+
+    function deleteInput(id) {
+      if (workspaceInputKey) {
+        const saved = JSON.parse(localStorage.getItem(workspaceInputKey) || "[]")
+          .filter(entry => entry.id !== id);
+        localStorage.setItem(workspaceInputKey, JSON.stringify(saved));
+      }
+      document.querySelector(`.input-card[data-input-id="${id}"]`)?.remove();
+      updateInputCount();
+      showToast("资料已删除");
+    }
+
+    function updateInputCount() {
+      const count = document.querySelectorAll("#inputList .input-card").length;
+      document.getElementById("inputCount").textContent = `${count} 条资料`;
+    }
+
+    function openTypeDialog() {
+      document.getElementById("typeOverlay").classList.add("open");
+    }
+
+    function closeTypeDialog() {
+      document.getElementById("typeOverlay").classList.remove("open");
+    }
+
+    function createDocument(type) {
+      closeTypeDialog();
+      pendingOutputType = type;
+      openOutputConfig(type);
+    }
+
+    function openOutputConfig(type) {
+      const remembered = rememberedConfigs[type] || {};
+      const selected = remembered.modules || outputModuleOptions[type] || [];
+      document.getElementById("configTypeLabel").textContent = outputTypeLabels[type] || "病历文书";
+      document.getElementById("configModules").innerHTML = (outputModuleOptions[type] || []).map(module =>
+        `<label class="module-check"><input type="checkbox" value="${escapeHtml(module)}" ${selected.includes(module) ? "checked" : ""}><span>${escapeHtml(module)}</span></label>`
+      ).join("");
+      document.getElementById("presetChips").innerHTML = builtInPrompts.map(([id, label]) =>
+        `<button class="preset-chip ${(remembered.prompts || []).includes(id) ? "active" : ""}" data-preset="${id}" onclick="togglePreset(this)">${label}</button>`
+      ).join("");
+      document.getElementById("customPromptInput").value = remembered.customPrompt || "";
+      document.getElementById("supplementalNarrativeInput").value =
+        remembered.supplementalNarrative || "";
+      document.getElementById("globalWritingSkill").textContent =
+        getGlobalWritingSkillLabel();
+      document.getElementById("rememberPromptCheck").checked = false;
+      document.getElementById("onlineResearchToggle").checked =
+        remembered.onlineResearch ?? ["admission", "first", "difficult"].includes(type);
+      document.getElementById("configOverlay").classList.add("open");
+    }
+
+    function closeOutputConfig() {
+      document.getElementById("configOverlay").classList.remove("open");
+      pendingOutputType = null;
+    }
+
+    function getGlobalWritingSkillLabel() {
+      try {
+        if (typeof AndroidMedicalBridge !== "undefined" &&
+            typeof AndroidMedicalBridge.getWritingSkillLabel === "function") {
+          return AndroidMedicalBridge.getWritingSkillLabel();
+        }
+      } catch { }
+      return "未配置 Markdown Skill";
+    }
+
+    function togglePreset(button) {
+      button.classList.toggle("active");
+    }
+
+    async function confirmOutputConfig() {
+      const modules = Array.from(document.querySelectorAll("#configModules input:checked")).map(input => input.value);
+      if (modules.length === 0) {
+        showToast("请至少选择一个输出栏目");
+        return;
+      }
+      const prompts = Array.from(document.querySelectorAll(".preset-chip.active")).map(button => button.dataset.preset);
+      const config = {
+        modules,
+        prompts,
+        supplementalNarrative: document.getElementById("supplementalNarrativeInput").value.trim(),
+        customPrompt: document.getElementById("customPromptInput").value.trim(),
+        onlineResearch: document.getElementById("onlineResearchToggle").checked
+      };
+      outputConfigs[pendingOutputType] = config;
+      if (document.getElementById("rememberPromptCheck").checked) {
+        rememberedConfigs[pendingOutputType] = config;
+        localStorage.setItem("careflow-medical-output-configs", JSON.stringify(rememberedConfigs));
+      }
+      const type = pendingOutputType;
+      document.getElementById("configOverlay").classList.remove("open");
+      pendingOutputType = null;
+      if (!hasNativeGeneration()) {
+        showToast("所有文书必须调用大模型生成，请先在安卓 App 中配置模型");
+        return;
+      }
+      if (type === "consent") {
+        generateDocument(type, config);
+      } else {
+        await generateNativeDocument(type, config);
+      }
+    }
+
+    function hasNativeGeneration() {
+      return typeof AndroidMedicalBridge !== "undefined" &&
+        typeof AndroidMedicalBridge.generateMedicalDocument === "function";
+    }
+
+    function collectPatientContext() {
+      return {
+        name: document.getElementById("workspacePatientName")?.textContent?.trim() || "",
+        meta: document.getElementById("workspacePatientMeta")?.textContent?.trim() || ""
+      };
+    }
+
+    function collectSourceInputs() {
+      return Array.from(document.querySelectorAll("#inputList .input-card"))
+        .sort((a, b) => Number(a.dataset.timestamp) - Number(b.dataset.timestamp))
+        .map(card => {
+          const time = new Date(Number(card.dataset.timestamp)).toLocaleString("zh-CN");
+          const content = card.querySelector(".input-content")?.textContent?.trim() || "";
+          return content ? `[${time}] ${content}` : "";
+        })
+        .filter(Boolean);
+    }
+
+    function collectPreviousOutputs() {
+      return Array.from(document.querySelectorAll(".document"))
+        .filter(doc => doc.querySelector(".generation-ready-bar"))
+        .flatMap(doc => {
+          const title = doc.querySelector(".document-heading h3")?.textContent?.trim() || "既往文书";
+          return Array.from(doc.querySelectorAll(".section-copy"))
+            .filter(element => element.offsetParent !== null)
+            .map(element => `${title}：${element.textContent.trim()}`);
+        });
+    }
+
+    function openGenerationDialog(type) {
+      generationBusy = true;
+      generationProgress = 5;
+      document.getElementById("generationTitle").textContent = "正在生成病历";
+      document.getElementById("generationDocumentName").textContent = `正在生成：${outputTypeLabels[type] || type}`;
+      document.getElementById("generationModelName").textContent = "当前已配置的大模型";
+      document.getElementById("generationStage").classList.remove("error");
+      document.getElementById("generationStage").textContent = "正在汇总左侧患者资料和既往输出…";
+      document.getElementById("generationCloseButton").disabled = true;
+      document.getElementById("generationOverlay").classList.add("open");
+      updateGenerationProgress(5);
+      clearInterval(generationTimer);
+      generationTimer = setInterval(() => {
+        if (!generationBusy || generationProgress >= 88) return;
+        generationProgress = Math.min(88, generationProgress + Math.max(2, Math.round((90 - generationProgress) / 7)));
+        updateGenerationProgress(generationProgress);
+      }, 420);
+    }
+
+    function updateGenerationProgress(value) {
+      generationProgress = value;
+      document.getElementById("generationPercent").textContent = `${value}%`;
+      document.getElementById("generationFill").style.width = `${value}%`;
+      const stage = document.getElementById("generationStage");
+      if (!stage.classList.contains("error")) {
+        if (value < 25) stage.textContent = "正在汇总左侧患者资料和既往输出…";
+        else if (value < 55) stage.textContent = "正在调用已选择的模型生成病历栏目…";
+        else if (value < 82) stage.textContent = "正在整理栏目内容并核对病历规范…";
+        else if (value < 100) stage.textContent = "正在校验生成结构与规范字段…";
+        else stage.textContent = "生成完成，可以开始输出。";
+      }
+    }
+
+    function requestNativeGeneration(type, config, plans = []) {
+      const callbackId = `medical-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const promptLabels = config.prompts
+        .map(id => builtInPrompts.find(item => item[0] === id)?.[1])
+        .filter(Boolean);
+      const sourceInputs = collectSourceInputs();
+      const patient = collectPatientContext();
+      const request = {
+        patient,
+        documentType: outputTypeLabels[type] || type,
+        modules: config.modules,
+        promptLabels,
+        supplementalNarrative: config.supplementalNarrative || "",
+        customPrompt: config.customPrompt || "",
+        sourceInputs,
+        previousOutputs: collectPreviousOutputs(),
+        plans,
+        onlineResearch: Boolean(config.onlineResearch),
+        searchQuery: [patient.meta, ...sourceInputs.slice(0, 3)].join(" ").slice(0, 700)
+      };
+      openGenerationDialog(type);
+      return new Promise(resolve => {
+        pendingGenerations.set(callbackId, resolve);
+        AndroidMedicalBridge.generateMedicalDocument(callbackId, JSON.stringify(request));
+      });
+    }
+
+    window.onAndroidGenerationResult = function(callbackId, success, payload, message) {
+      const resolve = pendingGenerations.get(callbackId);
+      if (!resolve) return;
+      pendingGenerations.delete(callbackId);
+      clearInterval(generationTimer);
+      generationTimer = null;
+      generationBusy = false;
+      if (success) {
+        updateGenerationProgress(100);
+        document.getElementById("generationCloseButton").disabled = false;
+        setTimeout(() => {
+          document.getElementById("generationOverlay").classList.remove("open");
+          resolve({ success: true, payload, message });
+        }, 320);
+      } else {
+        document.getElementById("generationTitle").textContent = "病历生成失败";
+        document.getElementById("generationStage").classList.add("error");
+        document.getElementById("generationStage").textContent = message || "生成失败，请检查模型设置";
+        document.getElementById("generationCloseButton").disabled = false;
+        resolve({ success: false, payload: "", message });
+      }
+    };
+
+    function closeGenerationDialog() {
+      if (generationBusy) return;
+      document.getElementById("generationOverlay").classList.remove("open");
+    }
+
+    function parseGeneratedSections(payload) {
+      const cleaned = String(payload).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+      const parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed.sections)) throw new Error("模型返回格式缺少 sections 数组");
+      return parsed.sections.map(section => ({
+        title: String(section.title || "").trim(),
+        content: String(section.content || "").trim()
+      }));
+    }
+
+    async function generateNativeDocument(type, config) {
+      const result = await requestNativeGeneration(type, config);
+      if (!result.success) return;
+      try {
+        let sections = parseGeneratedSections(result.payload);
+        const present = new Set(sections.map(section => section.title));
+        const missing = config.modules.filter(title => !present.has(title));
+        if (missing.length > 0) {
+          const retry = await requestNativeGeneration(type, {
+            ...config,
+            modules: missing,
+            customPrompt: [config.customPrompt, "必须完整生成本次所有缺失栏目，不得省略，不得输出占位说明。"].filter(Boolean).join("\n")
+          });
+          if (retry.success) {
+            const retriedSections = parseGeneratedSections(retry.payload);
+            const retriedTitles = new Set(retriedSections.map(section => section.title));
+            sections = sections.filter(section => !retriedTitles.has(section.title)).concat(retriedSections);
+          }
+        }
+        renderNativeDocument(type, config, sections);
+        persistWorkspaceDocument(type, config, sections);
+      } catch (error) {
+        document.getElementById("generationOverlay").classList.add("open");
+        document.getElementById("generationTitle").textContent = "生成结果解析失败";
+        document.getElementById("generationStage").classList.add("error");
+        document.getElementById("generationStage").textContent = error.message;
+        document.getElementById("generationCloseButton").disabled = false;
+      }
+    }
+
+    function markDocumentReady(doc) {
+      if (!doc || doc.querySelector(".generation-ready-bar")) return;
+      const bar = document.createElement("div");
+      bar.className = "generation-ready-bar";
+      bar.innerHTML = `<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>生成完成，可以开始输出</span>`;
+      doc.querySelector(".document-head").after(bar);
+    }
+
+    function renderNativeDocument(type, config, sections, silent = false) {
+      document.getElementById("emptyOutput").style.display = "none";
+      const byTitle = new Map(sections.map(section => [section.title, section.content]));
+      let docId;
+      let containerId;
+      if (type === "admission") {
+        docId = "admissionDoc";
+        containerId = "admissionSections";
+      } else if (type === "first") {
+        docId = "firstCourseDoc";
+        containerId = "firstCourseSections";
+      } else if (type === "preop-summary") {
+        docId = "preopSummaryDoc";
+        containerId = "preopSummarySections";
+      } else if (type === "preop-discussion") {
+        docId = "preopDiscussionDoc";
+        containerId = "preopDiscussionSections";
+      } else {
+        docId = "genericDoc";
+        containerId = "genericSections";
+        const spec = genericSpecs[type];
+        document.getElementById("genericTitle").textContent = spec?.title || outputTypeLabels[type] || "病历文书";
+        document.getElementById("genericDescription").textContent = "由当前模型根据患者资料生成";
+      }
+      document.getElementById(containerId).innerHTML = config.modules.map(title => {
+        const content = byTitle.get(title);
+        return content
+          ? sectionHtml(title, escapeHtml(content).replaceAll("\n", "<br>"))
+          : "";
+      }).join("");
+      createdDocuments.add(type);
+      document.getElementById("outputCount").textContent = createdDocuments.size;
+      renderTabs(type);
+      showDocument(docId);
+      markDocumentReady(document.getElementById(docId));
+      if (!silent) showToast("生成完成，可以开始输出");
+    }
+
+    function loadRememberedConfigs() {
+      try {
+        return JSON.parse(localStorage.getItem("careflow-medical-output-configs") || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function generateDocument(type, config) {
+      const selectedModules = config?.modules || outputModuleOptions[type] || [];
+      document.getElementById("emptyOutput").style.display = "none";
+      if (type === "admission") {
+        showDocument("admissionDoc");
+        if (!createdDocuments.has("admission")) {
+          renderSections("admissionSections", admissionSections.filter(([title]) => selectedModules.includes(title)));
+          createdDocuments.add("admission");
+        }
+      } else if (type === "first") {
+        showDocument("firstCourseDoc");
+        if (!createdDocuments.has("first")) {
+          renderSections("firstCourseSections", firstCourseSections.filter(([title]) => selectedModules.includes(title)));
+          createdDocuments.add("first");
+        }
+      } else if (type === "consent") {
+        showDocument("consentDoc");
+        document.getElementById("consentDoc").dataset.selectedModules = JSON.stringify(selectedModules);
+      } else if (type === "preop-summary") {
+        showDocument("preopSummaryDoc");
+        renderDependency(
+          "summaryDependency",
+          consentGenerated,
+          "已读取手术同意书、全部原始资料和既往输出，仅生成两个指定模块。",
+          "手术同意书尚未生成。当前仍只汇总已给出的患者资料。"
+        );
+        if (!createdDocuments.has("preop-summary")) {
+          renderSections("preopSummarySections", preopSummarySections.filter(([title]) => selectedModules.includes(title)));
+          createdDocuments.add("preop-summary");
+        }
+      } else if (type === "preop-discussion") {
+        showDocument("preopDiscussionDoc");
+        const ready = consentGenerated && createdDocuments.has("preop-summary");
+        renderDependency(
+          "discussionDependency",
+          ready,
+          "已读取术前小结和手术同意书，仅生成术中术后风险与特殊术前准备。",
+          "需先完成手术同意书和术前小结；当前缺失内容不会自动编造。"
+        );
+        if (!createdDocuments.has("preop-discussion")) {
+          renderSections("preopDiscussionSections", preopDiscussionSections.filter(([title]) => selectedModules.includes(title)));
+          createdDocuments.add("preop-discussion");
+        }
+      } else {
+        const spec = genericSpecs[type];
+        if (!spec) return;
+        document.getElementById("genericTitle").textContent = spec.title;
+        document.getElementById("genericDescription").textContent = spec.description;
+        const container = document.getElementById("genericSections");
+        container.innerHTML = spec.sections
+          .filter(title => selectedModules.includes(title))
+          .map((title) => sectionHtml(title, `<span class="placeholder">将根据左侧已保存资料生成“${title}”。</span>`)).join("");
+        createdDocuments.add(type);
+        showDocument("genericDoc");
+      }
+      if (type === "consent" && !consentGenerated) {
+        createdDocuments.add("consent");
+      }
+      document.getElementById("outputCount").textContent = Math.max(createdDocuments.size, 1);
+      renderTabs(type);
+      const promptCount = (config?.prompts?.length || 0) + (config?.customPrompt ? 1 : 0);
+      showToast(`正在生成 ${selectedModules.length} 个栏目${promptCount ? `，应用 ${promptCount} 条提示词` : ""}…`);
+    }
+
+    function showDocument(id) {
+      document.querySelectorAll(".document").forEach(el => el.classList.toggle("active", el.id === id));
+      document.getElementById("outputScroll").scrollTop = 0;
+      ensureDocumentOutputButton(document.getElementById(id));
+    }
+
+    function ensureDocumentOutputButton(doc) {
+      if (!doc) return;
+      const header = doc.querySelector(".document-head");
+      if (!header) return;
+      let actions = header.querySelector(".document-actions");
+      if (!actions) {
+        actions = document.createElement("div");
+        actions.className = "document-actions";
+        header.appendChild(actions);
+      }
+      if (actions.querySelector(".output-document-button")) return;
+      const button = document.createElement("button");
+      button.className = "output-document-button";
+      const canOutput = doc.id !== "consentDoc" || document.getElementById("consentOutput").classList.contains("ready");
+      button.disabled = !canOutput;
+      button.textContent = canOutput ? `输出到 ${getOutputTarget().label}` : "生成后可输出";
+      button.onclick = () => openOutputDialog(doc.id);
+      actions.appendChild(button);
+    }
+
+    function getOutputTarget() {
+      try {
+        if (typeof AndroidMedicalBridge !== "undefined") {
+          const nativeLabel = AndroidMedicalBridge.getTargetLabel();
+          if (nativeLabel) return { id: "native", label: nativeLabel };
+        }
+      } catch { }
+      let settings = {};
+      try {
+        settings = JSON.parse(localStorage.getItem("careflow-keyboard-settings-v1") || "{}");
+      } catch { }
+      const targetMap = {
+        "phone":"手机蓝牙 HID",
+        "pico-usb":"Pico W · USB HID",
+        "pico-ble":"Pico W · BLE HID",
+        "esp32-s3":"ESP32-S3 Super Mini",
+        "yd-esp32-s3":"YD-ESP32-S3 N16R8",
+        "esp32-legacy":"ESP32-S3 旧 BLE HID"
+      };
+      return {
+        id: settings.device || "phone",
+        label: targetMap[settings.device] || "手机蓝牙 HID"
+      };
+    }
+
+    function openOutputDialog(docId) {
+      activeOutputDocId = docId;
+      const doc = document.getElementById(docId);
+      const title = doc.querySelector(".document-heading h3")?.textContent?.trim() || "病历文书";
+      const sections = Array.from(doc.querySelectorAll(".section-copy"))
+        .filter(element => element.offsetParent !== null)
+        .map(element => element.textContent.trim())
+        .filter(Boolean);
+      activeOutputText = [title, ...sections].join("\n\n");
+      activeOutputTotal = Array.from(activeOutputText).length;
+      const target = getOutputTarget();
+      document.getElementById("outputTargetName").textContent = target.label;
+      document.getElementById("outputDocumentName").textContent = `准备输出：${title}`;
+      let rememberedSpeed = 5;
+      try {
+        const settings = JSON.parse(localStorage.getItem("careflow-keyboard-settings-v1") || "{}");
+        rememberedSpeed = Number(settings.speed) || 5;
+      } catch { }
+      document.getElementById("outputSpeedRange").value = rememberedSpeed;
+      document.getElementById("outputSpeedValue").textContent = rememberedSpeed;
+      document.getElementById("outputOverlay").classList.add("open");
+      startOutputSession();
+    }
+
+    function startOutputSession() {
+      clearInterval(outputTimer);
+      outputCharIndex = 0;
+      outputStatusMessage = "";
+      activeOutputTotal = Array.from(activeOutputText).length;
+      outputState = "running";
+      updateOutputUi();
+      if (typeof AndroidMedicalBridge !== "undefined" &&
+          typeof AndroidMedicalBridge.startOutput === "function") {
+        activeOutputCallbackId = `output-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const speed = Number(document.getElementById("outputSpeedRange").value) || 5;
+        AndroidMedicalBridge.startOutput(activeOutputCallbackId, activeOutputText, speed);
+        return;
+      }
+      activeOutputCallbackId = null;
+      outputTimer = setInterval(outputTick, 110);
+    }
+
+    function outputTick() {
+      if (outputState !== "running") return;
+      const speed = Number(document.getElementById("outputSpeedRange").value) || 5;
+      outputCharIndex = Math.min(activeOutputTotal, outputCharIndex + Math.max(1, Math.round(speed * 1.8)));
+      if (outputCharIndex >= activeOutputTotal) {
+        clearInterval(outputTimer);
+        outputTimer = null;
+        outputState = "completed";
+      }
+      updateOutputUi();
+    }
+
+    function togglePause() {
+      if (outputState === "running") {
+        outputState = "paused";
+        if (activeOutputCallbackId && typeof AndroidMedicalBridge.pauseOutput === "function") {
+          AndroidMedicalBridge.pauseOutput();
+        }
+      } else if (outputState === "paused") {
+        outputState = "running";
+        if (activeOutputCallbackId && typeof AndroidMedicalBridge.resumeOutput === "function") {
+          AndroidMedicalBridge.resumeOutput();
+        }
+      }
+      updateOutputUi();
+    }
+
+    function stopOutput() {
+      clearInterval(outputTimer);
+      outputTimer = null;
+      if (activeOutputCallbackId && typeof AndroidMedicalBridge.stopOutput === "function") {
+        AndroidMedicalBridge.stopOutput();
+      }
+      outputState = "stopped";
+      updateOutputUi();
+    }
+
+    function updateOutputSpeed(value) {
+      document.getElementById("outputSpeedValue").textContent = value;
+      try {
+        const settings = JSON.parse(localStorage.getItem("careflow-keyboard-settings-v1") || "{}");
+        settings.speed = Number(value);
+        localStorage.setItem("careflow-keyboard-settings-v1", JSON.stringify(settings));
+      } catch { }
+    }
+
+    function updateOutputUi() {
+      const total = activeOutputTotal || Array.from(activeOutputText).length;
+      const percent = total ? Math.min(100, Math.round(outputCharIndex / total * 100)) : 0;
+      const icon = document.getElementById("outputStateIcon");
+      icon.classList.toggle("paused", outputState === "paused" || outputState === "completed");
+      icon.classList.toggle("stopped", outputState === "stopped");
+      const title = document.getElementById("outputStateTitle");
+      const detail = document.getElementById("outputStateDetail");
+      const pauseButton = document.getElementById("pauseButton");
+      const stopButton = document.getElementById("stopButton");
+      const restartButton = document.getElementById("restartButton");
+      const closeButton = document.getElementById("outputCloseButton");
+
+      if (outputState === "running") {
+        title.textContent = "正在输出";
+        detail.textContent = "内容正在写入目标电脑当前光标位置";
+        pauseButton.textContent = "暂停";
+      } else if (outputState === "paused") {
+        title.textContent = "已暂停";
+        detail.textContent = "输出停在此处，点击“继续”从当前位置恢复";
+        pauseButton.textContent = "继续";
+      } else if (outputState === "stopped") {
+        title.textContent = "已完全停止";
+        detail.textContent = "本次输出已终止，再次输出会从第一个字符重新开始";
+        pauseButton.textContent = "暂停";
+      } else if (outputState === "completed") {
+        title.textContent = "输出完成";
+        detail.textContent = "全部内容已发送到目标终端";
+        pauseButton.textContent = "暂停";
+      } else if (outputState === "failed") {
+        title.textContent = "输出失败";
+        detail.textContent = outputStatusMessage || "目标终端输出失败";
+        pauseButton.textContent = "暂停";
+      }
+      if (outputStatusMessage && outputState === "running") detail.textContent = outputStatusMessage;
+
+      document.getElementById("outputProgressText").textContent = `${outputCharIndex} / ${total} 字`;
+      document.getElementById("outputProgressPercent").textContent = `${percent}%`;
+      document.getElementById("outputProgressFill").style.width = `${percent}%`;
+      pauseButton.disabled = outputState === "stopped" || outputState === "completed" || outputState === "failed";
+      stopButton.disabled = outputState === "stopped" || outputState === "completed" || outputState === "failed";
+      restartButton.disabled = outputState === "running" || outputState === "paused";
+      closeButton.disabled = outputState === "running" || outputState === "paused";
+    }
+
+    function closeOutputDialog() {
+      if (outputState === "running" || outputState === "paused") return;
+      clearInterval(outputTimer);
+      outputTimer = null;
+      document.getElementById("outputOverlay").classList.remove("open");
+    }
+
+    window.onAndroidOutputProgress = function(callbackId, index, total, state, message) {
+      if (callbackId !== activeOutputCallbackId) return;
+      outputCharIndex = Number(index) || 0;
+      activeOutputTotal = Number(total) || activeOutputTotal;
+      outputStatusMessage = message || "";
+      if (state === "running") outputState = "running";
+      else if (state === "paused") outputState = "paused";
+      else if (state === "stopped") outputState = "stopped";
+      else if (state === "completed") outputState = "completed";
+      else outputState = "failed";
+      if (outputState === "completed" || outputState === "stopped" || outputState === "failed") {
+        activeOutputCallbackId = null;
+      }
+      updateOutputUi();
+    };
+
+    function returnToPatientDetail() {
+      try {
+        if (typeof AndroidMedicalBridge !== "undefined" && AndroidMedicalBridge.goBack) {
+          AndroidMedicalBridge.goBack();
+          return;
+        }
+      } catch { }
+      if (history.length > 1) history.back();
+      else showToast("已返回病人详情");
+    }
+
+    function renderSections(containerId, sections) {
+      document.getElementById(containerId).innerHTML = sections.map(([title, copy]) =>
+        sectionHtml(title, copy)
+      ).join("");
+    }
+
+    function renderDependency(id, ready, readyText, missingText) {
+      const element = document.getElementById(id);
+      element.classList.toggle("ready", ready);
+      element.querySelector("span").textContent = ready ? readyText : missingText;
+    }
+
+    async function generateConsent() {
+      const online = document.getElementById("onlineResearch").checked;
+      const inputCount = document.querySelectorAll("#inputList .input-card").length;
+      const selectedModuleChoices = JSON.parse(document.getElementById("consentDoc").dataset.selectedModules || "[]");
+      if (!hasNativeGeneration()) {
+        showToast("请在安卓 App 中连接模型后生成手术同意书");
+        return;
+      }
+      const baseConfig = outputConfigs.consent || { modules: selectedModuleChoices, prompts: [], customPrompt: "" };
+      const onlineInstruction = online
+        ? "允许模型调用联网检索工具查询最新指南和专业资料，但必须注明来源；联网内容需由医师核对。"
+        : "本次不启用联网检索，只依据已提供资料生成。";
+      const extractionInstruction =
+        "请从左侧全部自然语言资料中识别医生提出的推荐手术方案和所有备选方案。不需要用户另外填写方案名称；方案数量不固定，识别到一个即生成一个，识别到两个就生成两个，识别到更多就继续逐项生成。";
+      const config = {
+        ...baseConfig,
+        modules: selectedModuleChoices,
+        onlineResearch: online,
+        customPrompt: [baseConfig.customPrompt, onlineInstruction, extractionInstruction].filter(Boolean).join("\n")
+      };
+      const result = await requestNativeGeneration("consent", config, []);
+      if (!result.success) return;
+      try {
+        const sections = parseGeneratedSections(result.payload);
+        renderNativeConsent(sections, selectedModuleChoices, online, inputCount);
+        persistWorkspaceDocument(
+          "consent",
+          config,
+          sections,
+          { selectedModules: selectedModuleChoices, online }
+        );
+      } catch (error) {
+        document.getElementById("generationOverlay").classList.add("open");
+        document.getElementById("generationTitle").textContent = "生成结果解析失败";
+        document.getElementById("generationStage").classList.add("error");
+        document.getElementById("generationStage").textContent = error.message;
+        document.getElementById("generationCloseButton").disabled = false;
+      }
+    }
+
+    function renderNativeConsent(sections, selectedModules, online, inputCount, silent = false) {
+      const byTitle = new Map(sections.map(section => [section.title, section.content]));
+      const disease = byTitle.get("疾病介绍") || "模型未返回疾病介绍，请重新生成。";
+      document.getElementById("diseaseIntro").textContent = disease;
+      document.getElementById("diseaseCharCount").textContent = `${Array.from(disease).length} 字`;
+      document.getElementById("consentSourceCount").textContent = `${inputCount} 条原始资料`;
+      const planSections = selectedModules.includes("方案比较")
+        ? sections.filter(section => /^方案[一二三四五六七八九十0-9]+/.test(section.title))
+        : [];
+      document.getElementById("surgeryPlanSections").innerHTML = planSections.map((section, index) => {
+        return `
+          <div class="section-block">
+            <div class="section-title-row"><h4 class="section-title">${escapeHtml(section.title)}</h4>${index === 0 ? '<span class="required">推荐</span>' : ""}</div>
+            <p class="section-copy">${escapeHtml(section.content).replaceAll("\n", "<br>")}</p>
+            <div class="prompt-row">
+              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+              <input placeholder="附加要求：补充该方案的风险、费用或替代条件">
+              <button class="apply-prompt" onclick="showToast('已记录该方案的附加要求')">应用</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+      document.getElementById("surgeryRisks").textContent =
+        byTitle.get("手术相关风险") || "模型未返回手术相关风险，请重新生成。";
+      document.getElementById("researchSourceLabel").textContent = online ? "已请求联网检索，来源需核对" : "未启用联网检索";
+      document.getElementById("diseaseIntro").closest(".section-block").style.display =
+        selectedModules.includes("疾病介绍") ? "" : "none";
+      document.getElementById("surgeryRisks").closest(".section-block").style.display =
+        selectedModules.includes("手术相关风险") ? "" : "none";
+      document.getElementById("consentOutput").classList.add("ready");
+      consentGenerated = true;
+      createdDocuments.add("consent");
+      document.getElementById("outputCount").textContent = createdDocuments.size;
+      renderTabs("consent");
+      showDocument("consentDoc");
+      markDocumentReady(document.getElementById("consentDoc"));
+      const outputButton = document.querySelector("#consentDoc .output-document-button");
+      if (outputButton) {
+        outputButton.disabled = false;
+        outputButton.textContent = `输出到 ${getOutputTarget().label}`;
+      }
+      if (!silent) showToast("生成完成，可以开始输出");
+    }
+
+    function sectionHtml(title, copy) {
+      const safeTitle = escapeHtml(title);
+      return `
+        <section class="section-block">
+          <div class="section-title-row"><h4 class="section-title">${safeTitle}</h4><span class="required">必填</span></div>
+          <p class="section-copy">${copy}</p>
+          <div class="prompt-row">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+            <input placeholder="附加要求：如言简意赅、引经据典、鉴别诊断再展开">
+            <button class="apply-prompt" onclick="showToast('已记录“${safeTitle}”的附加要求')">应用</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderTabs(activeType) {
+      const tabs = document.getElementById("outputTabs");
+      const labels = {
+        admission:"入院记录",
+        first:"首次病程记录",
+        progress:"普通病程记录",
+        "preop-discussion":"术前讨论",
+        "preop-summary":"术前小结",
+        operation:"手术记录",
+        consent:"手术同意书",
+        discharge:"出院小结",
+        difficult:"疑难病例讨论"
+      };
+      const docIds = {
+        admission:"admissionDoc",
+        first:"firstCourseDoc",
+        progress:"genericDoc",
+        "preop-discussion":"preopDiscussionDoc",
+        "preop-summary":"preopSummaryDoc",
+        operation:"genericDoc",
+        consent:"consentDoc",
+        discharge:"genericDoc",
+        difficult:"genericDoc"
+      };
+      tabs.style.display = "flex";
+      const existingTypes = Object.keys(labels).filter(label => createdDocuments.has(label) || label === activeType);
+      tabs.innerHTML = existingTypes.map(type => `<button class="output-tab ${type === activeType ? "active" : ""}" onclick="showDocument('${docIds[type]}')">${labels[type]}</button>`).join("");
+    }
+
+    function restoreGeneratedDocuments() {
+      const saved = loadWorkspaceDocuments();
+      const entries = Object.entries(saved).filter(([type, record]) =>
+        record && Array.isArray(record.sections) && outputTypeLabels[type]
+      );
+      if (entries.length === 0) return;
+      let lastType = null;
+      entries.forEach(([type, record]) => {
+        const config = record.config || {
+          modules: record.sections.map(section => section.title),
+          prompts: [],
+          customPrompt: ""
+        };
+        if (type === "consent") {
+          const extra = record.extra || {};
+          document.getElementById("onlineResearch").checked = Boolean(extra.online);
+          document.getElementById("consentDoc").dataset.selectedModules =
+            JSON.stringify(extra.selectedModules || config.modules || []);
+          renderNativeConsent(
+            record.sections,
+            extra.selectedModules || config.modules || [],
+            Boolean(extra.online),
+            document.querySelectorAll("#inputList .input-card").length,
+            true
+          );
+        } else {
+          renderNativeDocument(type, config, record.sections, true);
+        }
+        lastType = type;
+      });
+      if (lastType) renderTabs(lastType);
+      document.getElementById("outputCount").textContent = createdDocuments.size;
+      syncGeneratedDocumentsToNative();
+      if (workspaceOpenType && saved[workspaceOpenType]) {
+        const selected = saved[workspaceOpenType];
+        const selectedConfig = selected.config || {
+          modules: selected.sections.map(section => section.title),
+          prompts: [],
+          customPrompt: ""
+        };
+        if (workspaceOpenType === "consent") {
+          const extra = selected.extra || {};
+          renderNativeConsent(
+            selected.sections,
+            extra.selectedModules || selectedConfig.modules || [],
+            Boolean(extra.online),
+            document.querySelectorAll("#inputList .input-card").length,
+            true
+          );
+        } else {
+          renderNativeDocument(workspaceOpenType, selectedConfig, selected.sections, true);
+        }
+      }
+    }
+
+    function documentIdForType(type) {
+      const docIds = {
+        admission: "admissionDoc",
+        first: "firstCourseDoc",
+        progress: "genericDoc",
+        "preop-discussion": "preopDiscussionDoc",
+        "preop-summary": "preopSummaryDoc",
+        operation: "genericDoc",
+        consent: "consentDoc",
+        discharge: "genericDoc",
+        difficult: "genericDoc"
+      };
+      return docIds[type] || "genericDoc";
+    }
+
+    function escapeHtml(value) {
+      return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 1700);
+    }
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeOutputConfig();
+        closeTypeDialog();
+        cancelInput();
+      }
+    });
+
+    loadWorkspaceInputs();
+    restoreGeneratedDocuments();
+  </script>
+</body>
+</html>

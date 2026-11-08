@@ -1,6 +1,7 @@
 package com.hidble.phonekeyboard
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.nio.CharBuffer
@@ -133,6 +134,26 @@ object HidKeys {
     fun modifierMask(name: String): Int? = modifiers[name.uppercase(Locale.ROOT)]
 }
 
+class TextOutputControl {
+    @Volatile
+    var paused: Boolean = false
+
+    @Volatile
+    var cancelled: Boolean = false
+
+    var onProgress: ((Int, Int) -> Unit)? = null
+
+    suspend fun checkpoint() {
+        while (paused && !cancelled) delay(40)
+        if (cancelled) throw CancellationException("HID output stopped")
+    }
+
+    fun cancel() {
+        cancelled = true
+        paused = false
+    }
+}
+
 /**
  * HID 打字引擎：把文本/按键/Unicode 转成标准键盘 HID 报告序列。
  * 逻辑 1:1 移植自 v11 固件 usb_hid.c（Alt+X/十六进制/十进制/GBK 四种中文输入 + SPEED 调速）。
@@ -158,10 +179,10 @@ class TypingEngine(
         // 避免 Alt+X 来得太早导致不转换/丢字（此停顿随速度缩放，最慢档最稳）
         private const val ALT_PRE_MS = 100
         private const val ALT_FINAL_MS = 40
-        // 蓝牙 HID 报告传输间隔约 10ms：低于此值发送只是往缓冲里堆报告，
-        // 缓冲溢出会静默丢报告 -> 键位/修饰键残留 -> 目标机误操作（全选删除等）。
-        // 因此把所有报告的最小间隔设为 10ms，等于链路物理速率，宁可稳不可丢。
-        private const val MIN_DELAY_MS = 10L
+        // 1-8 档保留 10ms 稳定下限；9、10 档允许突破该保护线。
+        private const val STABLE_MIN_DELAY_MS = 10L
+        private const val LEVEL_9_MIN_DELAY_MS = 7L
+        private const val LEVEL_10_MIN_DELAY_MS = 5L
         /** 长文本自动分段：每段字符数 */
         const val CHUNK_SIZE = 40
         /** 段间暂停，让蓝牙发送缓冲消化，避免长文本高速发送时丢字 */
@@ -169,12 +190,8 @@ class TypingEngine(
         /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
         private const val SEND_MAX_RETRIES = 50
         private const val SEND_RETRY_WAIT_MS = 20L
-        // 1=最慢 .. 10=最快；最低档更慢、档间差值拉开，慢档更稳（降低随机丢字/转换失败）。
-        // 2026-09-02：每档提速 10%（延迟系数 ×0.9）。
-        // 2026-09-04：再提速 10%（×0.9）：[3600,2970,...] → [3240,2673,...]。
-        // 注意 MIN_DELAY_MS=10 为蓝牙物理下限，高档位（约 7 档以上）会触底，
-        // 实际速度以链路为准，不要再下调 MIN_DELAY_MS。
-        private val SPEED_SCALES = intArrayOf(3078, 2539, 2078, 1616, 1231, 885, 600, 385, 200, 62)
+        // 每一档的延迟系数统一下调为上版的一半；8 档仍是稳定上限，9/10 档突破该上限。
+        private val SPEED_SCALES = intArrayOf(1620, 1337, 1094, 851, 648, 466, 316, 203, 106, 33)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -208,7 +225,9 @@ class TypingEngine(
      * 长文本自动分段发送（每 CHUNK_SIZE 字暂停一下让蓝牙缓冲消化）；
      * 报告发送失败自动重试，连接中断则停止并回调 onSendInterrupted。
      */
-    suspend fun typeText(text: String) = mutex.withLock {
+    suspend fun typeText(text: String) = typeText(text, null)
+
+    suspend fun typeText(text: String, control: TextOutputControl?) = mutex.withLock {
         val cps = text.codePoints().toArray()
         var sent = 0
         try {
@@ -216,6 +235,7 @@ class TypingEngine(
             // 发送前先清掉目标端可能残留的按键/修饰键状态（避免误触全选/快捷键导致删光文本）
             releaseAll()
             for (cp in cps) {
+                control?.checkpoint()
                 if (cp == '\r'.code) continue
                 if (cp == '\n'.code) {
                     queue(0, HidKeys.KEY_RETURN, KEY_DOWN_MS)
@@ -232,11 +252,15 @@ class TypingEngine(
                     typeUnicodeLocked(cp)
                 }
                 sent++
-                if (sent % CHUNK_SIZE == 0) delay(CHUNK_FLUSH_MS)
+                control?.onProgress?.invoke(sent, cps.size)
+                if (sent % CHUNK_SIZE == 0) delay(scaled(CHUNK_FLUSH_MS.toInt()))
             }
         } catch (e: HidSendInterruptedException) {
             releaseAll()
             onSendInterrupted?.invoke(sent)
+        } catch (e: CancellationException) {
+            releaseAll()
+            throw e
         }
         releaseAll()
     }
@@ -436,7 +460,12 @@ class TypingEngine(
     private fun scaled(ms: Int): Long {
         val idx = speedLevel.coerceIn(1, 10) - 1
         val v = ms.toLong() * SPEED_SCALES[idx] / 1000L
-        return if (v < MIN_DELAY_MS) MIN_DELAY_MS else v
+        val minimum = when (speedLevel.coerceIn(1, 10)) {
+            9 -> LEVEL_9_MIN_DELAY_MS
+            10 -> LEVEL_10_MIN_DELAY_MS
+            else -> STABLE_MIN_DELAY_MS
+        }
+        return if (v < minimum) minimum else v
     }
 
     /** 发送彻底失败（连接中断）时抛出，用于终止长文本输入 */

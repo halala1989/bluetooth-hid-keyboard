@@ -53,6 +53,7 @@ class BoardBleManager(private val context: Context) {
 
     private var scanning = false
     private var ready = false
+    private var connectedAddress: String? = null
     private var mtu = 20
     private var writing = false
     private val writeQueue = ArrayDeque<ByteArray>()
@@ -108,6 +109,7 @@ class BoardBleManager(private val context: Context) {
         writeQueue.clear()
         writing = false
         ready = false
+        connectedAddress = null
         try { gatt?.disconnect(); gatt?.close() } catch (e: Exception) { Log.e(TAG, "disconnect error", e) }
         gatt = null
         cmdCharacteristic = null
@@ -115,6 +117,7 @@ class BoardBleManager(private val context: Context) {
     }
 
     fun isConnected(): Boolean = ready
+    fun currentAddress(): String? = connectedAddress
 
     /** 发送一条协议命令（自动按 MTU 分包，行尾补 \n） */
     @Synchronized
@@ -153,7 +156,42 @@ class BoardBleManager(private val context: Context) {
         cmdCharacteristic?.let { writeNext(it) }
     }
 
-    fun sendText(text: String) = sendCommand("TEXT:$text")
+    /**
+     * 发送文本（协议用 \n 作为命令结束符，所以文本里的换行必须拆开处理）：
+     *  - 按行拆分：每行发一条 TEXT；行与行之间发 KEY:ENTER
+     *  - 每行再按 UTF-8 字节数切块（中文 1 字 = 3 字节），避免超过固件 1200 字节的行缓冲
+     */
+    fun sendText(text: String) {
+        val maxBytes = 800   // 单条 TEXT 的 UTF-8 字节上限（留足前缀/结尾余量）
+        val normalized = text.replace("\r\n", "\n").replace('\r', '\n')
+        val lines = normalized.split('\n')
+        for ((idx, line) in lines.withIndex()) {
+            var remaining = line
+            while (remaining.isNotEmpty()) {
+                val chunk = takeUtf8Bytes(remaining, maxBytes)
+                if (chunk.isEmpty()) break
+                sendCommand("TEXT:$chunk")
+                remaining = remaining.substring(chunk.length)
+            }
+            if (idx != lines.lastIndex) {
+                sendCommand("KEY:ENTER")   // 原来的换行
+            }
+        }
+    }
+
+    /** 取前若干个字符，使其 UTF-8 字节数不超过 maxBytes（不拆开一个字符） */
+    private fun takeUtf8Bytes(s: String, maxBytes: Int): String {
+        var bytes = 0
+        val sb = StringBuilder()
+        for (ch in s) {
+            val b = ch.toString().toByteArray(Charsets.UTF_8).size
+            if (bytes + b > maxBytes) break
+            sb.append(ch)
+            bytes += b
+        }
+        return sb.toString()
+    }
+
     fun setSpeed(level: Int) = sendCommand("SPEED:$level")
     fun setUnicodeMode(mode: Int) = sendCommand("UMOD:$mode")
     fun sendKey(key: String) = sendCommand("KEY:$key")
@@ -193,6 +231,7 @@ class BoardBleManager(private val context: Context) {
                 if (!gatt.requestMtu(247)) gatt.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 ready = false
+                connectedAddress = null
                 writeQueue.clear()
                 writing = false
                 this@BoardBleManager.gatt = null
@@ -220,6 +259,7 @@ class BoardBleManager(private val context: Context) {
             val notify = notifyCharacteristic
             if (notify == null) {
                 ready = true
+                connectedAddress = gatt.device.address
                 handler.post { onConnectionStateChanged?.invoke(true) }
                 return
             }
@@ -227,6 +267,7 @@ class BoardBleManager(private val context: Context) {
             val descriptor = notify.getDescriptor(CCCD_UUID)
             if (descriptor == null) {
                 ready = true
+                connectedAddress = gatt.device.address
                 handler.post { onConnectionStateChanged?.invoke(true) }
             } else {
                 descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -252,6 +293,7 @@ class BoardBleManager(private val context: Context) {
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             ready = true
+            connectedAddress = gatt.device.address
             handler.post { onConnectionStateChanged?.invoke(true) }
         }
     }
@@ -274,14 +316,22 @@ object BoardLink {
     }
 
     fun isConnected(): Boolean = manager?.isConnected() == true
+    fun connectedAddress(): String? = manager?.currentAddress()
 
     fun lastAddress(context: Context): String? = manager?.lastBoardAddress() ?: get(context).lastBoardAddress()
+
+    /** 已知的板子地址：优先上次连接保存的，其次手机系统蓝牙里已配对的板子 */
+    fun knownBoardAddress(context: Context): String? {
+        val m = get(context)
+        m.lastBoardAddress()?.let { return it }
+        return m.bondedBoardDevices().firstOrNull()?.address
+    }
 
     /** 主界面发送前调用：若当前没连上，但之前连过板子，就自动按地址重连并等待就绪 */
     suspend fun reconnectAndWait(context: Context, timeoutMs: Long = 6000): Boolean {
         val m = get(context)
         if (m.isConnected()) return true
-        val addr = m.lastBoardAddress() ?: return false
+        val addr = m.lastBoardAddress() ?: m.bondedBoardDevices().firstOrNull()?.address ?: return false
         return try {
             val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager).adapter ?: return false
             val device = adapter.getRemoteDevice(addr)

@@ -117,7 +117,8 @@ static void queue_report(uint8_t modifier, uint8_t keycode, uint32_t delay_ms, h
     pending_report[0] = modifier;
     pending_report[2] = keycode;
     report_delay_ms = (delay_ms * speed_scale_permille) / 1000u;
-    if (report_delay_ms < MIN_DELAY_MS) report_delay_ms = MIN_DELAY_MS;
+    uint32_t min_delay = speed_level >= 9 ? 1u : MIN_DELAY_MS;
+    if (report_delay_ms < min_delay) report_delay_ms = min_delay;
     next_state = after;
     state = HID_SEND_REPORT;
     next_action = get_absolute_time();
@@ -522,7 +523,7 @@ bool usb_hid_set_unicode_mode(int mode) {
 bool usb_hid_set_speed(int level) {
     if (level < SPEED_MIN_LEVEL || level > SPEED_MAX_LEVEL) return false;
     static const uint32_t scales[SPEED_MAX_LEVEL] = {
-        2500u, 2000u, 1600u, 1200u, 1000u, 800u, 650u, 500u, 400u, 300u
+        1250u, 1000u, 800u, 600u, 500u, 400u, 325u, 250u, 200u, 150u
     };
     speed_level = (uint8_t)level;
     speed_scale_permille = scales[level - 1];

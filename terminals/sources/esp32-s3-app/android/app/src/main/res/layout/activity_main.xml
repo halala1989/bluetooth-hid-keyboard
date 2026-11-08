@@ -1,0 +1,565 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- ===== 标题栏 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌨ 手机蓝牙键盘"
+                android:textSize="21sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/llmSettingsTopButton"
+                style="@style/KeyButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="模型设置" />
+        </LinearLayout>
+
+        <!-- ===== 连接状态（点击整个状态条可直达「连接管理」） ===== -->
+        <LinearLayout
+            android:id="@+id/statusCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/headerStatusDot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● "
+                android:textSize="15sp"
+                android:textColor="@color/disconnected" />
+
+            <TextView
+                android:id="@+id/headerStatusText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="未启动"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/disconnected" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="点击进入 ›"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary" />
+        </LinearLayout>
+
+        <!-- ===== 文本输入卡片（置顶：输入 + 发送 + 常用语 + 速度滑块） ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="输入文本"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="10dp" />
+
+            <com.hidble.phonekeyboard.ScrollableEditText
+                android:id="@+id/textInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="110dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:hint="输入文字（支持中文/英文/数字，可多行）"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textColorHighlight="#334FC3F7"
+                android:textSize="15sp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:lines="4"
+                android:minLines="4"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:importantForAutofill="no" />
+
+            <Button
+                android:id="@+id/sendButton"
+                style="@style/PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="发送到键盘" />
+
+            <Button
+                android:id="@+id/phraseButton"
+                style="@style/KeyButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="常用语（长按列表项可编辑/删除）" />
+
+            <!-- 输入速度滑块（独占一行，位置直接生效，无需应用按钮） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="输入速度"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+
+                <SeekBar
+                    android:id="@+id/speedSeekBar"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:min="1"
+                    android:max="10"
+                    android:progress="5"
+                    android:progressTint="@color/primary"
+                    android:progressBackgroundTint="@color/card_stroke"
+                    android:thumbTint="@color/primary" />
+
+                <TextView
+                    android:id="@+id/speedValueText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="5"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary"
+                    android:minWidth="20dp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="1=最慢最稳，10=最快（默认 5），拖动即生效；8-10 已接近蓝牙物理上限，过快会丢字，推荐 5-7 档稳定使用。GBK 模式需目标电脑开启 NumLock。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- ===== 中文输入模式卡片（下拉菜单，选中项左侧绿色 √） ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="中文输入模式"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/unicodeModeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Alt+X（默认）：记事本/Word 等 RichEdit 可用，无需注册表/NumLock；十六进制=Alt+Numpad+（需 EnableHexNumpad+NumLock，记事本无效）；十进制=Alt+0+码点；GBK 仅中文版 Windows。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- ===== 大模型对话卡片 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="大模型对话"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <Button
+                    android:id="@+id/llmSettingsButton"
+                    style="@style/KeyButton"
+                    android:text="模型设置" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="选提供方 + 填 Token 后即可对话；「我」的发言为绿色、AI 回复为白色，输出框可直接编辑。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="8dp" />
+
+            <!-- 附件行：＋ 添加本地图片/音频（多模态模型） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="2dp">
+
+                <TextView
+                    android:id="@+id/llmAttachmentInfo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="可点“＋”添加本地图片/音频，随下一条消息发给模型（多模态）"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+
+                <Button
+                    android:id="@+id/llmAttachButton"
+                    style="@style/KeyButton"
+                    android:layout_width="46dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:textSize="18sp"
+                    android:text="＋"
+                    android:contentDescription="添加本地文件" />
+            </LinearLayout>
+
+            <!-- 提问输入框：4 行，右侧可上下滚动查看长文本（内容溢出时优先内部滚动） -->
+            <com.hidble.phonekeyboard.ScrollableEditText
+                android:id="@+id/llmInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="110dp"
+                android:background="@drawable/bg_input"
+                android:padding="12dp"
+                android:hint="输入要问模型的话..."
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textColorHighlight="#334FC3F7"
+                android:textSize="14sp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:lines="4"
+                android:minLines="4"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:importantForAutofill="no" />
+
+            <!-- 发送行：发送给模型（缩短）+ 新对话（归档并遗忘前文） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/llmSendButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.85"
+                    android:textSize="13sp"
+                    android:text="发送给模型" />
+
+                <Button
+                    android:id="@+id/llmStopButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.7"
+                    android:layout_marginStart="6dp"
+                    android:textSize="12sp"
+                    android:text="停止输出"
+                    android:enabled="false"
+                    android:contentDescription="停止大模型输出" />
+
+                <Button
+                    android:id="@+id/llmNewConversationButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="0.7"
+                    android:text="新对话"
+                    android:contentDescription="开始新对话，遗忘前文内容" />
+            </LinearLayout>
+
+            <!-- 科学文献检索开关：勾选后，发送给模型前先调火山“专业数据集”MCP 检索学术文献，再让模型据此回答 -->
+            <CheckBox
+                android:id="@+id/llmLitCheck"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:buttonTint="@color/primary"
+                android:text="🔬 检索科学文献（发送前先查学术文献，让模型据此回答并给出参考来源）"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:contentDescription="检索科学文献开关" />
+
+            <!-- 提示词选择（独占一行，避免与发送/新对话挤在一起） -->
+            <Spinner
+                android:id="@+id/llmPromptSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/spinner_bg"
+                android:paddingStart="12dp"
+                android:paddingEnd="34dp"
+                android:gravity="center_vertical"
+                android:popupBackground="@color/card_background"
+                android:contentDescription="提示词选择" />
+
+            <!-- 历史对话下拉：查看 / 载入 / 删除所有已存档对话 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="历史对话（点“新对话”会自动存档；点选可查看 / 载入 / 删除）"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="10dp" />
+
+            <Spinner
+                android:id="@+id/llmHistorySpinner"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/spinner_bg"
+                android:paddingStart="12dp"
+                android:paddingEnd="34dp"
+                android:gravity="center_vertical"
+                android:popupBackground="@color/card_background"
+                android:contentDescription="历史对话" />
+
+            <!-- AI 思考状态（请求中显示，回复后隐藏） -->
+            <LinearLayout
+                android:id="@+id/llmThinkingRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone"
+                android:layout_marginTop="8dp">
+
+                <ProgressBar
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:indeterminateTint="@color/primary" />
+
+                <TextView
+                    android:id="@+id/llmThinkingText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="AI 正在思考"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginStart="8dp"
+                    android:maxLines="4"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- 科学文献检索结果条：有结果/失败时显示，点按查看本次命中条目（可复制链接） -->
+            <TextView
+                android:id="@+id/llmLitInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_input"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="科学文献检索结果" />
+
+            <!-- 聊天气泡列表：我的消息靠右、AI 靠左，气泡宽度按内容自适应（不占满整框） -->
+            <ScrollView
+                android:id="@+id/llmBubbleScroll"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginTop="8dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_log"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:id="@+id/llmBubbleContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+            <!-- 对话输出框：右侧上下滑块可查看长文本（内容溢出时优先内部滚动） -->
+            <com.hidble.phonekeyboard.ScrollableEditText
+                android:id="@+id/llmOutput"
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:background="@drawable/bg_log"
+                android:padding="12dp"
+                android:hint="对话内容会显示在这里，可直接编辑"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="13sp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:fadeScrollbars="false"
+                android:lineSpacingExtra="2dp"
+                android:layout_marginTop="8dp"
+                android:importantForAutofill="no" />
+
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+
+                <Button
+                    android:id="@+id/llmSendToKeyboardButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1.4"
+                    android:text="发送到键盘" />
+
+                <Button
+                    android:id="@+id/llmClearButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="0.6"
+                    android:layout_marginStart="8dp"
+                    android:text="清空" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ===== 二级菜单入口卡片 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="更多功能"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="光标控制、组合键、功能键、蓝牙开关与已配对设备、命令日志已收纳到二级页面，让主界面更清爽。"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/connectionButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="连接管理" />
+
+                <Button
+                    android:id="@+id/keysButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="更多按键" />
+
+                <Button
+                    android:id="@+id/logButton"
+                    style="@style/KeyButton"
+                    android:layout_weight="1"
+                    android:text="命令日志" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

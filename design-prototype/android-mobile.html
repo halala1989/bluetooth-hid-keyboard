@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>住院管理 · 安卓端</title>
+  <style>
+    :root {
+      --bg: #f3f6f4;
+      --surface: #ffffff;
+      --soft: #f8faf9;
+      --ink: #162521;
+      --muted: #6e807a;
+      --faint: #9ba9a5;
+      --line: #e0e8e4;
+      --primary: #176c5b;
+      --primary-deep: #0d5144;
+      --primary-soft: #e2f1ec;
+      --primary-pale: #f1f8f5;
+      --blue: #467bae;
+      --blue-soft: #eaf2fa;
+      --amber: #a76b24;
+      --amber-soft: #fff1dc;
+      --red: #ba4c47;
+      --red-soft: #fceceb;
+      --shadow: 0 16px 42px rgba(28, 61, 52, .09);
+      --shadow-soft: 0 8px 22px rgba(28, 61, 52, .055);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 5% 0%, rgba(188, 221, 211, .42), transparent 32%),
+        radial-gradient(circle at 98% 100%, rgba(206, 224, 217, .52), transparent 28%),
+        var(--bg);
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible { outline: 3px solid rgba(23,108,91,.17); outline-offset: 2px; }
+
+    .device {
+      position: relative;
+      width: min(412px, 100vw);
+      height: 100vh;
+      margin: 0 auto;
+      overflow: hidden;
+      background: #f8fbf9;
+      box-shadow: 0 0 70px rgba(29, 57, 50, .11);
+    }
+
+    .status-bar {
+      height: 29px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 18px 0;
+      color: #344944;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .status-icons { display: flex; align-items: center; gap: 5px; }
+    .signal { display: flex; align-items: flex-end; gap: 2px; height: 9px; }
+    .signal i { width: 2px; background: currentColor; border-radius: 2px; }
+    .signal i:nth-child(1) { height: 3px; }
+    .signal i:nth-child(2) { height: 5px; }
+    .signal i:nth-child(3) { height: 7px; }
+    .signal i:nth-child(4) { height: 9px; }
+    .battery { width: 17px; height: 8px; padding: 1px; border: 1px solid currentColor; border-radius: 2px; }
+    .battery::after { content:""; display:block; width:82%; height:100%; background:currentColor; border-radius:1px; }
+
+    .screen {
+      position: absolute;
+      inset: 29px 0 0;
+      display: flex;
+      flex-direction: column;
+      background: #f8fbf9;
+      transition: transform .28s cubic-bezier(.2,.72,.25,1), opacity .2s ease;
+    }
+
+    .screen.hidden {
+      visibility: hidden;
+      pointer-events: none;
+      opacity: .35;
+      transform: translateX(22px);
+    }
+
+    .screen.list-screen.hidden { transform: translateX(-18px); }
+
+    .scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+    }
+
+    .scroll::-webkit-scrollbar { display: none; }
+
+    .list-content {
+      padding: 12px 17px 112px;
+    }
+
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 13px;
+      padding: 5px 1px 17px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--primary);
+      font-size: 8.5px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: -.045em;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 10.5px;
+      line-height: 1.5;
+    }
+
+    .doctor {
+      flex: 0 0 auto;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #c9dcd5;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .settings-button {
+      flex: 0 0 auto;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #c9dcd5;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+    .settings-button svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid #cfe0da;
+      border-radius: 17px;
+      background: linear-gradient(135deg, #edf8f4, #f7fbf9);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .summary-number {
+      flex: 0 0 auto;
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--primary);
+      color: white;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: 0 9px 20px rgba(23,108,91,.2);
+    }
+
+    .summary strong { display: block; font-size: 12.5px; }
+    .summary span { display: block; margin-top: 4px; color: var(--muted); font-size: 9.5px; }
+
+    .list-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin: 21px 1px 10px;
+    }
+
+    .list-heading h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -.02em;
+    }
+
+    .list-heading span { color: var(--faint); font-size: 9px; }
+
+    .patient-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .patient-row {
+      display: grid;
+      grid-template-columns: 47px minmax(0, 1fr) 20px;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 74px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: var(--surface);
+      color: var(--ink);
+      text-align: left;
+      box-shadow: 0 6px 19px rgba(32,64,55,.035);
+      transition: .18s ease;
+      animation: rowIn .25s ease both;
+    }
+
+    .patient-row:hover, .patient-row:active {
+      border-color: #c3d8d1;
+      background: var(--primary-pale);
+      transform: translateY(-1px);
+    }
+
+    @keyframes rowIn { from { opacity:0; transform:translateY(7px); } }
+
+    .avatar {
+      width: 47px;
+      height: 47px;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .patient-name {
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 900;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .patient-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 10.5px;
+    }
+
+    .gender {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #f0f4f2;
+      color: #5d716b;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .chevron { color: #9aaca6; font-size: 20px; text-align: center; }
+    .empty-state { display:none; padding:46px 20px; border:1px dashed #cfdbd7; border-radius:18px; background:rgba(255,255,255,.65); color:var(--muted); text-align:center; font-size:11px; line-height:1.7; }
+
+    .fab {
+      position: absolute;
+      z-index: 10;
+      right: 20px;
+      bottom: 24px;
+      width: 60px;
+      height: 60px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 15px 32px rgba(15,81,68,.3), 0 4px 12px rgba(15,81,68,.18);
+    }
+
+    .fab svg { width: 26px; height: 26px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; }
+
+    /* 详情页：原 PC 右侧内容全部纵向堆叠 */
+    .detail-header {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
+      align-items: center;
+      gap: 9px;
+      min-height: 57px;
+      padding: 5px 14px 7px;
+      border-bottom: 1px solid rgba(224,232,228,.82);
+      background: rgba(248,251,249,.94);
+    }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      color: var(--ink);
+    }
+
+    .icon-button svg { width: 18px; height: 18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    .detail-heading { text-align: center; min-width: 0; }
+    .detail-heading strong { display:block; overflow:hidden; font-size:14px; font-weight:900; white-space:nowrap; text-overflow:ellipsis; }
+    .detail-heading span { display:block; margin-top:2px; color:var(--faint); font-size:8.5px; }
+
+    .detail-content { padding: 12px 15px 92px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 18px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #105347, #1a7964);
+      color: white;
+      box-shadow: 0 16px 28px rgba(15,81,68,.18);
+    }
+
+    .hero::after {
+      content:"";
+      position:absolute;
+      right:-74px;
+      top:-90px;
+      width:220px;
+      height:220px;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:50%;
+      box-shadow:0 0 0 35px rgba(255,255,255,.035),0 0 0 70px rgba(255,255,255,.02);
+    }
+
+    .hero-top { position:relative; z-index:1; display:flex; align-items:center; gap:12px; }
+    .hero-avatar { width:52px; height:52px; display:grid; place-items:center; border-radius:16px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.17); font-size:19px; font-weight:900; }
+    .hero-main { min-width:0; flex:1; }
+    .hero-name { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .hero-name h2 { margin:0; font-size:23px; letter-spacing:-.04em; }
+    .hero-tag { padding:4px 7px; border:1px solid rgba(255,255,255,.2); border-radius:999px; background:rgba(255,255,255,.09); font-size:8.5px; font-weight:800; }
+    .hero-meta { margin-top:6px; color:rgba(255,255,255,.72); font-size:10px; line-height:1.55; }
+    .hero-diagnosis { position:relative; z-index:1; margin-top:14px; padding-top:13px; border-top:1px solid rgba(255,255,255,.14); font-size:11px; }
+    .hero-diagnosis strong { display:block; margin-bottom:7px; font-size:12.5px; }
+    .allergy { display:inline-flex; padding:5px 8px; border-radius:7px; background:rgba(255,218,189,.16); color:#ffe0c3; font-size:9px; font-weight:800; }
+
+    .journey { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:13px; }
+    .step { position:relative; padding-top:10px; color:rgba(255,255,255,.5); font-size:8px; }
+    .step::before { content:""; position:absolute; left:0; right:0; top:0; height:2px; border-radius:999px; background:rgba(255,255,255,.15); }
+    .step.done::before,.step.current::before { background:#91e1cd; }
+    .step.current { color:white; font-weight:800; }
+
+    .section { margin-top:14px; padding:15px; border:1px solid var(--line); border-radius:17px; background:white; box-shadow:0 6px 20px rgba(32,64,55,.025); }
+    .section-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .section-head h3 { margin:0; font-size:13px; }
+    .section-head button { border:0; background:transparent; color:var(--primary); font-size:9.5px; font-weight:900; }
+
+    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; }
+    .info-item { min-width:0; }
+    .info-item label { display:block; margin-bottom:4px; color:var(--faint); font-size:8px; }
+    .info-item strong { display:block; overflow:hidden; font-size:10.5px; font-weight:800; white-space:nowrap; text-overflow:ellipsis; }
+    .danger { color:var(--red) !important; }
+
+    .case-card { padding:12px; border-radius:13px; background:var(--soft); border:1px solid #e6ece9; }
+    .case-card + .case-card { margin-top:8px; }
+    .case-meta { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+    .case-type { color:var(--primary); font-size:9px; font-weight:900; }
+    .case-time { color:var(--faint); font-size:8px; }
+    .case-title { margin:6px 0 4px; font-size:11px; font-weight:900; }
+    .case-preview { margin:0; color:var(--muted); font-size:9.5px; line-height:1.6; display:-webkit-box; overflow:hidden; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+    .output-row { display:flex; align-items:center; gap:10px; padding:11px; border-radius:12px; background:var(--soft); }
+    .output-row + .output-row { margin-top:7px; }
+    .output-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:9px; background:var(--primary-soft); color:var(--primary); }
+    .output-icon.usb { background:var(--blue-soft); color:var(--blue); }
+    .output-icon svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .output-copy { flex:1; min-width:0; }
+    .output-copy strong { display:block; font-size:10px; }
+    .output-copy span { display:block; margin-top:2px; color:var(--faint); font-size:8.5px; }
+    .dot { width:5px; height:5px; border-radius:50%; background:#34a47c; box-shadow:0 0 0 3px rgba(52,164,124,.11); }
+    .dot.off { background:#b8a587; box-shadow:none; }
+
+    .detail-actions {
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:10;
+      display:grid;
+      grid-template-columns:.85fr 1.15fr;
+      gap:8px;
+      padding:12px 15px max(14px, env(safe-area-inset-bottom));
+      border-top:1px solid var(--line);
+      background:rgba(248,251,249,.96);
+      backdrop-filter:blur(16px);
+    }
+
+    .button {
+      min-height:48px;
+      border:1px solid transparent;
+      border-radius:13px;
+      font-size:12px;
+      font-weight:900;
+    }
+    .button.secondary { border-color:var(--line); background:white; color:#536860; }
+    .button.primary { background:var(--primary); color:white; box-shadow:0 10px 22px rgba(23,108,91,.19); }
+
+    /* 设置页 */
+    .settings-screen { background:#f6f9f7; }
+    .settings-header {
+      display:grid;
+      grid-template-columns:40px minmax(0,1fr) 40px;
+      align-items:center;
+      gap:9px;
+      min-height:58px;
+      padding:5px 14px 7px;
+      border-bottom:1px solid var(--line);
+      background:rgba(248,251,249,.96);
+    }
+    .settings-title { text-align:center; }
+    .settings-title strong { display:block; font-size:14px; font-weight:900; }
+    .settings-title span { display:block; margin-top:2px; color:var(--faint); font-size:8.5px; }
+    .settings-content { padding:13px 15px 92px; }
+    .settings-intro {
+      display:flex;
+      align-items:center;
+      gap:11px;
+      padding:14px;
+      border-radius:17px;
+      background:linear-gradient(135deg,#124f43,#1c7864);
+      color:white;
+      box-shadow:0 14px 27px rgba(15,81,68,.16);
+    }
+    .settings-intro-icon {
+      width:43px;
+      height:43px;
+      display:grid;
+      place-items:center;
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:13px;
+      background:rgba(255,255,255,.1);
+    }
+    .settings-intro-icon svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .settings-intro strong { display:block; font-size:12.5px; }
+    .settings-intro span { display:block; margin-top:4px; color:rgba(255,255,255,.68); font-size:9px; line-height:1.5; }
+    .settings-section { margin-top:13px; padding:15px; border:1px solid var(--line); border-radius:17px; background:white; box-shadow:0 6px 20px rgba(32,64,55,.025); }
+    .settings-section-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:11px; }
+    .settings-section-head h3 { margin:0; font-size:13px; }
+    .settings-section-head span { color:var(--faint); font-size:8.5px; }
+    .output-indicator { display:flex; align-items:center; gap:9px; margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:12px; background:var(--soft); }
+    .output-indicator-dot { width:9px; height:9px; flex:0 0 auto; border-radius:50%; background:var(--red); box-shadow:0 0 0 4px rgba(186,76,71,.1); }
+    .output-indicator.connected .output-indicator-dot { background:#2d9e75; box-shadow:0 0 0 4px rgba(45,158,117,.11); }
+    .output-indicator-copy { flex:1; min-width:0; }
+    .output-indicator-copy strong { display:block; font-size:10.5px; }
+    .output-indicator-copy span { display:block; margin-top:2px; color:var(--muted); font-size:8.5px; line-height:1.4; }
+    .terminal-connect {
+      flex:0 0 auto;
+      height:31px;
+      padding:0 9px;
+      border:0;
+      border-radius:8px;
+      background:var(--primary);
+      color:white;
+      font-size:8.5px;
+      font-weight:900;
+      box-shadow:0 6px 13px rgba(23,108,91,.16);
+    }
+    .terminal-connect:disabled { background:#b8cac5; box-shadow:none; }
+    .device-options { display:flex; flex-direction:column; gap:7px; }
+    .device-option {
+      display:grid;
+      grid-template-columns:34px minmax(0,1fr) 20px;
+      align-items:center;
+      gap:10px;
+      width:100%;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:var(--soft);
+      color:var(--ink);
+      text-align:left;
+    }
+    .device-option.active { border-color:#9ec8ba; background:var(--primary-pale); }
+    .device-option-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:9px; background:var(--primary-soft); color:var(--primary); }
+    .device-option-icon.usb { background:var(--blue-soft); color:var(--blue); }
+    .device-option-icon.ble { background:var(--amber-soft); color:var(--amber); }
+    .device-option-icon svg { width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .device-option-copy strong { display:block; font-size:10.5px; }
+    .device-option-copy span { display:block; margin-top:2px; color:var(--muted); font-size:8.5px; }
+    .radio { width:17px; height:17px; border:1.5px solid #b6c7c1; border-radius:50%; }
+    .device-option.active .radio { border:5px solid var(--primary); }
+
+    .speed-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .speed-top strong { font-size:11px; }
+    .speed-value { min-width:34px; padding:4px 8px; border-radius:8px; background:var(--primary-soft); color:var(--primary); text-align:center; font-size:10px; font-weight:900; }
+    .range { width:100%; margin:14px 0 4px; accent-color:var(--primary); }
+    .range-labels { display:flex; justify-content:space-between; color:var(--faint); font-size:8px; }
+    .speed-warning { margin-top:6px; color:var(--amber); font-size:8px; line-height:1.5; }
+    .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .mode-option { padding:10px; border:1px solid var(--line); border-radius:11px; background:var(--soft); color:var(--ink); text-align:left; }
+    .mode-option.active { border-color:#9ec8ba; background:var(--primary-pale); box-shadow:inset 0 0 0 1px rgba(23,108,91,.08); }
+    .mode-option strong { display:block; font-size:10px; }
+    .mode-option span { display:block; margin-top:3px; color:var(--muted); font-size:8px; line-height:1.4; }
+    .provider-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .provider-option { display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--line); border-radius:11px; background:var(--soft); color:var(--ink); text-align:left; }
+    .provider-option.active { border-color:#9ec8ba; background:var(--primary-pale); }
+    .provider-mark { width:27px; height:27px; display:grid; place-items:center; border-radius:8px; background:#eaf2fa; color:var(--blue); font-size:9px; font-weight:900; }
+    .provider-option[data-provider="mimo"] .provider-mark { background:var(--amber-soft); color:var(--amber); }
+    .provider-option strong { display:block; font-size:10px; }
+    .provider-option span { display:block; margin-top:2px; color:var(--faint); font-size:7.5px; }
+    .model-line { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; padding:9px 10px; border-radius:10px; background:var(--soft); }
+    .model-line span { color:var(--muted); font-size:8.5px; }
+    .model-line strong { font-size:9.5px; }
+    .token-field { position:relative; display:block; }
+    .token-field .input { padding-right:46px; font-family:ui-monospace,Consolas,monospace; font-size:11px; }
+    .token-toggle { position:absolute; right:7px; top:7px; width:32px; height:32px; border:0; border-radius:8px; background:var(--soft); color:var(--muted); font-size:14px; }
+    .model-test-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .model-test-button { height:36px; padding:0 10px; border:1px solid var(--line); border-radius:9px; background:white; color:var(--primary); font-size:8.5px; font-weight:900; }
+    .model-test-button:disabled { opacity:.55; }
+    .model-test-state { flex:1; color:var(--muted); font-size:8px; line-height:1.45; }
+    .model-test-state.success { color:#278365; }
+    .model-test-state.error { color:var(--red); }
+    .security-note { margin-top:7px; color:var(--faint); font-size:8px; line-height:1.55; }
+    .settings-save {
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:10;
+      display:grid;
+      grid-template-columns:1fr;
+      gap:8px;
+      padding:12px 15px max(14px, env(safe-area-inset-bottom));
+      border-top:1px solid var(--line);
+      background:rgba(248,251,249,.97);
+      backdrop-filter:blur(16px);
+    }
+
+    .pairing-sheet { max-height:78vh; }
+    .pairing-status { display:flex; align-items:flex-start; gap:9px; padding:10px; border-radius:11px; background:var(--primary-pale); color:var(--primary-deep); font-size:9.5px; line-height:1.55; }
+    .pairing-status .dot { margin-top:4px; flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:var(--amber); }
+    .pairing-list { margin-top:10px; display:flex; flex-direction:column; gap:7px; }
+    .computer-option { display:flex; align-items:center; gap:10px; width:100%; padding:11px; border:1px solid var(--line); border-radius:11px; background:var(--soft); color:var(--ink); text-align:left; }
+    .computer-option:hover { border-color:#a8cbbf; background:var(--primary-pale); }
+    .computer-icon { width:33px; height:33px; display:grid; place-items:center; border-radius:9px; background:var(--blue-soft); color:var(--blue); }
+    .computer-icon svg { width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .computer-copy { flex:1; }
+    .computer-copy strong { display:block; font-size:10.5px; }
+    .computer-copy span { display:block; margin-top:2px; color:var(--muted); font-size:8.5px; }
+    .computer-connect { color:var(--primary); font-size:9px; font-weight:900; }
+    .pairing-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:11px; }
+
+    /* 新建病人底部表单 */
+    .overlay {
+      position:absolute;
+      inset:0;
+      z-index:40;
+      display:none;
+      align-items:flex-end;
+      background:rgba(17,36,31,.32);
+      backdrop-filter:blur(4px);
+    }
+    .overlay.open { display:flex; }
+    .sheet { width:100%; padding:8px 18px max(20px, env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; background:white; box-shadow:0 -20px 60px rgba(17,44,36,.2); animation:sheetIn .24s ease-out; }
+    @keyframes sheetIn { from { opacity:.5; transform:translateY(25px); } }
+    .grabber { width:36px; height:4px; margin:1px auto 15px; border-radius:999px; background:#d7e1dd; }
+    .sheet-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
+    .sheet-head h2 { margin:0; font-size:20px; letter-spacing:-.03em; }
+    .sheet-head p { margin:5px 0 0; color:var(--muted); font-size:9.5px; }
+    .close { width:34px; height:34px; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--muted); font-size:18px; }
+    .field { display:block; margin-bottom:12px; }
+    .field > span { display:block; margin:0 0 6px 2px; color:#52665f; font-size:9.5px; font-weight:800; }
+    .input { width:100%; height:46px; padding:0 12px; border:1px solid var(--line); border-radius:12px; background:#fbfcfc; color:var(--ink); font-size:14px; }
+    .input:focus { outline:none; border-color:#91beb0; box-shadow:0 0 0 3px rgba(23,108,91,.08); }
+    .form-row { display:grid; grid-template-columns:1fr 1.2fr; gap:10px; }
+    .gender-picker { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+    .gender-option { height:46px; border:1px solid var(--line); border-radius:11px; background:#fbfcfc; color:var(--muted); font-size:12px; font-weight:800; }
+    .gender-option.active { border-color:#9bc6b8; background:var(--primary-soft); color:var(--primary-deep); }
+    .form-error { min-height:15px; color:var(--red); font-size:9px; }
+    .sheet-actions { display:grid; grid-template-columns:.8fr 1.2fr; gap:8px; }
+
+    .toast {
+      position:absolute;
+      z-index:60;
+      left:50%;
+      bottom:92px;
+      transform:translate(-50%,12px);
+      max-width:calc(100% - 40px);
+      padding:9px 13px;
+      border-radius:10px;
+      background:#153d34;
+      color:white;
+      font-size:9.5px;
+      font-weight:800;
+      white-space:nowrap;
+      opacity:0;
+      pointer-events:none;
+      transition:.2s ease;
+      box-shadow:0 12px 30px rgba(12,42,34,.22);
+    }
+    .toast.show { opacity:1; transform:translate(-50%,0); }
+
+    @media (min-width: 700px) {
+      .device {
+        height: calc(100vh - 28px);
+        margin-top: 14px;
+        border: 1px solid rgba(255,255,255,.95);
+        border-radius: 31px;
+        box-shadow: 0 28px 90px rgba(30,59,50,.15);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="device">
+    <div class="status-bar" aria-hidden="true">
+      <span>08:30</span>
+      <span class="status-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span>5G</span><span class="battery"></span></span>
+    </div>
+
+    <section class="screen list-screen" id="listScreen">
+      <div class="scroll">
+        <div class="list-content">
+          <header class="top">
+            <div>
+              <p class="eyebrow">INPATIENT CARE</p>
+              <h1>住院病人</h1>
+              <p class="subtitle">点击病人进入详情，或创建新的住院病人</p>
+            </div>
+        <button class="settings-button" onclick="openSettings()" aria-label="设置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+        </button>
+          </header>
+
+          <section class="summary">
+            <div class="summary-number" id="patientCount">3</div>
+            <div><strong>当前住院病人</strong><span>名单按添加顺序向下排列</span></div>
+          </section>
+
+          <div class="list-heading">
+            <h2>病人列表</h2>
+            <span id="listHint">最近添加的在下方</span>
+          </div>
+          <section class="patient-list" id="patientList"></section>
+          <div class="empty-state" id="emptyState">还没有病人<br>点击右下角加号创建第一位病人</div>
+        </div>
+      </div>
+      <button class="fab" onclick="openSheet()" aria-label="新建病人">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </section>
+
+    <section class="screen detail-screen hidden" id="detailScreen">
+      <header class="detail-header">
+        <button class="icon-button" onclick="showList()" aria-label="返回病人列表">
+          <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div class="detail-heading"><strong id="detailHeaderName">病人详情</strong><span>内科一病区 · 住院全流程</span></div>
+        <button class="icon-button" onclick="openSheet()" aria-label="新建病人">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+
+      <div class="scroll">
+        <div class="detail-content">
+          <article class="hero">
+            <div class="hero-top">
+              <div class="hero-avatar" id="detailAvatar">王</div>
+              <div class="hero-main">
+                <div class="hero-name"><h2 id="detailName">王建国</h2><span class="hero-tag" id="detailStatus">在院</span></div>
+                <div class="hero-meta" id="detailMeta">男 · 67岁 · 08床</div>
+              </div>
+            </div>
+            <div class="hero-diagnosis"><strong id="detailDiagnosis">社区获得性肺炎</strong><span class="allergy" id="detailAllergy">⚠ 青霉素过敏</span></div>
+            <div class="journey">
+              <div class="step done">入院</div>
+              <div class="step done">首次评估</div>
+              <div class="step current">在院诊疗</div>
+              <div class="step">出院</div>
+            </div>
+          </article>
+
+          <section class="section">
+            <div class="section-head"><h3>基本信息</h3><button onclick="showToast('资料编辑将在下一层页面展开')">编辑</button></div>
+            <div class="info-grid">
+              <div class="info-item"><label>入院日期</label><strong>2026-11-06</strong></div>
+              <div class="info-item"><label>主治医生</label><strong>李医生</strong></div>
+              <div class="info-item"><label>护理等级</label><strong>二级护理</strong></div>
+              <div class="info-item"><label>责任护士</label><strong>周敏</strong></div>
+              <div class="info-item"><label>当前重点</label><strong>抗感染治疗</strong></div>
+              <div class="info-item"><label>过敏史</label><strong class="danger" id="detailAllergyText">青霉素过敏</strong></div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h3>病例文书</h3><button onclick="showToast('病例编辑将在下一层打开')">＋ 新建</button></div>
+            <article class="case-card">
+              <div class="case-meta"><span class="case-type">日常病程</span><span class="case-time">今天 08:12</span></div>
+              <div class="case-title">11 月 8 日呼吸内科查房记录</div>
+              <p class="case-preview">患者夜间体温最高 37.8℃，咳嗽较昨日减轻，痰量减少。继续当前抗感染方案，关注炎症指标变化。</p>
+            </article>
+            <article class="case-card">
+              <div class="case-meta"><span class="case-type">首次病程</span><span class="case-time">11 月 6 日 16:40</span></div>
+              <div class="case-title">首次病程记录</div>
+              <p class="case-preview">结合胸部 CT 与血常规结果，考虑社区获得性肺炎，已制定抗感染及对症支持治疗方案。</p>
+            </article>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h3>电脑输出</h3><span style="color:#278365;font-size:9px;font-weight:800">● 已连接</span></div>
+            <div class="output-row">
+              <span class="output-icon"><svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></span>
+              <span class="output-copy"><strong>手机蓝牙 HID</strong><span>内科工作站</span></span>
+              <span class="dot"></span>
+            </div>
+            <div class="output-row">
+              <span class="output-icon usb"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg></span>
+              <span class="output-copy"><strong>Pico USB HID</strong><span>等待硬件连接</span></span>
+              <span class="dot off"></span>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="detail-actions">
+        <button class="button secondary" onclick="showToast('已进入输出设置')">输出设置</button>
+        <button class="button primary" onclick="showToast('病例编辑将在下一层打开')">书写病例</button>
+      </footer>
+    </section>
+
+    <section class="screen settings-screen hidden" id="settingsScreen">
+      <header class="settings-header">
+        <button class="icon-button" onclick="closeSettings()" aria-label="返回病人列表">
+          <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div class="settings-title"><strong>键盘与模型设置</strong><span>原蓝牙键盘项目</span></div>
+        <span></span>
+      </header>
+
+      <div class="scroll">
+        <div class="settings-content">
+          <div class="settings-intro">
+            <span class="settings-intro-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h8"/><path d="M8 4h8"/></svg>
+            </span>
+            <div><strong>输出与模型统一配置</strong><span>这里的选择会应用于病例和文本输出，并与原键盘功能共用。</span></div>
+          </div>
+
+          <section class="settings-section">
+            <div class="settings-section-head"><h3>输出设备</h3><span>已开发设备</span></div>
+            <div class="output-indicator" id="outputIndicator">
+              <span class="output-indicator-dot"></span>
+              <span class="output-indicator-copy">
+                <strong id="outputIndicatorTitle">手机蓝牙 HID · 等待连接</strong>
+                <span id="outputIndicatorDetail">选择电脑并完成蓝牙配对后变为绿色</span>
+              </span>
+              <button class="terminal-connect" id="terminalConnectButton" onclick="connectSelectedTerminal()">主动连接</button>
+            </div>
+            <div class="device-options">
+              <button class="device-option active" data-device="phone" onclick="selectDevice(this)">
+                <span class="device-option-icon"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M10 18h4"/></svg></span>
+                <span class="device-option-copy"><strong>手机蓝牙 HID</strong><span>当前手机直接模拟标准蓝牙键盘</span></span>
+                <span class="radio"></span>
+              </button>
+              <button class="device-option" data-device="pico-usb" onclick="selectDevice(this)">
+                <span class="device-option-icon usb"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg></span>
+                <span class="device-option-copy"><strong>Pico W · USB HID</strong><span>固件 v10 / v11，USB 连接目标电脑</span></span>
+                <span class="radio"></span>
+              </button>
+              <button class="device-option" data-device="pico-ble" onclick="selectDevice(this)">
+                <span class="device-option-icon ble"><svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></span>
+                <span class="device-option-copy"><strong>Pico W · BLE HID</strong><span>手机通过蓝牙连接 Pico W 键盘</span></span>
+                <span class="radio"></span>
+              </button>
+              <button class="device-option" data-device="yd-esp32-s3" onclick="selectDevice(this)">
+                <span class="device-option-icon usb"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg></span>
+                <span class="device-option-copy"><strong>YD-ESP32-S3 N16R8</strong><span>双 Type-C 桥接板 · USB HID</span></span>
+                <span class="radio"></span>
+              </button>
+              <button class="device-option" data-device="esp32-legacy" onclick="selectDevice(this)">
+                <span class="device-option-icon ble"><svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></span>
+                <span class="device-option-copy"><strong>ESP32-S3 旧 BLE HID</strong><span>兼容归档 · 保留旧固件连接</span></span>
+                <span class="radio"></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="settings-section-head"><h3>输出速度</h3><span>1 慢 · 10 快</span></div>
+            <div class="speed-top"><strong>输入节奏</strong><span class="speed-value" id="speedValue">5</span></div>
+            <input class="range" id="speedRange" type="range" min="1" max="10" step="1" value="5" oninput="updateSpeed(this.value)">
+            <div class="range-labels"><span>更稳定</span><span>默认</span><span>更快</span></div>
+            <div class="speed-warning">第 8 档为稳定上限；第 9、10 档突破保护下限，最高速度约为旧版两倍，可能因链路丢字。</div>
+          </section>
+
+          <section class="settings-section">
+            <div class="settings-section-head"><h3>输出模式</h3><span>中文输入方式</span></div>
+            <div class="mode-grid">
+              <button class="mode-option active" data-mode="altx" onclick="selectMode(this)"><strong>Alt+X</strong><span>记事本、Word；推荐</span></button>
+              <button class="mode-option" data-mode="hex" onclick="selectMode(this)"><strong>十六进制</strong><span>浏览器；需 NumLock</span></button>
+              <button class="mode-option" data-mode="decimal" onclick="selectMode(this)"><strong>十进制</strong><span>RichEdit 应用</span></button>
+              <button class="mode-option" data-mode="gbk" onclick="selectMode(this)"><strong>GBK</strong><span>中文版 Windows</span></button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="settings-section-head"><h3>大模型</h3><span>当前仅开放两种</span></div>
+            <div class="provider-grid">
+              <button class="provider-option active" data-provider="deepseek" onclick="selectProvider(this)">
+                <span class="provider-mark">DS</span><span><strong>DeepSeek</strong><span>通用文本</span></span>
+              </button>
+              <button class="provider-option" data-provider="mimo" onclick="selectProvider(this)">
+                <span class="provider-mark">Mi</span><span><strong>小米 MiMo</strong><span>文本 / 音频</span></span>
+              </button>
+            </div>
+            <div class="model-line"><span>当前模型</span><strong id="currentModel">deepseek-v4-flash</strong></div>
+            <label class="field" style="margin-top:13px;margin-bottom:0">
+              <span>API Token</span>
+              <span class="token-field">
+                <input class="input" id="tokenInput" type="password" autocomplete="off" placeholder="输入 API Token" oninput="modelConnectionChanged()">
+                <button class="token-toggle" type="button" onclick="toggleToken()" aria-label="显示或隐藏 Token" id="tokenToggle">◉</button>
+              </span>
+            </label>
+            <div class="model-test-row">
+              <button class="model-test-button" id="testModelButton" onclick="testModelConnection()">测试模型连接</button>
+              <span class="model-test-state" id="modelTestState">未测试</span>
+            </div>
+            <div class="security-note">Token 仅保存在本机设置中。正式安卓版将使用系统加密存储，不写入病例数据库。</div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="settings-save">
+        <button class="button primary" onclick="saveSettings()">保存全部设置</button>
+      </footer>
+    </section>
+
+    <div class="overlay" id="pairingOverlay" onclick="closePairingSheet()">
+      <section class="sheet pairing-sheet" onclick="event.stopPropagation()">
+        <div class="grabber"></div>
+        <div class="sheet-head">
+          <div><h2>选择配对电脑</h2><p>手机将作为“手机蓝牙键盘”</p></div>
+          <button class="close" onclick="closePairingSheet()">×</button>
+        </div>
+        <div class="pairing-status"><span class="dot"></span><span>先选择已配对电脑；如果没有，点击“让电脑发现手机”，再到电脑蓝牙设置中添加“手机蓝牙键盘”。</span></div>
+        <div class="pairing-list">
+          <button class="computer-option" onclick="connectComputer('DESKTOP-ROOM-01')">
+            <span class="computer-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+            <span class="computer-copy"><strong>DESKTOP-ROOM-01</strong><span>已配对 · 上次连接设备</span></span>
+            <span class="computer-connect">连接</span>
+          </button>
+          <button class="computer-option" onclick="connectComputer('WARD-PC-02')">
+            <span class="computer-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+            <span class="computer-copy"><strong>WARD-PC-02</strong><span>已配对 · 内科工作站</span></span>
+            <span class="computer-connect">连接</span>
+          </button>
+        </div>
+        <div class="pairing-actions">
+          <button class="button secondary" onclick="closePairingSheet()">取消</button>
+          <button class="button primary" onclick="discoverPhone()">让电脑发现手机</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeSheet()">
+      <section class="sheet" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+        <div class="grabber"></div>
+        <div class="sheet-head">
+          <div><h2>新建病人</h2><p>填写基础信息后加入病人列表</p></div>
+          <button class="close" onclick="closeSheet()">×</button>
+        </div>
+        <form onsubmit="addPatient(event)">
+          <label class="field"><span>病人姓名</span><input class="input" id="nameInput" maxlength="20" placeholder="请输入姓名" autocomplete="off"></label>
+          <div class="form-row">
+            <label class="field"><span>年龄</span><input class="input" id="ageInput" type="number" min="0" max="130" inputmode="numeric" placeholder="岁"></label>
+            <div class="field"><span>性别</span><div class="gender-picker">
+              <button type="button" class="gender-option active" data-gender="男" onclick="pickGender(this)">男</button>
+              <button type="button" class="gender-option" data-gender="女" onclick="pickGender(this)">女</button>
+              <button type="button" class="gender-option" data-gender="其他" onclick="pickGender(this)">其他</button>
+            </div></div>
+          </div>
+          <div class="form-error" id="formError"></div>
+          <div class="sheet-actions">
+            <button type="button" class="button secondary" onclick="closeSheet()">取消</button>
+            <button type="submit" class="button primary">确定添加</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "careflow-android-patients-v1";
+    const defaults = [
+      { id:1, name:"王建国", age:67, gender:"男", bed:"08", status:"在院", diagnosis:"社区获得性肺炎", allergy:"青霉素过敏" },
+      { id:2, name:"刘秀兰", age:72, gender:"女", bed:"12", status:"待出院", diagnosis:"2 型糖尿病伴血糖控制不佳", allergy:"否认药物过敏" },
+      { id:3, name:"赵明", age:54, gender:"男", bed:"03", status:"在院", diagnosis:"急性胰腺炎", allergy:"磺胺类药物过敏" }
+    ];
+
+    let patients = load();
+    let selectedGender = "男";
+    const list = document.getElementById("patientList");
+    const SETTINGS_KEY = "careflow-keyboard-settings-v1";
+    let settings = loadSettings();
+
+    function load() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return Array.isArray(stored) ? stored : defaults.map(x => ({...x}));
+      } catch { return defaults.map(x => ({...x})); }
+    }
+
+    function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(patients)); }
+
+    function loadSettings() {
+      try {
+        return {
+          device: "phone",
+          speed: 5,
+          mode: "altx",
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          token: "",
+          ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")
+        };
+      } catch {
+        return { device:"phone", speed:5, mode:"altx", provider:"deepseek", model:"deepseek-v4-flash", token:"" };
+      }
+    }
+
+    function renderList() {
+      list.innerHTML = patients.map((p, i) => `
+        <button class="patient-row" style="animation-delay:${Math.min(i*22,130)}ms" onclick="openDetail(${p.id})">
+          <span class="avatar">${escapeHtml(p.name.slice(0,1))}</span>
+          <span>
+            <div class="patient-name">${escapeHtml(p.name)}</div>
+            <div class="patient-meta"><span>${p.age}岁</span><span class="gender">${escapeHtml(p.gender)}</span><span>${escapeHtml(p.bed)}床</span></div>
+          </span>
+          <span class="chevron">›</span>
+        </button>
+      `).join("");
+      document.getElementById("patientCount").textContent = patients.length;
+      document.getElementById("emptyState").style.display = patients.length ? "none" : "block";
+      document.getElementById("listHint").textContent = patients.length ? `当前共 ${patients.length} 位` : "等待添加";
+    }
+
+    function openDetail(id) {
+      const p = patients.find(item => item.id === id);
+      if (!p) return;
+      document.getElementById("detailHeaderName").textContent = p.name;
+      document.getElementById("detailAvatar").textContent = p.name.slice(0,1);
+      document.getElementById("detailName").textContent = p.name;
+      document.getElementById("detailStatus").textContent = p.status || "在院";
+      document.getElementById("detailMeta").textContent = `${p.gender} · ${p.age}岁 · ${p.bed}床`;
+      document.getElementById("detailDiagnosis").textContent = p.diagnosis || "入院诊断待录入";
+      document.getElementById("detailAllergy").textContent = p.allergy && !p.allergy.includes("否认") ? `⚠ ${p.allergy}` : (p.allergy || "过敏史待确认");
+      document.getElementById("detailAllergyText").textContent = p.allergy || "过敏史待确认";
+      document.getElementById("detailAllergyText").className = p.allergy && !p.allergy.includes("否认") ? "danger" : "";
+      document.getElementById("listScreen").classList.add("hidden");
+      document.getElementById("detailScreen").classList.remove("hidden");
+      document.getElementById("detailScreen").querySelector(".scroll").scrollTop = 0;
+    }
+
+    function showList() {
+      document.getElementById("detailScreen").classList.add("hidden");
+      document.getElementById("listScreen").classList.remove("hidden");
+    }
+
+    function openSettings() {
+      document.getElementById("listScreen").classList.add("hidden");
+      document.getElementById("detailScreen").classList.add("hidden");
+      document.getElementById("settingsScreen").classList.remove("hidden");
+      renderSettings();
+      document.getElementById("settingsScreen").querySelector(".scroll").scrollTop = 0;
+    }
+
+    function closeSettings() {
+      document.getElementById("settingsScreen").classList.add("hidden");
+      document.getElementById("listScreen").classList.remove("hidden");
+    }
+
+    function renderSettings() {
+      document.querySelectorAll(".device-option").forEach(el => el.classList.toggle("active", el.dataset.device === settings.device));
+      document.querySelectorAll(".mode-option").forEach(el => el.classList.toggle("active", el.dataset.mode === settings.mode));
+      document.querySelectorAll(".provider-option").forEach(el => el.classList.toggle("active", el.dataset.provider === settings.provider));
+      document.getElementById("speedRange").value = settings.speed;
+      document.getElementById("speedValue").textContent = settings.speed;
+      document.getElementById("currentModel").textContent = settings.model;
+      document.getElementById("tokenInput").value = settings.token || "";
+      document.getElementById("tokenInput").type = "password";
+      document.getElementById("tokenToggle").textContent = "◉";
+      const testState = document.getElementById("modelTestState");
+      testState.textContent = settings.token ? "已保存 Token，尚未重新测试" : "未配置 API Token";
+      testState.className = "model-test-state";
+      document.getElementById("terminalConnectButton").disabled = false;
+      document.getElementById("terminalConnectButton").textContent = settings.device === "phone" ? "主动连接" : "连接";
+    }
+
+    function selectDevice(button) {
+      settings.device = button.dataset.device;
+      document.querySelectorAll(".device-option").forEach(el => el.classList.toggle("active", el === button));
+      const connectButton = document.getElementById("terminalConnectButton");
+      connectButton.disabled = false;
+      connectButton.textContent = settings.device === "phone" ? "主动连接" : "连接";
+      if (settings.device === "phone") {
+        setOutputIndicator("手机蓝牙 HID · 等待连接", "选择电脑并完成蓝牙配对后变为绿色", false);
+      } else {
+        const label = button.querySelector(".device-option-copy strong").textContent;
+        setOutputIndicator(`${label} · 等待连接`, "连接外接终端后变为绿色", false);
+      }
+    }
+
+    function connectSelectedTerminal() {
+      if (settings.device === "phone") {
+        const lastComputer = localStorage.getItem("careflow-last-computer");
+        if (lastComputer) {
+          const connectButton = document.getElementById("terminalConnectButton");
+          connectButton.disabled = true;
+          connectButton.textContent = "连接中";
+          setOutputIndicator("手机蓝牙 HID · 正在连接", `手机主动连接：${lastComputer}`, false);
+          setTimeout(() => {
+            connectButton.textContent = "已连接";
+            setOutputIndicator("手机蓝牙 HID · 连接成功", `已连接：${lastComputer}`, true);
+            showToast(`已主动连接 ${lastComputer}`);
+          }, 650);
+        } else {
+          openPairingSheet();
+        }
+        return;
+      }
+      const button = document.querySelector(".device-option.active .device-option-copy strong");
+      const label = button ? button.textContent : "目标终端";
+      const connectButton = document.getElementById("terminalConnectButton");
+      connectButton.disabled = true;
+      connectButton.textContent = "连接中";
+      setOutputIndicator(`${label} · 正在连接`, "正在建立蓝牙连接，请保持板子通电", false);
+      setTimeout(() => {
+        setOutputIndicator(`${label} · 连接成功`, "终端已就绪，可以输出病历", true);
+        connectButton.textContent = "已连接";
+        showToast(`已连接 ${label}`);
+      }, 900);
+    }
+
+    function setOutputIndicator(title, detail, connected) {
+      document.getElementById("outputIndicatorTitle").textContent = title;
+      document.getElementById("outputIndicatorDetail").textContent = detail;
+      document.getElementById("outputIndicator").classList.toggle("connected", connected);
+    }
+
+    function openPairingSheet() {
+      document.getElementById("pairingOverlay").classList.add("open");
+    }
+
+    function closePairingSheet() {
+      document.getElementById("pairingOverlay").classList.remove("open");
+    }
+
+    function connectComputer(name) {
+      closePairingSheet();
+      localStorage.setItem("careflow-last-computer", name);
+      setOutputIndicator("手机蓝牙 HID · 连接成功", `已连接：${name}`, true);
+      const connectButton = document.getElementById("terminalConnectButton");
+      connectButton.textContent = "已连接";
+      connectButton.disabled = true;
+      showToast(`已连接 ${name}`);
+    }
+
+    function discoverPhone() {
+      closePairingSheet();
+      setOutputIndicator("手机蓝牙 HID · 等待配对", "手机已可见，请在电脑端添加“手机蓝牙键盘”", false);
+      showToast("手机已对附近设备可见，请在电脑端完成配对");
+    }
+
+    function updateSpeed(value) {
+      settings.speed = Number(value);
+      document.getElementById("speedValue").textContent = value;
+    }
+
+    function selectMode(button) {
+      settings.mode = button.dataset.mode;
+      document.querySelectorAll(".mode-option").forEach(el => el.classList.toggle("active", el === button));
+    }
+
+    function selectProvider(button) {
+      settings.provider = button.dataset.provider;
+      settings.model = settings.provider === "deepseek" ? "deepseek-v4-flash" : "mimo-v2.5";
+      document.querySelectorAll(".provider-option").forEach(el => el.classList.toggle("active", el === button));
+      document.getElementById("currentModel").textContent = settings.model;
+      modelConnectionChanged();
+    }
+
+    function modelConnectionChanged() {
+      const state = document.getElementById("modelTestState");
+      state.textContent = document.getElementById("tokenInput").value.trim()
+        ? "Token 已修改，尚未测试"
+        : "请填写 API Token";
+      state.className = "model-test-state";
+    }
+
+    function testModelConnection() {
+      const token = document.getElementById("tokenInput").value.trim();
+      const button = document.getElementById("testModelButton");
+      const state = document.getElementById("modelTestState");
+      if (!token) {
+        state.textContent = "请先填写 API Token";
+        state.className = "model-test-state error";
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "测试中…";
+      state.textContent = `正在连接 ${settings.provider === "deepseek" ? "DeepSeek" : "小米 MiMo"} / ${settings.model}…`;
+      state.className = "model-test-state";
+      setTimeout(() => {
+        button.disabled = false;
+        button.textContent = "测试模型连接";
+        state.textContent = `连接成功：${settings.provider === "deepseek" ? "DeepSeek" : "小米 MiMo"} / ${settings.model}`;
+        state.className = "model-test-state success";
+        showToast("模型连接验证成功");
+      }, 900);
+    }
+
+    function toggleToken() {
+      const input = document.getElementById("tokenInput");
+      const toggle = document.getElementById("tokenToggle");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      toggle.textContent = show ? "◌" : "◉";
+    }
+
+    function saveSettings() {
+      settings.token = document.getElementById("tokenInput").value.trim();
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      showToast("键盘与模型设置已保存");
+    }
+
+    function openSheet() {
+      document.getElementById("overlay").classList.add("open");
+      document.getElementById("formError").textContent = "";
+      document.getElementById("nameInput").value = "";
+      document.getElementById("ageInput").value = "";
+      selectedGender = "男";
+      document.querySelectorAll(".gender-option").forEach(x => x.classList.toggle("active", x.dataset.gender === "男"));
+      setTimeout(() => document.getElementById("nameInput").focus(), 80);
+    }
+
+    function closeSheet() { document.getElementById("overlay").classList.remove("open"); }
+
+    function pickGender(button) {
+      selectedGender = button.dataset.gender;
+      document.querySelectorAll(".gender-option").forEach(x => x.classList.remove("active"));
+      button.classList.add("active");
+    }
+
+    function addPatient(event) {
+      event.preventDefault();
+      const name = document.getElementById("nameInput").value.trim();
+      const age = Number(document.getElementById("ageInput").value);
+      const error = document.getElementById("formError");
+      if (!name) { error.textContent = "请填写病人姓名"; return; }
+      if (!Number.isFinite(age) || age < 0 || age > 130) { error.textContent = "请填写 0–130 岁之间的有效年龄"; return; }
+      const patient = {
+        id: Date.now(), name, age: Math.round(age), gender: selectedGender,
+        bed:"待定", status:"在院", diagnosis:"入院诊断待录入", allergy:"过敏史待确认"
+      };
+      patients.push(patient);
+      persist();
+      renderList();
+      closeSheet();
+      showToast(`${name} 已添加到病人列表`);
+      setTimeout(() => document.querySelectorAll(".patient-row")[patients.length - 1]?.scrollIntoView({behavior:"smooth",block:"nearest"}), 60);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    let timer;
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(timer);
+      timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closePairingSheet();
+        closeSheet();
+        if (!document.getElementById("settingsScreen").classList.contains("hidden")) closeSettings();
+        else if (!document.getElementById("detailScreen").classList.contains("hidden")) showList();
+      }
+    });
+
+    renderList();
+    renderSettings();
+  </script>
+</body>
+</html>

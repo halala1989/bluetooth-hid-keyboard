@@ -1,0 +1,233 @@
+# 项目开发历史（对话记录整理）
+
+> 本文档由 2026-08-25 ~ 2026-08-26 的开发对话整理而成，方便换电脑后快速了解来龙去脉。
+> 托管仓库：https://github.com/halala1989/bluetooth-hid-keyboard
+
+## 一、项目简介（两条产品线）
+
+| 产品线 | 分支 | 版本 | 说明 |
+|---|---|---|---|
+| 手机蓝牙键盘（当前） | `phone-keyboard`（默认分支） | v1.0 / v1.1 / v1.2 | Android 手机直接模拟成蓝牙键盘，**不需要 Pico W**；包名 `com.hidble.phonekeyboard` |
+| Pico W 键盘（旧） | `master` | v10 / v11 | Pico W BLE → USB HID 键盘，需要 Pico W 固件 |
+
+目标电脑端都不需要安装任何软件、驱动，也不读取屏幕。
+
+## 二、开发时间线
+
+### 2026-08-25 · v10（Pico W 方案起步）
+- 在 Pico W 上实现 BLE GATT + USB HID 键盘：手机 App 通过 BLE 发文本/按键，Pico W 转成 USB HID 报告打到电脑。
+- 中文输入 4 种模式（`UMOD`）：
+  - Alt+X（默认）：输入十六进制码后按 Alt+X（Win11 记事本/Word 等 RichEdit 应用，无需注册表/NumLock）
+  - 十六进制：Alt+小键盘+十六进制码（需 EnableHexNumpad 注册表+NumLock；Win11 记事本无效）
+  - 十进制：Alt+0+十进制码点（RichEdit 应用）
+  - GBK：Alt+小键盘十进制 GBK 机内码（仅中文版 Windows）
+- 验证结论：Win11 记事本 + Alt+X 可输入中文；**GBK 模式测试成功**。
+
+### 2026-08-26 · v11（Pico W 方案增强）
+- 输入速度调速：固件新增 `SPEED` 命令（1=最慢…10=最快，默认 5），整体缩放按键/字符/Alt 输入延迟；App 输入框旁新增“速度”文本框 + “应用”，自动保存、连接后自动下发。
+- 常用语句：App 输入区新增“常用语”按钮，可添加/编辑/删除并自动保存，点选插入输入框。
+- 界面重排：文本输入（含发送）移到最顶部；扫描设备/断开连接/发现设备移到最底部。
+- 建立版本化发布约定：`releases/vNN/` 归档 + git tag（v10、v11…）。
+
+### 2026-08-26 · 拆分独立产品线 phone-keyboard v1.0
+- 用户提出新想法：不再需要 Pico W，让手机直接模拟成蓝牙键盘。
+- 实现：改用 Android 9+ 的 `BluetoothHidDevice` API，手机注册成标准蓝牙键盘，电脑蓝牙直接配对打字。
+- 中文输入 4 模式与速度逻辑 1:1 移植到手机端（`TypingEngine.kt`），体验与 v11 一致。
+- **独立分支** `phone-keyboard`，版本从 **1.0** 开始编号（不与 Pico W 的 v10/v11 混用）；
+  应用重命名（包名 `com.hidble.phonekeyboard`、应用名“手机蓝牙键盘”），与手机上已装的旧版互不覆盖、可同时安装。
+
+### 2026-08-26 · v1.1（一键开关）
+- 底部改为「模拟蓝牙键盘」大开关：打开即自动请求开启蓝牙并自动注册成蓝牙键盘；关闭即停止。
+- 已配对设备列表保留在开关下方，可手动重连。
+
+### 2026-08-26 · v1.2（修复电脑搜不到）
+- 现象（真机测试）：开关关闭时电脑能搜到手机（普通手机），打开后电脑完全搜不到。
+- 原因：安卓注册成 HID 键盘后会关闭蓝牙“可见性”。
+- 修复：注册成功后自动触发系统 `ACTION_REQUEST_DISCOVERABLE`（“对附近设备可见”授权，默认 5 分钟），点允许后电脑即可搜到“手机蓝牙键盘”并配对。
+
+### 2026-08-27 · v1.3（大模型接入）
+- 新增 `LlmClient.kt`（OpenAI 兼容 Chat Completions，零依赖）+ 模型设置二级页（DeepSeek/MiMo/火山，只填 Token）。
+- 中文输入提速（Alt 与首位数字合并报告、去掉多余抬起等待）+ 长文本自动分段（每 80 字暂停 20ms、失败自动重试）。
+- 版本递增到 v1.3（versionCode 4）。
+
+### 2026-08-27 · v1.4（界面美化 + 乱码修复 + 发送中止）
+- 新应用图标（手机→蓝牙→键盘，矢量自适应图标）。
+- 主界面瘦身：功能键/光标/组合键、蓝牙开关+已配对设备、命令日志全部移入二级页面（KeysActivity / ConnectionActivity / LogActivity + LogStore）。
+- 中文模式改下拉菜单（绿色 √ 在右侧）、输入速度改横向滑块（拖动即生效）、主输入框改 4 行可滚动。
+- 大模型：4 行提问框、输出“我”绿/AI 白、发送到键盘默认排除“我”、AI 思考动画、文本框优先内部滚动。
+- 发送 HID 时阻止锁屏；发送按钮改为「发送到键盘」+ 发送中可点「停止」中止。
+- 顶部状态条可点击直达连接管理。
+- **Alt+X 乱码修复**：加 `U+` 前缀隔离十六进制码（Word/记事本会读回全部相邻 hex）；`ALT_PRE_MS` 停顿 + 速度档位重排防随机丢字。
+
+### 2026-08-28 · v1.4 真机 Bug 修复（目标机为 GBK 模式）
+- **长文本“删光前面内容”**：根因 = 报告发送速率超过蓝牙物理速率（<10ms/份）→ 缓冲溢出丢报告 →
+  Shift/Alt “抬起”丢失卡键；GBK 模式叠加目标机 NumLock 未开（小键盘变方向键）+ 残留 Shift → 全选删除。
+  修复：报告最小间隔 10ms（对齐蓝牙速率）、发送前后/中止时 `releaseAll()` 清残留按键、
+  LED 报告检测 NumLock，GBK 未开时提示。
+- **切换页面/程序掉线**：掉线自动重连（3 次/2s）、回前台主动补连、HID 服务重启自动恢复注册、
+  所有 Activity 加 `configChanges` 防转屏销毁、重连后清一次键盘状态。
+- **配对设备点击无反应**：`connect()` 未注册自动先注册、服务未就绪自动重试；点击有明确反馈。
+- 详细技术结论与后续 AI 提示见 `docs/CONTINUE_DEV.md`。
+
+### 2026-08-28 · v1.5（大模型对话：提示词预设下拉）
+- 「发送给模型」按钮缩短，同一行右侧新增提示词下拉菜单：无提示词（直接发送）/ 已存预设 / ＋ 新建提示词 / ✎ 删除提示词。
+- 选中预设后发送，提示词内容自动拼接到用户输入前面（内置示例「书面化整理」：把患者交谈转为正式书面语言，去口语/语气词/多余符号）。
+- 预设存 SharedPreferences（`llm_prompts`），选择状态持久化；新建/删除即时生效。
+- 版本号递增到 v1.5（versionCode 6）。
+- 内置医疗提示词预设（2026-08-28）：门诊病历草稿 / 入院记录草稿 / SOAP病历 / 病历规范书面化 / 患者沟通解释 / 随访记录，
+  均遵循中国《病历书写基本规范》，按“预设版本号”增量补齐到老用户，不覆盖自定义提示词。
+
+### 2026-08-28 · 定名 v2.0 Beta
+- 功能基本完善，产品正式定名为 **2.0 Beta**（versionCode 7 / versionName "2.0-beta"）。
+- 后续测试中发现的 bug 将在 2.0 Beta 基础上修补，直至正式发布 2.0。
+
+### 2026-09-02 · v2.0-beta（大模型流式输出 + 对话历史持久化）
+- 流式输出：`LlmClient.chatStream`（SSE 逐行解析 `choices[0].delta.content`），
+  回复边生成边显示（首个增量到达前仍显示“AI 正在思考…”动画），流式期间跳过逐字着色/保存，结束统一处理。
+- 对话历史持久化：user/assistant 消息存 SharedPreferences（`llm_history`，最多 40 条），重启恢复多轮上下文；「清空」同步删除。
+- 版本号 versionCode 7 → 8（versionName 仍为 "2.0-beta"）。
+
+### 2026-09-02 · v2.0-beta（连接保活 + 各档提速 10% + 提示词长按编辑）
+- **蓝牙连接保活**：根因是 Android 对“非前台”的 HID 注册 App 会自动注销（官方文档明示）。
+  新增前台服务 `HidKeyboardService`（connectedDevice 类型）在键盘注册期间保持 App 前台，
+  切子页面/切后台不再断连；关闭键盘才停止服务。
+- **输入速度**：`SPEED_SCALES` 延迟系数整体 ×0.9（每档提速 10%），`MIN_DELAY_MS=10` 物理下限不动。
+- **提示词管理**：下拉改为“✎ 管理提示词…”；列表点按=删除（确认）、长按=编辑（原位更新）；
+  选择仍走主下拉，不可编辑。
+- 版本号 versionCode 8 → 9（versionName 仍为 "2.0-beta"）。
+
+### 2026-09-02 · v2.0-beta（修复流式回复串入 "null"）
+- 根因：`optString("content")` 对 JSON null（角色/思考/结束增量块）返回字面量 "null" 被拼进正文。
+- 修复：流式与非流式均改用 `opt("content")` + 类型判断，只接受真正的字符串内容。
+- 版本号 versionCode 9 → 10（versionName 仍为 "2.0-beta"）。
+
+### 2026-09-02 · v2.0-beta（真机验证完成）
+- 本轮全部改动（流式输出/历史持久化/连接保活/各档提速/提示词管理/null 修复）经真机验证通过，未发现新问题。
+- 当前 v2.0 Beta（versionCode 10）为稳定可用状态，待办与后续方向见 `docs/CONTINUE_DEV.md`。
+
+### 2026-09-04 · v2.0-beta（各档再提速 10% + 新对话按钮 + 历史对话下拉 + 多模态附件）
+- **输入速度**：`SPEED_SCALES` 再次 ×0.9（两轮累计约提速 19%）：
+  `[3600,2970,2430,1890,1440,1035,702,450,234,72]` → `[3240,2673,2187,1701,1296,932,632,405,211,65]`；
+  `MIN_DELAY_MS=10` 物理下限不动，7 档以上触底属预期。
+- **对话操作改版**：“发送给模型”按钮缩短，同行右侧新增“新对话”（自动存档旧对话后清空上下文，开始新对话）；
+  提示词下拉独占一行。
+- **历史对话下拉**：新增会话存档（`llm_conversations`，最多 50 个），点选弹窗可查看完整内容，
+  支持“载入为当前对话 / 删除”；载入前自动存档当前编辑内容，避免丢失。
+- **“＋”多模态附件**：可添加本地图片/音频（单文件 ≤12MB、一次 ≤4 个），随消息以 OpenAI
+  多模态 content 数组发送（图片 `image_url`、音频 `input_audio`）；附件字节只保留在本次运行内存，
+  重启后历史仅保留文件名称文字说明，不再重传原文件。
+- 实现文件：`MainActivity.kt`、`LlmClient.kt`（`LlmPart`/`LlmMessage` + content 数组）、`activity_main.xml`、`TypingEngine.kt`。
+- 版本号 versionCode 10 → 11（versionName 仍为 "2.0-beta"）；根目录 APK 已更新；**新功能待真机验证**。
+
+### 2026-09-04 · v2.0-beta（新增“火山 AI Hub（Agent Plan）”提供方）
+- 需求：大模型增加对**火山 AI Hub** 的支持，用户使用 **Agent-Plan-Small** 套餐。
+- 调研结论：“Agent-Plan-Small”是火山方舟 Agent Plan 个人版的**套餐档位**（Small/Medium/Large/Max），
+  **不是模型名**；接入需用 Agent Plan 专属 OpenAI 兼容端点
+  `https://ark.cn-beijing.volces.com/api/plan/v3`（`.../chat/completions`），
+  `model` 填套餐内具体模型（如 `doubao-seed-2.0-lite`、`doubao-seed-2.0-pro`、`glm-5.2` 等），
+  Token 用控制台 Agent Plan 专用 API Key；Agent Plan 不提供 `/models` 列表接口。
+- 实现：`LlmProviders` 新增第 4 个提供方“火山 AI Hub（Agent Plan）”（默认模型
+  `doubao-seed-2.0-lite`）；`LlmProvider` 增加 `hint` 字段，设置页在模型框下方提示
+  “Small 是套餐档位不是模型名，请填具体模型名”并列出常用模型。
+- 实现文件：`LlmClient.kt`、`LlmSettingsActivity.kt`、`activity_llm_settings.xml`。
+- 版本号 versionCode 11 → 12（versionName 仍为 "2.0-beta"）；根目录 APK 已更新；**待真机验证**。
+
+### 2026-09-05 · v2.0-beta（流式显示思考过程 + 各档提速5% + 普通模式预设）
+- 流式体验优化：模型思考阶段（reasoning_content）实时显示“思考中：…”滚动内容，正文到达后自动切回逐字输出；
+  等待时显示“已等待 N 秒”，避免误以为卡住；思考内容不写入病历正文/历史。versionCode 13。
+- 各速度档位再提速 5%（SPEED_SCALES ×0.95）。
+- 提示词预设新增「普通模式」：不套医学/病历模板，正常聊天直答（预设版本号 2→3，老用户自动补齐）。
+
+### 2026-09-05 · v2.0-beta（火山 Agent Plan 默认模型改为 ark-code-latest）
+- 按火山官方文档，Agent Plan 模型应填 `ark-code-latest`（多模型聚合入口，自动选套餐内最合适子模型）。
+- 提供方预设默认模型 doubao-seed-2.0-lite → ark-code-latest；设置页提示同步更新；
+  自动迁移已保存的旧默认值（不覆盖手动指定的具体模型）。versionCode 14。
+
+### 2026-09-05 · v2.0-beta（官方文档复核 Agent Plan 接入配置）
+- 阅读火山方舟官方《Agent Plan 个人版 · 快速开始》与《其他工具（OpenAI 兼容接入）》，
+  确认现有接入（Base URL `https://ark.cn-beijing.volces.com/api/plan/v3` + 模型 `ark-code-latest`
+  + Agent Plan 专用 Key）与官方文档完全一致；`ark-code-latest` 为控制台可切换的聚合模型（切换 3–5 分钟生效）。
+- 本轮不改代码、不升版本号，仅归档核对结论与官方链接。
+
+### 2026-09-06 · v2.0-beta（科学文献检索：对话前勾选自动查学术文献）
+- 新增 LlmLiterature.kt：直连火山 Agent Plan“专业数据集”MCP（工具 dataPro_search，Streamable HTTP JSON-RPC），
+  覆盖 CNKI/万方/维普/arxiv/PubMed/MDPI/Biorxiv；code 4011 = Key 无效/额度不足/未开启专业数据集 Harness。
+- 主界面新增“🔬 检索科学文献”勾选框：发送前先检索，文献作参考上下文附给模型（不写入历史），
+  结果条可点按查看并复制链接；检索失败不阻断对话。
+- 模型设置新增“科学文献检索专用 Key（可选）”，留空用 Agent Plan Token；需先在方舟控制台开启专业数据集 Harness。
+  versionCode 15。
+
+### 2026-09-06 · v2.0-beta（“停止输出”按钮 + 切后台继续输出）
+- 发送行新增“停止输出”按钮：请求持独立协程 llmRequestJob，点击即取消；流式读取/文献检索加
+  ensureActive 使停止及时生效；CancellationException 静默收尾，已生成内容保留；try/finally 统一复位。
+- 新增前台保活服务 LlmRunService（通知“大模型输出中”+ 唤醒锁）：请求期间切后台/锁屏也把回复跑完，
+  请求结束/停止/页面关闭自动停止。versionCode 16。
+
+### 2026-09-10 · ESP32-S3 Super Mini 硬件线启动（BLE HID 键盘，替代 Pico）
+- 新硬件实测：ESP32-S3 (QFN56) v0.2，Wi-Fi + BT5 LE，4MB Flash + 2MB PSRAM，原生 USB-Serial/JTAG（COM10）。
+- 新目录 esp32_firmware/（ESP-IDF v5.2.2 + NimBLE，基于官方 esp_hid_device 示例）：已完成编译、
+  烧录、开机稳定、电脑 BLE 扫描可见 "ESP32-S3 Keyboard"（广播含 HID 服务 0x1812）。
+- 踩坑已固化到 esp32_firmware/README.md 与 patch_idf_nimble_hid_stack.ps1：
+  ① 中文路径导致 ldgen 失败 → build 目录放英文路径；② NimBLE HID 事件任务栈 2048 溢出导致重启 → 改 6144；
+  ③ 无屏幕配对 → 改 Just Works（NO_IO + 关闭 MITM）；④ Flash 按 4MB 配置。
+- 下一步：自定义服务 1234/1235/1236 + TEXT/KEY/MOD/UNI/UMOD/SPEED 协议；PSRAM 环形大缓冲 + 控速输出；
+  GBK/Alt+X 输入逻辑移植；手机 App 侧接入。
+
+### 2026-09-10 · ESP32-S3 数据通道打通 + App 接入（外接键盘板）
+- 固件：新增手机数据通道服务 1234/1235/1236（TEXT/KEY/MOD/UNI/UMOD/SPEED），PSRAM 512KB 环形缓冲 + 控速 HID 输出；
+  修广播缺 Appearance（Windows 要“显示更多设备”）、广播 31 字节超限（名字移到 scan response）、连接后停止广播（改为持续广播）。
+  电脑端 BLE 实测：STATUS:READY + OK，键盘报文已发出。
+- App（versionCode 17+）：连接管理页新增“外接键盘板（ESP32-S3）”卡片（扫描/连接/断开）；连接后“发送到键盘”优先走板子，
+  未连板子时回退手机自身 HID 键盘；连接时自动同步速度档与中文输入模式（UMOD）。
+
+## 三、关键技术点 / 踩坑记录
+
+1. **Alt 码输入必须用小键盘键位**（HID KP_0..KP_9）；主键盘数字/字母会被当作 Alt 快捷键弹菜单。
+2. 十六进制模式的字母 A-F 用主键盘字母键（不带 Shift）。
+3. Win11 记事本会拦截 `Alt+小键盘+`（弹链接编辑器），所以十六进制模式在记事本无效；记事本支持 Alt+X。
+4. 自动开关 NumLock 有副作用（会把 NumLock 关掉、导致输入翻倍），已移除。
+5. 目标机是英文版 Windows 时 GBK 机内码无效；十进制仅在 RichEdit 应用有效。
+6. **Android 13+ 不允许 App 静默打开蓝牙**，只能弹系统授权（`ACTION_REQUEST_ENABLE`）由用户确认。
+7. **注册 HID 后蓝牙可见性会被关闭**，必须再请求“对附近设备可见”，否则电脑搜不到。
+8. 中文输入依赖 Windows 内置 Alt 码输入：记事本/Word 用 Alt+X，浏览器聊天框切“十六进制”或“GBK”。
+9. **Word/记事本 Alt+X 会把光标前所有相邻 hex 字符读成一个码点**：前面有数字/字母（如日期）时会合并成超长无效码点→乱码。官方消歧：加 `U+` 前缀（如 `U+5E74`+Alt+X→年）；`x` 前缀是 ASCII 专用。
+10. 按 Alt+X 前要停顿（`ALT_PRE_MS=100`），否则宿主来不及写入最后一位数字导致随机乱码；目标电脑输入法应处于英文模式。
+11. **大模型多模态消息**：带图片/音频时 `content` 必须是数组（纯文本用字符串最兼容），
+    图片 = `{"type":"image_url","image_url":{"url":"data:<mime>;base64,..."}}`；
+    音频 = `{"type":"input_audio","input_audio":{"data":"data:<mime>;base64,..."}}`（小米 MiMo 原生支持）。
+    发送前务必确认所选模型支持该模态，否则会返回 4xx/提示不支持。
+12. **火山 AI Hub（Agent Plan）**：`Agent-Plan-Small` 是套餐档位不是模型名；专属地址为
+    `https://ark.cn-beijing.volces.com/api/plan/v3`（OpenAI 兼容，Chat Completions/SSE 均可用），
+    Token 用 Agent Plan 专用 Key（ark- 开头，与普通方舟 Key 不通用），无 `/models` 列表接口，
+    模型名需手动填套餐内具体模型。
+13. **火山 Agent Plan 科学文献检索 = MCP（dataPro_search）**：不是聊天自动开关。端点
+    `https://datapro.hqd.cn-beijing.volces.com/mcp`，头 `X-Agent-Plan-Key`；App 在发送前调它把文献拼进上下文。
+    返回 code==0 成功、**4011=Key 无效/额度不足/未开启专业数据集权限**；需先在控制台“配置 Harness”开启专业数据集。
+14. **大模型输出的停止与后台续跑**：请求在独立协程 `llmRequestJob`，点“停止输出”= cancel；
+    切后台/锁屏要跑完靠前台服务 `LlmRunService`（通知+唤醒锁）。从最近任务划掉 App 会中断本次请求，属正常。
+
+## 四、测试反馈与已知限制
+
+- 手机键盘方案需要 **Android 9+（API 28）** 且手机支持蓝牙键盘（HID Device）功能（大多数手机支持，个别 ROM 可能限制）。
+- 若某手机 ROM 把 HID 可见性限制死，需要在系统蓝牙设置里手动开“对附近设备可见”。
+- 中文输入在浏览器对话框（非 RichEdit）不支持 Alt+X，需切“十六进制”（需注册表+NumLock）或 GBK。
+
+## 五、发布与版本约定
+
+- 每次发布：版本号 +1 → 产物归档 `releases/vNN/`（APK + RELEASE_NOTES.md）→ 打 git tag `vNN` → 更新 `releases/LATEST`。
+- 手机键盘产品线从 1.0 开始（v1.0、v1.1、v1.2…）；Pico W 产品线用 v10、v11…。
+- 详见 `releases/README.md`。
+
+## 六、待办 / 未来规划（对话中已提出）
+
+- **大模型润色**：输入文本框连接自建 LLM API，把一段长话自动分段、去口水词、整理成书面语言后再发送。
+- 微软拼音 `vuc` 方案（任意应用输入 Unicode）；一键 Shift 切换中英文输入法。
+
+## 七、如何继续开发（换电脑）
+
+```powershell
+git clone https://github.com/halala1989/bluetooth-hid-keyboard.git
+cd bluetooth-hid-keyboard
+git checkout phone-keyboard        # 当前产品线
+```
+环境（CC Switch / ChatGPT 配置、构建工具链）迁移见 `docs/MIGRATION.md`。
