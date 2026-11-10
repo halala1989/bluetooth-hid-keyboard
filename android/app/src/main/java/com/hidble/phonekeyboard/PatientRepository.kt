@@ -195,7 +195,14 @@ class PatientRepository(context: Context) :
     }
 
     fun deletePatient(id: Long) {
-        writableDatabase.delete(TABLE_PATIENTS, "id = ?", arrayOf(id.toString()))
+        writableDatabase.beginTransaction()
+        try {
+            writableDatabase.delete(TABLE_RECORDS, "patient_id = ?", arrayOf(id.toString()))
+            writableDatabase.delete(TABLE_PATIENTS, "id = ?", arrayOf(id.toString()))
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
     }
 
     fun listRecords(patientId: Long): List<ClinicalRecord> {

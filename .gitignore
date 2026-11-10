@@ -23,7 +23,12 @@ _alttest.txt
 external-terminals/
 terminals/sources/**/_source.tar
 
-# Intermediate test APKs; published test18 is kept explicitly
+# Intermediate test APKs; the current published test build is kept explicitly
 住院全流程管理-v*.apk
 医键住院管理-v4.0-test*.apk
 !医键住院管理-v4.0-test18.apk
+!医键住院管理-v4.0-test19.apk
+!医键住院管理-v4.0-test20.apk
+!医键住院管理-v4.0-test21.apk
+!医键住院管理-v4.0-test22.apk
+!医键住院管理-v4.0-test23.apk

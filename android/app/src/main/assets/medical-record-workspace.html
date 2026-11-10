@@ -382,8 +382,61 @@
       background:rgba(255,255,255,.84);
     }
     .output-tabs::-webkit-scrollbar { display:none; }
-    .output-tab { flex:0 0 auto; padding:6px 9px; border:1px solid var(--line); border-radius:999px; background:white; color:var(--muted); font-size:8.5px; font-weight:800; }
+    .output-tab {
+      position:relative;
+      flex:0 0 auto;
+      padding:6px 9px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background:white;
+      color:var(--muted);
+      font-size:8.5px;
+      font-weight:800;
+      touch-action:manipulation;
+      user-select:none;
+      -webkit-user-select:none;
+    }
     .output-tab.active { border-color:#abcabf; background:var(--primary-soft); color:var(--primary-deep); }
+    .output-tab.saved { padding-right:19px; }
+    .output-tab.saved::after {
+      content:"";
+      position:absolute;
+      top:5px;
+      right:6px;
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:var(--primary);
+      box-shadow:0 0 0 2px white;
+    }
+
+    .output-save-bar {
+      display:none;
+      flex:0 0 auto;
+      align-items:center;
+      gap:10px;
+      padding:9px 14px 10px;
+      border-top:1px solid var(--line);
+      background:rgba(250,252,251,.97);
+      box-shadow:0 -8px 22px rgba(30,65,55,.045);
+    }
+    .output-save-bar.visible { display:flex; }
+    .output-save-copy { flex:1; min-width:0; }
+    .output-save-copy strong { display:block; overflow:hidden; font-size:10px; white-space:nowrap; text-overflow:ellipsis; }
+    .output-save-copy span { display:block; margin-top:3px; color:var(--muted); font-size:8px; }
+    .output-save-button {
+      min-height:36px;
+      padding:0 13px;
+      border:0;
+      border-radius:10px;
+      background:var(--primary);
+      color:white;
+      font-size:9px;
+      font-weight:900;
+      box-shadow:0 7px 16px rgba(23,108,91,.18);
+    }
+    .output-save-button:disabled { background:#c7d5d0; color:#f6faf8; box-shadow:none; }
+    .output-pane.has-output-savebar .fab.output-add { bottom:76px; }
 
     .consent-editor {
       margin:12px 14px 0;
@@ -700,6 +753,11 @@
       .fab.input-add { left:11px; }
       .fab.output-add { right:11px; }
       .fab svg { width:20px; height:20px; }
+      .output-pane.has-output-savebar .fab.output-add { bottom:66px; }
+      .output-save-bar { padding:7px 9px 8px; gap:7px; }
+      .output-save-copy strong { font-size:9px; }
+      .output-save-copy span { font-size:7.5px; }
+      .output-save-button { min-height:33px; padding:0 9px; font-size:8px; }
       .input-card { padding:10px 11px; margin-bottom:7px; border-radius:12px; }
       .input-title { margin:6px 0 4px; font-size:10.5px; }
       .input-content { font-size:9px; line-height:1.55; }
@@ -738,10 +796,6 @@
       </div>
       <div class="top-spacer"></div>
       <div class="connection"><span class="connection-dot"></span> 手机蓝牙 HID 已连接</div>
-      <button class="button secondary" onclick="showToast('草稿已保存')">
-        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-        保存草稿
-      </button>
     </header>
 
     <section class="workspace">
@@ -791,14 +845,14 @@
         </button>
       </article>
 
-      <article class="pane output-pane">
+      <article class="pane output-pane" id="outputPane">
         <header class="pane-head">
           <span class="pane-icon output">
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>
           </span>
           <div class="pane-title">
             <h2>病历输出</h2>
-            <p>根据左侧原始资料生成规范文书</p>
+            <p>可保留多份草稿，保存后进入患者详情</p>
           </div>
           <span class="count-badge" id="outputCount">未生成</span>
         </header>
@@ -813,6 +867,8 @@
             <h3>还没有生成病历文书</h3>
             <p>点击右下角蓝色加号，选择需要生成的文书类型。系统会读取左侧已保存的患者资料。</p>
           </section>
+
+          <div id="outputDocuments"></div>
 
           <section class="document" id="admissionDoc">
             <header class="document-head">
@@ -874,22 +930,6 @@
               <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
               本模块只生成知情告知文本，不代替医生说明、患者自主选择和签字确认。
             </div>
-            <section class="consent-editor">
-              <div class="consent-editor-head">
-                <div>
-                  <h4>AI 从自然语言资料中提取手术方案</h4>
-                  <p>在左侧对话框直接描述推荐方案和备选方案，可提供一个、两个、三个或更多；数量和名称由模型自动识别。</p>
-                </div>
-                <span class="recommended-badge">自然语言提取</span>
-              </div>
-              <div class="source-strip" style="margin:10px 0 0">
-                <span>示例：</span><b>推荐某手术，备选某方法，同时考虑另一方案</b>
-              </div>
-              <div class="consent-tools">
-                <label class="web-toggle"><input type="checkbox" id="onlineResearch" checked> 联网检索指南与风险信息</label>
-                <button class="button primary" onclick="generateConsent()">汇总资料并生成</button>
-              </div>
-            </section>
             <div class="source-strip">
               <span>引用来源：</span><b>左侧全部输入</b><b>已生成文书</b><b id="consentSourceCount">3 条原始资料</b>
             </div>
@@ -956,6 +996,14 @@
             </header>
             <div id="genericSections"></div>
           </section>
+        </div>
+
+        <div class="output-save-bar" id="outputSaveBar">
+          <div class="output-save-copy">
+            <strong id="outputSaveTitle">当前文书</strong>
+            <span id="outputSaveState">尚未保存到患者详情</span>
+          </div>
+          <button class="output-save-button" id="saveOutputButton" onclick="saveActiveDocument()">保存到患者详情</button>
         </div>
 
         <button class="fab output-add" onclick="openTypeDialog()" aria-label="新建病历输出">
@@ -1096,12 +1144,28 @@
         <div class="output-speed-head"><strong>输出速度</strong><span class="output-speed-value" id="outputSpeedValue">5</span></div>
         <input type="range" id="outputSpeedRange" min="1" max="10" value="5" oninput="updateOutputSpeed(this.value)">
         <div class="speed-range-labels"><span>稳定</span><span>默认</span><span>快速</span></div>
-        <div class="speed-warning">第 8 档为稳定上限；第 9、10 档突破保护下限，最高约为旧版两倍，可能因蓝牙链路丢字。</div>
+        <div class="speed-warning">所有档位较上一版再提升约 10%；第 8 档为稳定上限，第 9、10 档继续突破保护下限。出现丢字时请手动降低一档。</div>
       </div>
       <div class="output-controls">
         <button class="button secondary" id="pauseButton" onclick="togglePause()">暂停</button>
         <button class="button danger-soft" id="stopButton" onclick="stopOutput()">完全停止</button>
         <button class="button primary" id="restartButton" onclick="startOutputSession()">重新输出</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="deleteDocumentOverlay" onclick="closeDeleteDocumentDialog()">
+    <section class="type-dialog" style="max-width:380px" onclick="event.stopPropagation()">
+      <div class="dialog-head">
+        <div>
+          <h2>删除这份文书？</h2>
+          <p id="deleteDocumentMessage">删除后将从病例输出和患者详情中移除。</p>
+        </div>
+        <button class="close" onclick="closeDeleteDocumentDialog()">×</button>
+      </div>
+      <div style="padding:0 18px 18px;display:flex;justify-content:flex-end;gap:8px">
+        <button class="button secondary" onclick="closeDeleteDocumentDialog()">取消</button>
+        <button class="button danger-soft" onclick="confirmDeleteDocument()">确认删除</button>
       </div>
     </section>
   </div>
@@ -1175,8 +1239,9 @@
     let inputSequence = 3;
     let editingInputId = null;
     let demoInputSequence = 100;
-    const createdDocuments = new Set();
-    let consentGenerated = false;
+    let workspaceDocuments = [];
+    let activeDocumentId = null;
+    let pendingDeleteDocumentId = null;
     const pendingGenerations = new Map();
     let generationTimer = null;
     let generationProgress = 0;
@@ -1209,6 +1274,7 @@
     const workspacePatientName = workspaceParams.get("patientName");
     const workspacePatientMeta = workspaceParams.get("patientMeta");
     const workspaceOpenType = workspaceParams.get("openType");
+    const workspaceOpenDocumentId = workspaceParams.get("openDocumentId");
     const workspaceInputKey = workspacePatientId ? `careflow-record-inputs-${workspacePatientId}` : null;
     const workspaceDocumentsKey = workspacePatientId ? `careflow-record-documents-${workspacePatientId}` : null;
     if (workspacePatientName) {
@@ -1269,45 +1335,50 @@
       } catch { }
     }
 
+    function normalizeWorkspaceDocument(record, typeHint = "") {
+      const type = String(record?.type || typeHint || "");
+      const generatedAt = Number(record?.generatedAt || record?.updatedAt) || Date.now();
+      const sections = Array.isArray(record?.sections) ? record.sections : [];
+      return {
+        id: String(record?.id || record?.documentId || `legacy-${type}-${generatedAt}`),
+        type,
+        title: String(record?.title || outputTypeLabels[type] || type),
+        config: record?.config || {
+          modules: sections.map(section => section.title),
+          prompts: [],
+          customPrompt: "",
+          supplementalNarrative: "",
+          onlineResearch: false
+        },
+        sections,
+        extra: record?.extra || {},
+        generatedAt,
+        savedAt: Number(record?.savedAt) || null
+      };
+    }
+
     function loadWorkspaceDocuments() {
-      if (!workspaceDocumentsKey) return {};
+      if (!workspaceDocumentsKey) return [];
       try {
-        const saved = JSON.parse(localStorage.getItem(workspaceDocumentsKey) || "{}");
-        return saved && typeof saved === "object" ? saved : {};
+        const saved = JSON.parse(localStorage.getItem(workspaceDocumentsKey) || "[]");
+        const entries = Array.isArray(saved)
+          ? saved.map(record => normalizeWorkspaceDocument(record))
+          : Object.entries(saved || {}).map(([type, record]) =>
+              normalizeWorkspaceDocument({ ...record, type }, type)
+            );
+        return entries
+          .filter(record => record.type && record.sections.length > 0)
+          .sort((a, b) => a.generatedAt - b.generatedAt);
       } catch {
-        return {};
+        return [];
       }
     }
 
-    function persistWorkspaceDocument(type, config, sections, extra = {}) {
+    function persistWorkspaceDocuments() {
       if (!workspaceDocumentsKey) return;
       try {
-        const saved = loadWorkspaceDocuments();
-        saved[type] = {
-          config,
-          sections,
-          extra,
-          generatedAt: Date.now()
-        };
-        localStorage.setItem(workspaceDocumentsKey, JSON.stringify(saved));
-        syncGeneratedDocumentsToNative();
+        localStorage.setItem(workspaceDocumentsKey, JSON.stringify(workspaceDocuments));
       } catch { }
-    }
-
-    function syncGeneratedDocumentsToNative() {
-      if (!workspaceDocumentsKey ||
-          typeof AndroidMedicalBridge === "undefined" ||
-          typeof AndroidMedicalBridge.syncGeneratedDocuments !== "function") {
-        return;
-      }
-      const saved = loadWorkspaceDocuments();
-      const documents = Object.entries(saved).map(([type, record]) => ({
-        type,
-        title: outputTypeLabels[type] || type,
-        sections: record.sections || [],
-        updatedAt: record.generatedAt || Date.now()
-      }));
-      AndroidMedicalBridge.syncGeneratedDocuments(JSON.stringify(documents));
     }
 
     const outputModuleOptions = {
@@ -1502,11 +1573,7 @@
         showToast("所有文书必须调用大模型生成，请先在安卓 App 中配置模型");
         return;
       }
-      if (type === "consent") {
-        generateDocument(type, config);
-      } else {
-        await generateNativeDocument(type, config);
-      }
+      await generateNativeDocument(type, config);
     }
 
     function hasNativeGeneration() {
@@ -1660,8 +1727,10 @@
             sections = sections.filter(section => !retriedTitles.has(section.title)).concat(retriedSections);
           }
         }
-        renderNativeDocument(type, config, sections);
-        persistWorkspaceDocument(type, config, sections);
+        const record = createWorkspaceDocument(type, config, sections);
+        renderWorkspaceDocument(record);
+        showDocumentById(record.id);
+        showToast("生成完成，尚未保存到患者详情");
       } catch (error) {
         document.getElementById("generationOverlay").classList.add("open");
         document.getElementById("generationTitle").textContent = "生成结果解析失败";
@@ -1672,49 +1741,117 @@
     }
 
     function markDocumentReady(doc) {
-      if (!doc || doc.querySelector(".generation-ready-bar")) return;
-      const bar = document.createElement("div");
-      bar.className = "generation-ready-bar";
-      bar.innerHTML = `<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>生成完成，可以开始输出</span>`;
-      doc.querySelector(".document-head").after(bar);
+      if (doc && !doc.querySelector(".generation-ready-bar")) {
+        const bar = document.createElement("div");
+        bar.className = "generation-ready-bar";
+        bar.innerHTML = `<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>生成完成，可以开始输出</span>`;
+        doc.querySelector(".document-head").after(bar);
+      }
     }
 
-    function renderNativeDocument(type, config, sections, silent = false) {
-      document.getElementById("emptyOutput").style.display = "none";
-      const byTitle = new Map(sections.map(section => [section.title, section.content]));
-      let docId;
-      let containerId;
-      if (type === "admission") {
-        docId = "admissionDoc";
-        containerId = "admissionSections";
-      } else if (type === "first") {
-        docId = "firstCourseDoc";
-        containerId = "firstCourseSections";
-      } else if (type === "preop-summary") {
-        docId = "preopSummaryDoc";
-        containerId = "preopSummarySections";
-      } else if (type === "preop-discussion") {
-        docId = "preopDiscussionDoc";
-        containerId = "preopDiscussionSections";
-      } else {
-        docId = "genericDoc";
-        containerId = "genericSections";
-        const spec = genericSpecs[type];
-        document.getElementById("genericTitle").textContent = spec?.title || outputTypeLabels[type] || "病历文书";
-        document.getElementById("genericDescription").textContent = "由当前模型根据患者资料生成";
+    function createWorkspaceDocument(type, config, sections, extra = {}, savedAt = null) {
+      const generatedAt = Date.now();
+      const record = normalizeWorkspaceDocument({
+        id: `doc-${type}-${generatedAt}-${Math.random().toString(16).slice(2, 8)}`,
+        type,
+        title: outputTypeLabels[type] || type,
+        config,
+        sections,
+        extra,
+        generatedAt,
+        savedAt
+      }, type);
+      workspaceDocuments.push(record);
+      persistWorkspaceDocuments();
+      return record;
+    }
+
+    function planNumberFromTitle(title) {
+      const normalized = String(title || "").trim().replace(/\s+/g, "");
+      const arabic = normalized.match(/^方案([0-9]+)/);
+      if (arabic) return Number(arabic[1]);
+      const chinese = normalized.match(/^方案([一二三四五六七八九十两]+)/);
+      if (!chinese) return 9999;
+      const numberText = chinese[1];
+      const digits = {
+        零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4,
+        五: 5, 六: 6, 七: 7, 八: 8, 九: 9
+      };
+      if (!numberText.includes("十")) return digits[numberText] ?? 9999;
+      const [tensText, onesText] = numberText.split("十");
+      const tens = tensText ? (digits[tensText] ?? 1) : 1;
+      const ones = onesText ? (digits[onesText] ?? 0) : 0;
+      return tens * 10 + ones;
+    }
+
+    function renderableSections(record) {
+      const selected = record.config?.modules || record.sections.map(section => section.title);
+      if (record.type === "consent") {
+        const ordered = [];
+        if (selected.includes("疾病介绍")) {
+          const disease = record.sections.find(section => section.title === "疾病介绍");
+          if (disease) ordered.push(disease);
+        }
+        if (selected.includes("方案比较")) {
+          const seenPlans = new Set();
+          record.sections
+            .map((section, index) => ({ section, index }))
+            .filter(item => /^方案[一二三四五六七八九十两0-9]+/.test(item.section.title.trim()))
+            .sort((a, b) => {
+              const numberDiff =
+                planNumberFromTitle(a.section.title) - planNumberFromTitle(b.section.title);
+              return numberDiff || a.index - b.index;
+            })
+            .forEach(item => {
+              const planNumber = planNumberFromTitle(item.section.title);
+              const key = planNumber === 9999
+                ? item.section.title.trim().replace(/\s+/g, "")
+                : String(planNumber);
+              if (seenPlans.has(key)) return;
+              seenPlans.add(key);
+              ordered.push(item.section);
+            });
+        }
+        if (selected.includes("手术相关风险")) {
+          const risk = record.sections.find(section => section.title === "手术相关风险");
+          if (risk) ordered.push(risk);
+        }
+        return ordered;
       }
-      document.getElementById(containerId).innerHTML = config.modules.map(title => {
-        const content = byTitle.get(title);
-        return content
-          ? sectionHtml(title, escapeHtml(content).replaceAll("\n", "<br>"))
-          : "";
-      }).join("");
-      createdDocuments.add(type);
-      document.getElementById("outputCount").textContent = createdDocuments.size;
-      renderTabs(type);
-      showDocument(docId);
-      markDocumentReady(document.getElementById(docId));
-      if (!silent) showToast("生成完成，可以开始输出");
+      const byTitle = new Map(record.sections.map(section => [section.title, section]));
+      const ordered = selected.map(title => byTitle.get(title)).filter(Boolean);
+      return ordered.length ? ordered : record.sections;
+    }
+
+    function renderWorkspaceDocument(record) {
+      document.getElementById("emptyOutput").style.display = "none";
+      document.querySelector(`#outputDocuments .document[data-document-id="${CSS.escape(record.id)}"]`)?.remove();
+      const doc = document.createElement("section");
+      doc.className = "document";
+      doc.dataset.documentId = record.id;
+      const generatedTime = new Date(record.generatedAt).toLocaleString("zh-CN");
+      const sourceCount = collectSourceInputs().length;
+      const sections = renderableSections(record);
+      doc.innerHTML = `
+        <header class="document-head">
+          <div class="document-heading">
+            <h3>${escapeHtml(record.title)}</h3>
+            <p>${sourceCount} 条输入资料 · 生成于 ${escapeHtml(generatedTime)}</p>
+          </div>
+          <div class="document-actions">
+            <button class="output-document-button" onclick="openOutputDialogByDocument('${record.id}')">输出到 ${escapeHtml(getOutputTarget().label)}</button>
+          </div>
+        </header>
+        <div class="generation-ready-bar"></div>
+        <div class="doc-note">
+          <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+          生成内容需由医师核对。长按上方标签可以删除这份文书。
+        </div>
+        ${sections.map(section => sectionHtml(section.title, escapeHtml(section.content).replaceAll("\n", "<br>"))).join("")}
+      `;
+      document.getElementById("outputDocuments").appendChild(doc);
+      updateDocumentSavedState(record);
+      return doc;
     }
 
     function loadRememberedConfigs() {
@@ -1725,94 +1862,56 @@
       }
     }
 
-    function generateDocument(type, config) {
-      const selectedModules = config?.modules || outputModuleOptions[type] || [];
-      document.getElementById("emptyOutput").style.display = "none";
-      if (type === "admission") {
-        showDocument("admissionDoc");
-        if (!createdDocuments.has("admission")) {
-          renderSections("admissionSections", admissionSections.filter(([title]) => selectedModules.includes(title)));
-          createdDocuments.add("admission");
-        }
-      } else if (type === "first") {
-        showDocument("firstCourseDoc");
-        if (!createdDocuments.has("first")) {
-          renderSections("firstCourseSections", firstCourseSections.filter(([title]) => selectedModules.includes(title)));
-          createdDocuments.add("first");
-        }
-      } else if (type === "consent") {
-        showDocument("consentDoc");
-        document.getElementById("consentDoc").dataset.selectedModules = JSON.stringify(selectedModules);
-      } else if (type === "preop-summary") {
-        showDocument("preopSummaryDoc");
-        renderDependency(
-          "summaryDependency",
-          consentGenerated,
-          "已读取手术同意书、全部原始资料和既往输出，仅生成两个指定模块。",
-          "手术同意书尚未生成。当前仍只汇总已给出的患者资料。"
-        );
-        if (!createdDocuments.has("preop-summary")) {
-          renderSections("preopSummarySections", preopSummarySections.filter(([title]) => selectedModules.includes(title)));
-          createdDocuments.add("preop-summary");
-        }
-      } else if (type === "preop-discussion") {
-        showDocument("preopDiscussionDoc");
-        const ready = consentGenerated && createdDocuments.has("preop-summary");
-        renderDependency(
-          "discussionDependency",
-          ready,
-          "已读取术前小结和手术同意书，仅生成术中术后风险与特殊术前准备。",
-          "需先完成手术同意书和术前小结；当前缺失内容不会自动编造。"
-        );
-        if (!createdDocuments.has("preop-discussion")) {
-          renderSections("preopDiscussionSections", preopDiscussionSections.filter(([title]) => selectedModules.includes(title)));
-          createdDocuments.add("preop-discussion");
-        }
-      } else {
-        const spec = genericSpecs[type];
-        if (!spec) return;
-        document.getElementById("genericTitle").textContent = spec.title;
-        document.getElementById("genericDescription").textContent = spec.description;
-        const container = document.getElementById("genericSections");
-        container.innerHTML = spec.sections
-          .filter(title => selectedModules.includes(title))
-          .map((title) => sectionHtml(title, `<span class="placeholder">将根据左侧已保存资料生成“${title}”。</span>`)).join("");
-        createdDocuments.add(type);
-        showDocument("genericDoc");
-      }
-      if (type === "consent" && !consentGenerated) {
-        createdDocuments.add("consent");
-      }
-      document.getElementById("outputCount").textContent = Math.max(createdDocuments.size, 1);
-      renderTabs(type);
-      const promptCount = (config?.prompts?.length || 0) + (config?.customPrompt ? 1 : 0);
-      showToast(`正在生成 ${selectedModules.length} 个栏目${promptCount ? `，应用 ${promptCount} 条提示词` : ""}…`);
-    }
-
-    function showDocument(id) {
-      document.querySelectorAll(".document").forEach(el => el.classList.toggle("active", el.id === id));
+    function showDocumentById(id) {
+      const record = workspaceDocuments.find(document => document.id === id);
+      if (!record) return;
+      activeDocumentId = id;
+      document.querySelectorAll("#outputDocuments .document").forEach(element =>
+        element.classList.toggle("active", element.dataset.documentId === id)
+      );
       document.getElementById("outputScroll").scrollTop = 0;
-      ensureDocumentOutputButton(document.getElementById(id));
+      renderTabs(id);
+      updateOutputSaveBar();
     }
 
-    function ensureDocumentOutputButton(doc) {
+    function findActiveDocument() {
+      return workspaceDocuments.find(document => document.id === activeDocumentId) || null;
+    }
+
+    function updateDocumentSavedState(record) {
+      const doc = document.querySelector(
+        `#outputDocuments .document[data-document-id="${CSS.escape(record.id)}"]`
+      );
       if (!doc) return;
-      const header = doc.querySelector(".document-head");
-      if (!header) return;
-      let actions = header.querySelector(".document-actions");
-      if (!actions) {
-        actions = document.createElement("div");
-        actions.className = "document-actions";
-        header.appendChild(actions);
+      const bar = doc.querySelector(".generation-ready-bar");
+      if (bar) {
+        bar.innerHTML = record.savedAt
+          ? `<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>已保存到患者详情 · ${new Date(record.savedAt).toLocaleString("zh-CN")}</span>`
+          : `<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>生成完成，尚未保存到患者详情</span>`;
       }
-      if (actions.querySelector(".output-document-button")) return;
-      const button = document.createElement("button");
-      button.className = "output-document-button";
-      const canOutput = doc.id !== "consentDoc" || document.getElementById("consentOutput").classList.contains("ready");
-      button.disabled = !canOutput;
-      button.textContent = canOutput ? `输出到 ${getOutputTarget().label}` : "生成后可输出";
-      button.onclick = () => openOutputDialog(doc.id);
-      actions.appendChild(button);
+      const outputButton = doc.querySelector(".output-document-button");
+      if (outputButton) outputButton.textContent = `输出到 ${getOutputTarget().label}`;
+    }
+
+    function updateOutputSaveBar() {
+      const record = findActiveDocument();
+      const bar = document.getElementById("outputSaveBar");
+      const pane = document.getElementById("outputPane");
+      bar.classList.toggle("visible", Boolean(record));
+      pane.classList.toggle("has-output-savebar", Boolean(record));
+      if (!record) return;
+      const button = document.getElementById("saveOutputButton");
+      document.getElementById("outputSaveTitle").textContent = record.title;
+      if (record.savedAt) {
+        document.getElementById("outputSaveState").textContent =
+          `已保存到患者详情 · ${new Date(record.savedAt).toLocaleString("zh-CN")}`;
+        button.textContent = "已保存";
+        button.disabled = true;
+      } else {
+        document.getElementById("outputSaveState").textContent = "当前文书只保留在病例输出区";
+        button.textContent = "保存到患者详情";
+        button.disabled = false;
+      }
     }
 
     function getOutputTarget() {
@@ -1840,13 +1939,16 @@
       };
     }
 
-    function openOutputDialog(docId) {
-      activeOutputDocId = docId;
-      const doc = document.getElementById(docId);
-      const title = doc.querySelector(".document-heading h3")?.textContent?.trim() || "病历文书";
-      const sections = Array.from(doc.querySelectorAll(".section-copy"))
-        .filter(element => element.offsetParent !== null)
-        .map(element => element.textContent.trim())
+    function openOutputDialogByDocument(documentId) {
+      const record = workspaceDocuments.find(document => document.id === documentId);
+      if (!record) {
+        showToast("这份文书已不存在，请重新生成");
+        return;
+      }
+      activeOutputDocId = documentId;
+      const title = record.title;
+      const sections = renderableSections(record)
+        .map(section => section.content)
         .filter(Boolean);
       activeOutputText = [title, ...sections].join("\n\n");
       activeOutputTotal = Array.from(activeOutputText).length;
@@ -2007,102 +2109,6 @@
       else showToast("已返回病人详情");
     }
 
-    function renderSections(containerId, sections) {
-      document.getElementById(containerId).innerHTML = sections.map(([title, copy]) =>
-        sectionHtml(title, copy)
-      ).join("");
-    }
-
-    function renderDependency(id, ready, readyText, missingText) {
-      const element = document.getElementById(id);
-      element.classList.toggle("ready", ready);
-      element.querySelector("span").textContent = ready ? readyText : missingText;
-    }
-
-    async function generateConsent() {
-      const online = document.getElementById("onlineResearch").checked;
-      const inputCount = document.querySelectorAll("#inputList .input-card").length;
-      const selectedModuleChoices = JSON.parse(document.getElementById("consentDoc").dataset.selectedModules || "[]");
-      if (!hasNativeGeneration()) {
-        showToast("请在安卓 App 中连接模型后生成手术同意书");
-        return;
-      }
-      const baseConfig = outputConfigs.consent || { modules: selectedModuleChoices, prompts: [], customPrompt: "" };
-      const onlineInstruction = online
-        ? "允许模型调用联网检索工具查询最新指南和专业资料，但必须注明来源；联网内容需由医师核对。"
-        : "本次不启用联网检索，只依据已提供资料生成。";
-      const extractionInstruction =
-        "请从左侧全部自然语言资料中识别医生提出的推荐手术方案和所有备选方案。不需要用户另外填写方案名称；方案数量不固定，识别到一个即生成一个，识别到两个就生成两个，识别到更多就继续逐项生成。";
-      const config = {
-        ...baseConfig,
-        modules: selectedModuleChoices,
-        onlineResearch: online,
-        customPrompt: [baseConfig.customPrompt, onlineInstruction, extractionInstruction].filter(Boolean).join("\n")
-      };
-      const result = await requestNativeGeneration("consent", config, []);
-      if (!result.success) return;
-      try {
-        const sections = parseGeneratedSections(result.payload);
-        renderNativeConsent(sections, selectedModuleChoices, online, inputCount);
-        persistWorkspaceDocument(
-          "consent",
-          config,
-          sections,
-          { selectedModules: selectedModuleChoices, online }
-        );
-      } catch (error) {
-        document.getElementById("generationOverlay").classList.add("open");
-        document.getElementById("generationTitle").textContent = "生成结果解析失败";
-        document.getElementById("generationStage").classList.add("error");
-        document.getElementById("generationStage").textContent = error.message;
-        document.getElementById("generationCloseButton").disabled = false;
-      }
-    }
-
-    function renderNativeConsent(sections, selectedModules, online, inputCount, silent = false) {
-      const byTitle = new Map(sections.map(section => [section.title, section.content]));
-      const disease = byTitle.get("疾病介绍") || "模型未返回疾病介绍，请重新生成。";
-      document.getElementById("diseaseIntro").textContent = disease;
-      document.getElementById("diseaseCharCount").textContent = `${Array.from(disease).length} 字`;
-      document.getElementById("consentSourceCount").textContent = `${inputCount} 条原始资料`;
-      const planSections = selectedModules.includes("方案比较")
-        ? sections.filter(section => /^方案[一二三四五六七八九十0-9]+/.test(section.title))
-        : [];
-      document.getElementById("surgeryPlanSections").innerHTML = planSections.map((section, index) => {
-        return `
-          <div class="section-block">
-            <div class="section-title-row"><h4 class="section-title">${escapeHtml(section.title)}</h4>${index === 0 ? '<span class="required">推荐</span>' : ""}</div>
-            <p class="section-copy">${escapeHtml(section.content).replaceAll("\n", "<br>")}</p>
-            <div class="prompt-row">
-              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
-              <input placeholder="附加要求：补充该方案的风险、费用或替代条件">
-              <button class="apply-prompt" onclick="showToast('已记录该方案的附加要求')">应用</button>
-            </div>
-          </div>
-        `;
-      }).join("");
-      document.getElementById("surgeryRisks").textContent =
-        byTitle.get("手术相关风险") || "模型未返回手术相关风险，请重新生成。";
-      document.getElementById("researchSourceLabel").textContent = online ? "已请求联网检索，来源需核对" : "未启用联网检索";
-      document.getElementById("diseaseIntro").closest(".section-block").style.display =
-        selectedModules.includes("疾病介绍") ? "" : "none";
-      document.getElementById("surgeryRisks").closest(".section-block").style.display =
-        selectedModules.includes("手术相关风险") ? "" : "none";
-      document.getElementById("consentOutput").classList.add("ready");
-      consentGenerated = true;
-      createdDocuments.add("consent");
-      document.getElementById("outputCount").textContent = createdDocuments.size;
-      renderTabs("consent");
-      showDocument("consentDoc");
-      markDocumentReady(document.getElementById("consentDoc"));
-      const outputButton = document.querySelector("#consentDoc .output-document-button");
-      if (outputButton) {
-        outputButton.disabled = false;
-        outputButton.textContent = `输出到 ${getOutputTarget().label}`;
-      }
-      if (!silent) showToast("生成完成，可以开始输出");
-    }
-
     function sectionHtml(title, copy) {
       const safeTitle = escapeHtml(title);
       return `
@@ -2118,103 +2124,184 @@
       `;
     }
 
-    function renderTabs(activeType) {
+    function renderTabs(activeId = activeDocumentId) {
       const tabs = document.getElementById("outputTabs");
-      const labels = {
-        admission:"入院记录",
-        first:"首次病程记录",
-        progress:"普通病程记录",
-        "preop-discussion":"术前讨论",
-        "preop-summary":"术前小结",
-        operation:"手术记录",
-        consent:"手术同意书",
-        discharge:"出院小结",
-        difficult:"疑难病例讨论"
+      const typeTotals = {};
+      workspaceDocuments.forEach(record => {
+        typeTotals[record.type] = (typeTotals[record.type] || 0) + 1;
+      });
+      const typeSeen = {};
+      tabs.style.display = workspaceDocuments.length ? "flex" : "none";
+      tabs.innerHTML = workspaceDocuments.map(record => {
+        typeSeen[record.type] = (typeSeen[record.type] || 0) + 1;
+        const base = outputTypeLabels[record.type] || record.type;
+        const label = typeTotals[record.type] > 1
+          ? `${base} ${typeSeen[record.type]}`
+          : base;
+        const classes = ["output-tab"];
+        if (record.id === activeId) classes.push("active");
+        if (record.savedAt) classes.push("saved");
+        return `<button class="${classes.join(" ")}" data-document-id="${record.id}" title="单击查看，长按删除">${escapeHtml(label)}</button>`;
+      }).join("");
+      tabs.querySelectorAll(".output-tab").forEach(button => {
+        attachOutputTabGestures(button, button.dataset.documentId);
+      });
+      document.getElementById("outputCount").textContent =
+        workspaceDocuments.length ? `${workspaceDocuments.length} 份` : "未生成";
+    }
+
+    function attachOutputTabGestures(button, documentId) {
+      let holdTimer = null;
+      let longPressed = false;
+      const clearHold = () => {
+        if (holdTimer) clearTimeout(holdTimer);
+        holdTimer = null;
       };
-      const docIds = {
-        admission:"admissionDoc",
-        first:"firstCourseDoc",
-        progress:"genericDoc",
-        "preop-discussion":"preopDiscussionDoc",
-        "preop-summary":"preopSummaryDoc",
-        operation:"genericDoc",
-        consent:"consentDoc",
-        discharge:"genericDoc",
-        difficult:"genericDoc"
-      };
-      tabs.style.display = "flex";
-      const existingTypes = Object.keys(labels).filter(label => createdDocuments.has(label) || label === activeType);
-      tabs.innerHTML = existingTypes.map(type => `<button class="output-tab ${type === activeType ? "active" : ""}" onclick="showDocument('${docIds[type]}')">${labels[type]}</button>`).join("");
+      button.addEventListener("pointerdown", event => {
+        if (event.button !== undefined && event.button !== 0) return;
+        longPressed = false;
+        clearHold();
+        holdTimer = setTimeout(() => {
+          longPressed = true;
+          openDeleteDocumentDialog(documentId);
+        }, 650);
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach(name =>
+        button.addEventListener(name, clearHold)
+      );
+      button.addEventListener("click", event => {
+        clearHold();
+        if (longPressed) {
+          event.preventDefault();
+          longPressed = false;
+          return;
+        }
+        showDocumentById(documentId);
+      });
+      button.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        openDeleteDocumentDialog(documentId);
+      });
+    }
+
+    function openDeleteDocumentDialog(documentId) {
+      const record = workspaceDocuments.find(document => document.id === documentId);
+      if (!record) return;
+      pendingDeleteDocumentId = documentId;
+      document.getElementById("deleteDocumentMessage").textContent = record.savedAt
+        ? `“${record.title}”已保存到患者详情，确认后会同时从工作台和患者详情中删除。`
+        : `“${record.title}”尚未保存，确认后会从病例输出区删除。`;
+      document.getElementById("deleteDocumentOverlay").classList.add("open");
+    }
+
+    function closeDeleteDocumentDialog() {
+      pendingDeleteDocumentId = null;
+      document.getElementById("deleteDocumentOverlay").classList.remove("open");
+    }
+
+    function confirmDeleteDocument() {
+      const documentId = pendingDeleteDocumentId;
+      const index = workspaceDocuments.findIndex(document => document.id === documentId);
+      if (index < 0) {
+        closeDeleteDocumentDialog();
+        return;
+      }
+      const record = workspaceDocuments[index];
+      if (activeOutputDocId === record.id) stopOutput();
+      if (record.savedAt &&
+          typeof AndroidMedicalBridge !== "undefined" &&
+          typeof AndroidMedicalBridge.deleteGeneratedDocument === "function") {
+        AndroidMedicalBridge.deleteGeneratedDocument(record.id);
+      }
+      workspaceDocuments.splice(index, 1);
+      persistWorkspaceDocuments();
+      document.querySelector(
+        `#outputDocuments .document[data-document-id="${CSS.escape(record.id)}"]`
+      )?.remove();
+      if (activeDocumentId === record.id) {
+        activeDocumentId =
+          workspaceDocuments[Math.min(index, workspaceDocuments.length - 1)]?.id || null;
+      }
+      if (activeDocumentId) {
+        showDocumentById(activeDocumentId);
+      } else {
+        document.getElementById("emptyOutput").style.display = "";
+        renderTabs();
+        updateOutputSaveBar();
+      }
+      closeDeleteDocumentDialog();
+      showToast("文书已删除");
+    }
+
+    function saveActiveDocument() {
+      const record = findActiveDocument();
+      if (!record) return;
+      if (record.savedAt) {
+        showToast("这份文书已经保存到患者详情");
+        return;
+      }
+      if (typeof AndroidMedicalBridge === "undefined" ||
+          typeof AndroidMedicalBridge.saveGeneratedDocument !== "function") {
+        showToast("无法保存，请重新打开病历工作台");
+        return;
+      }
+      const button = document.getElementById("saveOutputButton");
+      button.disabled = true;
+      button.textContent = "保存中…";
+      let saved = false;
+      try {
+        saved = AndroidMedicalBridge.saveGeneratedDocument(JSON.stringify(record)) !== false;
+      } catch {
+        saved = false;
+      }
+      if (!saved) {
+        button.disabled = false;
+        button.textContent = "保存到患者详情";
+        showToast("保存失败，请稍后重试");
+        return;
+      }
+      record.savedAt = Date.now();
+      persistWorkspaceDocuments();
+      updateDocumentSavedState(record);
+      renderTabs(activeDocumentId);
+      updateOutputSaveBar();
+      showToast("已保存，患者详情页可以查看");
     }
 
     function restoreGeneratedDocuments() {
-      const saved = loadWorkspaceDocuments();
-      const entries = Object.entries(saved).filter(([type, record]) =>
-        record && Array.isArray(record.sections) && outputTypeLabels[type]
-      );
-      if (entries.length === 0) return;
-      let lastType = null;
-      entries.forEach(([type, record]) => {
-        const config = record.config || {
-          modules: record.sections.map(section => section.title),
-          prompts: [],
-          customPrompt: ""
-        };
-        if (type === "consent") {
-          const extra = record.extra || {};
-          document.getElementById("onlineResearch").checked = Boolean(extra.online);
-          document.getElementById("consentDoc").dataset.selectedModules =
-            JSON.stringify(extra.selectedModules || config.modules || []);
-          renderNativeConsent(
-            record.sections,
-            extra.selectedModules || config.modules || [],
-            Boolean(extra.online),
-            document.querySelectorAll("#inputList .input-card").length,
-            true
-          );
-        } else {
-          renderNativeDocument(type, config, record.sections, true);
-        }
-        lastType = type;
-      });
-      if (lastType) renderTabs(lastType);
-      document.getElementById("outputCount").textContent = createdDocuments.size;
-      syncGeneratedDocumentsToNative();
-      if (workspaceOpenType && saved[workspaceOpenType]) {
-        const selected = saved[workspaceOpenType];
-        const selectedConfig = selected.config || {
-          modules: selected.sections.map(section => section.title),
-          prompts: [],
-          customPrompt: ""
-        };
-        if (workspaceOpenType === "consent") {
-          const extra = selected.extra || {};
-          renderNativeConsent(
-            selected.sections,
-            extra.selectedModules || selectedConfig.modules || [],
-            Boolean(extra.online),
-            document.querySelectorAll("#inputList .input-card").length,
-            true
-          );
-        } else {
-          renderNativeDocument(workspaceOpenType, selectedConfig, selected.sections, true);
-        }
-      }
-    }
+      workspaceDocuments = loadWorkspaceDocuments();
+      workspaceDocuments.forEach(record => renderWorkspaceDocument(record));
 
-    function documentIdForType(type) {
-      const docIds = {
-        admission: "admissionDoc",
-        first: "firstCourseDoc",
-        progress: "genericDoc",
-        "preop-discussion": "preopDiscussionDoc",
-        "preop-summary": "preopSummaryDoc",
-        operation: "genericDoc",
-        consent: "consentDoc",
-        discharge: "genericDoc",
-        difficult: "genericDoc"
-      };
-      return docIds[type] || "genericDoc";
+      let selectedId = workspaceOpenDocumentId;
+      if (selectedId && !workspaceDocuments.some(record => record.id === selectedId)) {
+        try {
+          if (typeof AndroidMedicalBridge !== "undefined" &&
+              typeof AndroidMedicalBridge.getSavedDocument === "function") {
+            const raw = AndroidMedicalBridge.getSavedDocument(selectedId);
+            if (raw) {
+              const record = normalizeWorkspaceDocument(JSON.parse(raw));
+              record.savedAt = record.savedAt || record.generatedAt;
+              workspaceDocuments.push(record);
+              persistWorkspaceDocuments();
+              renderWorkspaceDocument(record);
+            }
+          }
+        } catch { }
+      }
+      if (!workspaceDocuments.some(record => record.id === selectedId) && workspaceOpenType) {
+        selectedId = workspaceDocuments.find(record => record.type === workspaceOpenType)?.id || null;
+      }
+      if (!selectedId) {
+        selectedId = workspaceDocuments[workspaceDocuments.length - 1]?.id || null;
+      }
+
+      if (selectedId) {
+        showDocumentById(selectedId);
+      } else {
+        document.getElementById("emptyOutput").style.display = "";
+        renderTabs();
+        updateOutputSaveBar();
+      }
     }
 
     function escapeHtml(value) {
@@ -2234,6 +2321,7 @@
       if (event.key === "Escape") {
         closeOutputConfig();
         closeTypeDialog();
+        closeDeleteDocumentDialog();
         cancelInput();
       }
     });

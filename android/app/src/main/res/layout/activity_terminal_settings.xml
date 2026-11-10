@@ -373,7 +373,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="7dp"
-                    android:text="1–8 档保留稳定限速；第 8 档是稳定上限，第 9、10 档主动突破保护下限，速度约为旧版两倍，可能因链路丢字。"
+                    android:text="所有档位较上一版再提升约 10%；第 8 档为稳定上限，第 9、10 档继续突破保护下限。出现丢字时请手动降低一档。"
                     android:textColor="@color/clinical_warning"
                     android:textSize="9sp" />
 

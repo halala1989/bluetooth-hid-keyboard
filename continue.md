@@ -1,13 +1,13 @@
 # 医键住院管理：跨电脑继续开发指南
 
-本文档用于在新的电脑上继续开发 **医键住院管理 v4.0-test18**。开始前请先确认仓库分支为 `phone-keyboard`，不要使用旧版的 `master` 分支替代当前产品。
+本文档用于在新的电脑上继续开发 **医键住院管理 v4.0-test23**。开始前请先确认仓库分支为 `phone-keyboard`，不要使用旧版的 `master` 分支替代当前产品。
 
 - GitHub：<https://github.com/halala1989/bluetooth-hid-keyboard>
 - 当前分支：`phone-keyboard`
 - App 名称：`医键住院管理`
 - applicationId：`com.hidble.carekeyboard`
-- 当前版本：`4.0-test18`
-- versionCode：`40017`
+- 当前版本：`4.0-test23`
+- versionCode：`40022`
 
 ## 1. 新电脑首次准备
 
@@ -71,8 +71,8 @@ android/app/build/outputs/apk/debug/app-debug.apk
 当前正式测试包也放在：
 
 ```text
-医键住院管理-v4.0-test18.apk
-releases/v4.0-test18/医键住院管理-v4.0-test18.apk
+医键住院管理-v4.0-test23.apk
+releases/v4.0-test23/医键住院管理-v4.0-test23.apk
 ```
 
 如果你修改了功能，应重新构建并替换测试版 APK，避免源码与安装包不一致。
@@ -95,7 +95,18 @@ adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 - 首页是患者列表，右下角“+”新增姓名、性别、年龄。
 - 患者详情只保留姓名、性别、年龄。
 - “书写病历”是大尺寸入口；已生成并保存的文书显示在详情页下方。
-- 首页“下午好，医生”右侧的齿轮是“书写规范”，用于导入、启用和删除 Markdown Skill。
+- 首页“早上好，医生”右侧的齿轮是“书写规范”，用于导入、启用和删除 Markdown Skill。
+- Skill 预览下方可输入自然语言修改要求，并调用 DeepSeek 或 MiMo 返回完整 Markdown；成功后自动保存，失败时保留原 Skill。
+- 当前规则预览可以独立上下拖动；AI 修改完成后会自动定位到变化段落并高亮显示。
+- 入院记录、首次病程记录、手术同意书等类型可以重复生成多份草稿；草稿未保存时持续保留在工作台。
+- 病例输出区底部“保存到患者详情”用于显式保存当前文书；保存后患者详情会出现对应记录。
+- 长按病例输出区顶部文书标签可确认删除；已保存文书会同时从患者详情移除。
+- 首页只显示患者总数、病例总数和出院病例数；病例数按已保存文书统计。
+- 患者详情底部可办理出院，办理后患者状态改为“已出院”，并计入出院病例统计。
+- 删除患者会同时清理 SQLite 历史文书、加密保存文书和该患者的工作台草稿。
+- 手术同意书不再需要额外的联网检索和汇总生成步骤，确认标准配置后直接生成。
+- 手术同意书显示和输出顺序固定为疾病介绍、方案一至方案 N、手术相关风险，并按方案编号排序、去除重复方案。
+- 手机键盘全部输出档位较 Test22 再提速约 10%；第 10 档最低延迟为 3ms，丢字时应手动降低一档。
 
 ### 病历工作台
 
@@ -169,7 +180,7 @@ docs/INPATIENT_APP.md                # 产品实现与安全边界
 docs/MIGRATION.md                    # 通用迁移说明
 terminals/catalog.json               # 全部终端版本清单
 terminals/sources/                   # 已归档终端和固件源码
-releases/v4.0-test18/                # 当前测试版 APK 与发布说明
+releases/v4.0-test23/                # 当前测试版 APK 与发布说明
 ```
 
 ## 7. 继续开发时的优先检查
@@ -200,7 +211,7 @@ cd android
 应看到：
 
 ```text
-package: name='com.hidble.carekeyboard' versionCode='40017' versionName='4.0-test18'
+package: name='com.hidble.carekeyboard' versionCode='40022' versionName='4.0-test23'
 application-label:'医键住院管理'
 ```
 

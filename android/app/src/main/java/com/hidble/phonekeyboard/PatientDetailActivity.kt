@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -33,6 +35,8 @@ class PatientDetailActivity : AppCompatActivity() {
     private lateinit var genderSpinner: Spinner
     private lateinit var ageInput: EditText
     private lateinit var recordsContainer: LinearLayout
+    private lateinit var dischargePatientButton: Button
+    private var draftCleanerWebView: WebView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +54,13 @@ class PatientDetailActivity : AppCompatActivity() {
         super.onResume()
         refreshConnectionChip()
         refreshRecords()
+        refreshDischargeButton()
+    }
+
+    override fun onDestroy() {
+        draftCleanerWebView?.destroy()
+        draftCleanerWebView = null
+        super.onDestroy()
     }
 
     private fun bindViews() {
@@ -57,6 +68,7 @@ class PatientDetailActivity : AppCompatActivity() {
         genderSpinner = findViewById(R.id.genderSpinner)
         ageInput = findViewById(R.id.ageInput)
         recordsContainer = findViewById(R.id.recordsContainer)
+        dischargePatientButton = findViewById(R.id.dischargePatientButton)
     }
 
     private fun setupSpinners() {
@@ -74,6 +86,7 @@ class PatientDetailActivity : AppCompatActivity() {
     private fun setupActions() {
         findViewById<Button>(R.id.backButton).setOnClickListener { finish() }
         findViewById<Button>(R.id.savePatientButton).setOnClickListener { savePatient() }
+        dischargePatientButton.setOnClickListener { dischargePatient() }
         findViewById<Button>(R.id.addRecordButton).setOnClickListener {
             if (patientId <= 0) {
                 Toast.makeText(this, "请先保存患者基本信息", Toast.LENGTH_SHORT).show()
@@ -98,12 +111,43 @@ class PatientDetailActivity : AppCompatActivity() {
                 .setPositiveButton("确认删除") { _, _ ->
                     repository.deletePatient(patientId)
                     GeneratedDocumentStore.delete(this, patientId)
-                    Toast.makeText(this, "患者资料已删除", Toast.LENGTH_SHORT).show()
-                    finish()
+                    clearWorkspaceDrafts(patientId) {
+                        Toast.makeText(this, "患者及全部本地文书已删除", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
                 }
                 .setNegativeButton("取消", null)
                 .show()
         }
+    }
+
+    private fun clearWorkspaceDrafts(patientId: Long, onFinished: () -> Unit) {
+        val webView = WebView(this)
+        draftCleanerWebView = webView
+        var completed = false
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                super.onPageFinished(view, url)
+                if (completed) return
+                completed = true
+                val inputKey = "careflow-record-inputs-$patientId"
+                val documentsKey = "careflow-record-documents-$patientId"
+                view.evaluateJavascript(
+                    "localStorage.removeItem('$inputKey');" +
+                        "localStorage.removeItem('$documentsKey');'cleared'"
+                ) {
+                    view.destroy()
+                    if (draftCleanerWebView === view) draftCleanerWebView = null
+                    onFinished()
+                }
+            }
+        }
+        webView.loadUrl(
+            "file:///android_asset/medical-record-workspace.html" +
+                "?patientId=$patientId"
+        )
     }
 
     private fun loadPatient() {
@@ -122,6 +166,7 @@ class PatientDetailActivity : AppCompatActivity() {
             bindHeader(Patient(name = "新患者"))
         }
         refreshRecords()
+        refreshDischargeButton()
     }
 
     private fun bindHeader(value: Patient) {
@@ -173,6 +218,49 @@ class PatientDetailActivity : AppCompatActivity() {
         patient?.let { bindHeader(it) }
         Toast.makeText(this, "患者资料已保存", Toast.LENGTH_SHORT).show()
         refreshRecords()
+        refreshDischargeButton()
+    }
+
+    private fun refreshDischargeButton() {
+        val current = patient
+        when {
+            patientId <= 0 || current == null -> {
+                dischargePatientButton.text = "请先保存患者资料"
+                dischargePatientButton.isEnabled = false
+            }
+            current.status == "已出院" -> {
+                dischargePatientButton.text = "已出院"
+                dischargePatientButton.isEnabled = false
+            }
+            else -> {
+                dischargePatientButton.text = "办理出院"
+                dischargePatientButton.isEnabled = true
+            }
+        }
+    }
+
+    private fun dischargePatient() {
+        val current = patient ?: repository.findPatient(patientId)
+        if (patientId <= 0 || current == null) {
+            Toast.makeText(this, "请先保存患者资料", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (current.status == "已出院") {
+            Toast.makeText(this, "该患者已经办理出院", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("办理出院？")
+            .setMessage("办理后患者状态将改为“已出院”，并计入出院病例统计。患者和已保存文书仍会保留。")
+            .setPositiveButton("确认出院") { _, _ ->
+                repository.savePatient(current.copy(status = "已出院"))
+                patient = repository.findPatient(patientId)
+                patient?.let { bindHeader(it) }
+                refreshDischargeButton()
+                Toast.makeText(this, "患者已办理出院", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun refreshRecords() {
@@ -201,7 +289,12 @@ class PatientDetailActivity : AppCompatActivity() {
             item.setOnClickListener {
                 val currentPatient = patient ?: repository.findPatient(patientId) ?: return@setOnClickListener
                 startActivity(
-                    MedicalRecordWorkspaceActivity.intentFor(this, currentPatient, record.type)
+                    MedicalRecordWorkspaceActivity.intentFor(
+                        this,
+                        currentPatient,
+                        record.type,
+                        record.id
+                    )
                 )
             }
             item.setOnLongClickListener {
@@ -209,7 +302,7 @@ class PatientDetailActivity : AppCompatActivity() {
                     .setTitle("删除这份文书？")
                     .setMessage(record.title.ifBlank { outputTitle(record.type) })
                     .setPositiveButton("删除") { _, _ ->
-                        GeneratedDocumentStore.deleteOne(this, patientId, record.type)
+                        GeneratedDocumentStore.deleteOne(this, patientId, record.id)
                         refreshRecords()
                     }
                     .setNegativeButton("取消", null)

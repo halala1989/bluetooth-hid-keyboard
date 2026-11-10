@@ -239,11 +239,19 @@
                 android:visibility="gone" />
 
             <Button
+                android:id="@+id/dischargePatientButton"
+                style="@style/SecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="18dp"
+                android:text="办理出院" />
+
+            <Button
                 android:id="@+id/deletePatientButton"
                 style="@style/KeyButton"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="10dp"
                 android:text="删除患者及全部本地文书"
                 android:textColor="@color/clinical_danger" />
         </LinearLayout>

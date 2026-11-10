@@ -36,6 +36,7 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         private const val EXTRA_PATIENT_NAME = "patient_name"
         private const val EXTRA_PATIENT_META = "patient_meta"
         private const val EXTRA_OPEN_TYPE = "open_type"
+        private const val EXTRA_OPEN_DOCUMENT_ID = "open_document_id"
         private const val MEDICAL_SYSTEM_PROMPT =
             "你是中医医院住院病历书写助手。必须遵守《病历书写基本规范》和《中医病历书写基本规范》。" +
                 "只依据用户提供的患者资料生成，不得编造症状、体征、查体、检验检查、诊断、手术过程或诊疗经过。" +
@@ -58,11 +59,17 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
                 "生成手术同意书时，必须从左侧全部资料和本次补充自然语言资料中共同识别医生提出的推荐手术方案与全部备选方案，数量和名称不固定，不得要求医生另外逐项填写。疾病介绍目标为200至300个中文字符；识别到几个方案就逐项生成几个方案的优点和缺点，并生成与患者情况和术式相关的手术风险。" +
                 "不得自动开具具体处方。输出必须是合法 JSON 对象。"
 
-        fun intentFor(context: Context, patient: Patient, openType: String? = null): Intent =
+        fun intentFor(
+            context: Context,
+            patient: Patient,
+            openType: String? = null,
+            openDocumentId: String? = null
+        ): Intent =
             Intent(context, MedicalRecordWorkspaceActivity::class.java)
                 .putExtra(EXTRA_PATIENT_ID, patient.id.toString())
                 .putExtra(EXTRA_PATIENT_NAME, patient.displayName)
                 .putExtra(EXTRA_OPEN_TYPE, openType)
+                .putExtra(EXTRA_OPEN_DOCUMENT_ID, openDocumentId)
                 .putExtra(
                     EXTRA_PATIENT_META,
                     listOf(patient.gender, patient.ageLabel)
@@ -102,11 +109,13 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         val patientName = intent.getStringExtra(EXTRA_PATIENT_NAME).orEmpty()
         val patientMeta = intent.getStringExtra(EXTRA_PATIENT_META).orEmpty()
         val openType = intent.getStringExtra(EXTRA_OPEN_TYPE).orEmpty()
+        val openDocumentId = intent.getStringExtra(EXTRA_OPEN_DOCUMENT_ID).orEmpty()
         val url = "file:///android_asset/medical-record-workspace.html" +
             "?patientId=${Uri.encode(patientId)}" +
             "&patientName=${Uri.encode(patientName)}" +
             "&patientMeta=${Uri.encode(patientMeta)}" +
-            "&openType=${Uri.encode(openType)}"
+            "&openType=${Uri.encode(openType)}" +
+            "&openDocumentId=${Uri.encode(openDocumentId)}"
         webView.loadUrl(url)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -259,6 +268,26 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         fun syncGeneratedDocuments(documentsJson: String) {
             activity.runOnUiThread { activity.syncGeneratedDocuments(documentsJson) }
         }
+
+        @JavascriptInterface
+        fun saveGeneratedDocument(documentJson: String): Boolean =
+            activity.currentPatientId > 0 &&
+                GeneratedDocumentStore.save(activity, activity.currentPatientId, documentJson)
+
+        @JavascriptInterface
+        fun deleteGeneratedDocument(documentId: String): Boolean {
+            if (activity.currentPatientId <= 0 || documentId.isBlank()) return false
+            GeneratedDocumentStore.deleteOne(activity, activity.currentPatientId, documentId)
+            return true
+        }
+
+        @JavascriptInterface
+        fun getSavedDocument(documentId: String): String =
+            if (activity.currentPatientId > 0 && documentId.isNotBlank()) {
+                GeneratedDocumentStore.get(activity, activity.currentPatientId, documentId).orEmpty()
+            } else {
+                ""
+            }
 
         @JavascriptInterface
         fun goBack() {

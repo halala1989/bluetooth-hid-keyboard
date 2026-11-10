@@ -46,7 +46,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/rulesScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -87,6 +88,69 @@
             </LinearLayout>
 
             <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="15dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="让 AI 修改书写 Skill"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="用自然语言说明要增加、删除或调整的书写规则。AI 会返回修改后的完整 Markdown，并在成功后自动保存。"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:lineSpacingExtra="2dp" />
+
+                <EditText
+                    android:id="@+id/skillRevisionInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_input"
+                    android:gravity="top|start"
+                    android:hint="例如：增加“中医鉴别诊断必须引用《中医内科学》的辨证依据”，并把手术同意书的风险说明改得更简洁。"
+                    android:importantForAutofill="no"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:lineSpacingExtra="2dp"
+                    android:padding="12dp"
+                    android:scrollbars="vertical"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/skillRevisionState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="请先导入 Markdown Skill"
+                    android:textColor="@color/clinical_warning"
+                    android:textSize="9sp" />
+
+                <Button
+                    android:id="@+id/aiRefineSkillButton"
+                    style="@style/PrimaryButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="8dp"
+                    android:enabled="false"
+                    android:text="调用 AI 修改并保存" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/skillPreviewCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -139,20 +203,31 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/skillPreview"
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/skillPreviewScroll"
                     android:layout_width="match_parent"
                     android:layout_height="280dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/bg_log"
-                    android:fontFamily="monospace"
-                    android:gravity="top|start"
-                    android:padding="12dp"
+                    android:fillViewport="true"
+                    android:nestedScrollingEnabled="true"
+                    android:overScrollMode="ifContentScrolls"
                     android:scrollbars="vertical"
-                    android:text="尚未导入 Markdown Skill。"
-                    android:textColor="@color/text_primary"
-                    android:textSize="10sp"
-                    android:lineSpacingExtra="2dp" />
+                    android:scrollbarStyle="insideInset">
+
+                    <TextView
+                        android:id="@+id/skillPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:gravity="top|start"
+                        android:lineSpacingExtra="2dp"
+                        android:minHeight="280dp"
+                        android:padding="12dp"
+                        android:text="尚未导入 Markdown Skill。"
+                        android:textColor="@color/text_primary"
+                        android:textSize="10sp" />
+                </androidx.core.widget.NestedScrollView>
             </LinearLayout>
 
             <LinearLayout
@@ -187,5 +262,5 @@
                 android:textSize="9sp"
                 android:lineSpacingExtra="2dp" />
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

@@ -92,11 +92,18 @@ class PatientListActivity : AppCompatActivity() {
     private fun refresh() {
         patients.clear()
         patients += repository.listPatients()
-        val overview = repository.overview()
-        findViewById<TextView>(R.id.statTotal).text = overview.total.toString()
-        findViewById<TextView>(R.id.statInHospital).text = overview.inHospital.toString()
-        findViewById<TextView>(R.id.statAttention).text = overview.needsAttention.toString()
-        findViewById<TextView>(R.id.statRecordsToday).text = overview.recordsToday.toString()
+        val recordsByPatient = patients.associateWith { patient ->
+            GeneratedDocumentStore.list(this, patient.id)
+        }
+        findViewById<TextView>(R.id.statTotal).text = patients.size.toString()
+        findViewById<TextView>(R.id.statCaseTotal).text =
+            recordsByPatient.values.sumOf { it.size }.toString()
+        findViewById<TextView>(R.id.statDischargedCases).text =
+            recordsByPatient
+                .filterKeys { patient -> patient.status == "已出院" }
+                .values
+                .sumOf { it.size }
+                .toString()
 
         renderPatients()
     }
@@ -129,7 +136,7 @@ class PatientListActivity : AppCompatActivity() {
             item.findViewById<TextView>(R.id.patientDiagnosis).visibility = View.GONE
             item.findViewById<TextView>(R.id.patientAllergy).visibility = View.GONE
             item.findViewById<TextView>(R.id.patientRecordCount).text =
-                "${repository.recordCount(patient.id)} 份文书"
+                "${GeneratedDocumentStore.list(this, patient.id).size} 份文书"
 
             val status = item.findViewById<TextView>(R.id.patientStatus)
             status.text = patient.status.ifBlank { "在院" }
