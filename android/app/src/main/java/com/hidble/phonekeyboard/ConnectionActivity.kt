@@ -96,7 +96,7 @@ class ConnectionActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         MainActivity.instance?.connectionActivity = this
-        boardManager.onConnectionStateChanged = { connected -> refreshBoardStatus(connected) }
+        boardManager.onConnectionStateChanged = { refreshAll() }
         boardManager.onDeviceFound = { device, rssi, name ->
             if (foundBoards.none { it.first.address == device.address }) {
                 foundBoards.add(Triple(device, rssi, name))
@@ -135,12 +135,13 @@ class ConnectionActivity : AppCompatActivity() {
             val p = getSharedPreferences("hidble_prefs", MODE_PRIVATE)
             boardManager.setSpeed(p.getInt("speed_level", 5))
             boardManager.setUnicodeMode(p.getInt("unicode_mode", 3))
-            boardStatusText.text = "已连接：ESP32-S3 Keyboard（“发送到键盘”将走板子输出）"
+            val boardName = boardManager.currentDeviceName() ?: "ESP32蓝牙键盘终端-0001"
+            boardStatusText.text = "已连接：$boardName（“发送到键盘”将走板子输出）"
             boardStatusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
             boardDisconnectButton.isEnabled = true
             boardScanButton.isEnabled = false
         } else {
-            boardStatusText.text = "未连接：点下面按钮扫描并连接 ESP32-S3 Keyboard"
+            boardStatusText.text = "未连接：点下面按钮扫描并连接 ESP32蓝牙键盘终端-0001"
             boardStatusText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
             boardDisconnectButton.isEnabled = false
             boardScanButton.isEnabled = true
@@ -199,53 +200,47 @@ class ConnectionActivity : AppCompatActivity() {
     }
     /** 从 MainActivity 拉取最新状态刷新本页（含从连接页返回、主界面状态变化时） */
     fun refreshAll() {
-        val main = MainActivity.instance ?: run {
-            suppressSwitch = true
-            keyboardSwitch.isChecked = false
-            suppressSwitch = false
-            statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            statusText.text = "未启动"
-            statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-            deviceNameText.text = "主界面未运行，请返回主界面操作"
-            deviceNames.clear()
-            bondedDevices.clear()
-            deviceListAdapter.notifyDataSetChanged()
-            return
-        }
+        val main = MainActivity.instance
 
         suppressSwitch = true
-        keyboardSwitch.isChecked = main.isRegistered()
+        keyboardSwitch.isChecked = main?.isRegistered() == true
         suppressSwitch = false
 
-        val connected = main.isConnected()
-        when {
-            connected -> {
-                statusText.text = "已连接"
-                statusText.setTextColor(ContextCompat.getColor(this, R.color.connected))
-                statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
-                deviceNameText.text = "已连接到电脑：${main.connectedDeviceName() ?: "电脑"}，可以直接输入文字发送；关闭开关可断开。"
+        val phoneConnected = main?.isConnected() == true
+        val boardConnected = boardManager.isConnected()
+        val targets = buildList {
+            if (phoneConnected) {
+                add("电脑：${main?.connectedDeviceName() ?: "蓝牙电脑"}")
             }
-            main.isRegistered() -> {
-                statusText.text = "键盘已启动"
-                statusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
-                statusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
-                deviceNameText.text = "手机已模拟为蓝牙键盘：到电脑上 设置 → 蓝牙 → 添加设备，搜索“${HidDeviceManager.KEYBOARD_NAME}”并配对。"
+            if (boardConnected) {
+                add(boardManager.currentDeviceName() ?: "ESP32蓝牙键盘终端-0001")
             }
-            else -> {
-                statusText.text = "未启动"
-                statusText.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-                statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-                deviceNameText.text = "打开上方开关后，手机会自动开启蓝牙并模拟成蓝牙键盘，到电脑上搜索即可。"
-            }
+        }
+        val anyConnected = targets.isNotEmpty()
+        val statusColor = if (anyConnected) R.color.connected else R.color.disconnected
+        statusDot.setTextColor(ContextCompat.getColor(this, statusColor))
+        statusText.setTextColor(ContextCompat.getColor(this, statusColor))
+        statusText.text = if (anyConnected) "已启动" else "未启动"
+        if (anyConnected) {
+            deviceNameText.text = "连接目标：${targets.joinToString("；")}"
+            deviceNameText.setTextColor(ContextCompat.getColor(this, R.color.clinical_blue))
+        } else if (main?.isRegistered() == true) {
+            deviceNameText.text =
+                "手机键盘已广播，但尚未连接电脑；ESP32-S3 外接板也未连接。"
+            deviceNameText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        } else {
+            deviceNameText.text =
+                "暂无活动连接。打开手机蓝牙键盘开关，或在下方连接 ESP32-S3 外接板。"
+            deviceNameText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
         }
 
         bondedDevices.clear()
         deviceNames.clear()
-        main.getBondedDevices().forEach { (name, device) ->
+        main?.getBondedDevices()?.forEach { (name, device) ->
             bondedDevices.add(device)
             deviceNames.add(name)
         }
         deviceListAdapter.notifyDataSetChanged()
-        refreshBoardStatus(boardManager.isConnected())
+        refreshBoardStatus(boardConnected)
     }
 }

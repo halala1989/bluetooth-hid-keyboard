@@ -25,8 +25,9 @@ try {
     & idf.py -B $BuildDir `
         "-DSDKCONFIG=$BuildDir\sdkconfig" `
         "-DSDKCONFIG_DEFAULTS=$defaults" `
-        "-DBRIDGE_DEVICE_NAME=YD-ESP32-S3 Bridge" `
-        "-DBRIDGE_USB_PRODUCT_NAME=YD-ESP32-S3 Keyboard" `
+        "-DBRIDGE_DEVICE_NAME=ESP32蓝牙键盘终端" `
+        "-DBRIDGE_USB_PRODUCT_NAME=ESP32蓝牙键盘终端" `
+        "-DBRIDGE_SERIAL_NUMBER=0001" `
         build
     if ($LASTEXITCODE -ne 0) { throw "Firmware build failed" }
 
@@ -60,15 +61,15 @@ $artifacts = @(
 foreach ($relative in $artifacts) {
     $src = Join-Path $BuildDir $relative
     if (Test-Path $src) {
-        $name = if ($relative -eq "merged-flash.bin") { "YD-ESP32-S3-bridge-merged.bin" } else { Split-Path $relative -Leaf }
+        $name = if ($relative -eq "merged-flash.bin") { "YD-ESP32-S3-N16R8-0001-bridge-merged.bin" } else { Split-Path $relative -Leaf }
         Copy-Item $src (Join-Path $OutputDir $name) -Force
     }
 }
 
-$hashTarget = Join-Path $OutputDir "YD-ESP32-S3-bridge-merged.bin"
+$hashTarget = Join-Path $OutputDir "YD-ESP32-S3-N16R8-0001-bridge-merged.bin"
 if (Test-Path $hashTarget) {
     $hash = (Get-FileHash $hashTarget -Algorithm SHA256).Hash
-    "$hash  YD-ESP32-S3-bridge-merged.bin" | Set-Content (Join-Path $OutputDir "SHA256SUMS.txt") -Encoding ascii
+    "$hash  YD-ESP32-S3-N16R8-0001-bridge-merged.bin" | Set-Content (Join-Path $OutputDir "SHA256SUMS.txt") -Encoding ascii
     Write-Host "Firmware: $hashTarget"
     Write-Host "SHA256:  $hash"
 }

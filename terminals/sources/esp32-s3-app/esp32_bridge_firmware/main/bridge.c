@@ -42,6 +42,24 @@
 
 static const char *TAG = "DATA_SVC";
 
+#ifndef BRIDGE_DEVICE_NAME
+#define BRIDGE_DEVICE_NAME "ESP32蓝牙键盘终端"
+#endif
+#ifndef BRIDGE_USB_PRODUCT_NAME
+#define BRIDGE_USB_PRODUCT_NAME "ESP32蓝牙键盘终端"
+#endif
+#ifndef BRIDGE_SERIAL_NUMBER
+#define BRIDGE_SERIAL_NUMBER "0001"
+#endif
+
+static char s_device_name[64];
+
+static void init_device_name(void)
+{
+    snprintf(s_device_name, sizeof(s_device_name), "%s-%s",
+             BRIDGE_DEVICE_NAME, BRIDGE_SERIAL_NUMBER);
+}
+
 /* ---------- 协议 UUID（与 Pico / Android App 一致） ---------- */
 #define DATA_SVC_UUID      0x1234
 #define DATA_CMD_UUID      0x1235
@@ -619,8 +637,8 @@ static const uint8_t hid_report_descriptor[] = {
 static const char *hid_string_descriptor[5] = {
     (char[]){0x09, 0x04},              // 语言
     "PhoneKeyboard",                   // 厂商
-    "ESP32-S3 Bridge Keyboard",        // 产品名
-    "000001",                          // 序列号
+    s_device_name,                     // 产品名（产品名-唯一序列号）
+    BRIDGE_SERIAL_NUMBER,              // 唯一序列号
     "USB HID Keyboard",                // HID 接口
 };
 
@@ -645,11 +663,13 @@ static void usb_hid_init(void)
         .configuration_descriptor = hid_configuration_descriptor,
     };
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
-    ESP_LOGI(TAG, "USB HID keyboard installed, waiting for mount...");
-    while (!tud_mounted()) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-    ESP_LOGI(TAG, "USB HID mounted");
+    /*
+     * Do not block the whole application on USB enumeration. For the YD board,
+     * the USB HID port and the COM/flash port are separate connectors; users may
+     * power the board before attaching the HID cable. BLE must advertise and
+     * accept phone commands even while USB is not yet mounted.
+     */
+    ESP_LOGI(TAG, "USB HID keyboard installed (mount is checked when typing)");
 }
 
 /* ================= BLE（NimBLE 数据通道）================= */
@@ -657,14 +677,11 @@ static void start_advertising(void)
 {
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
+    struct ble_hs_adv_fields response_fields;
     int rc;
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    static const char *name = "ESP32-S3 Bridge";
-    fields.name = (uint8_t *)name;
-    fields.name_len = strlen(name);
-    fields.name_is_complete = 1;
     static ble_uuid16_t uuid = BLE_UUID16_INIT(DATA_SVC_UUID);
     fields.uuids16 = &uuid;
     fields.num_uuids16 = 1;
@@ -672,6 +689,13 @@ static void start_advertising(void)
 
     rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) { ESP_LOGE(TAG, "adv set fields failed: %d", rc); return; }
+
+    memset(&response_fields, 0, sizeof(response_fields));
+    response_fields.name = (uint8_t *)s_device_name;
+    response_fields.name_len = strlen(s_device_name);
+    response_fields.name_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&response_fields);
+    if (rc != 0) { ESP_LOGE(TAG, "adv scan response failed: %d", rc); return; }
 
     memset(&adv_params, 0, sizeof(adv_params));
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
@@ -702,6 +726,8 @@ static void host_task(void *param)
 
 void app_main(void)
 {
+    init_device_name();
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -728,7 +754,7 @@ void app_main(void)
     ESP_ERROR_CHECK(nimble_port_init());
     ble_svc_gap_init();
     ble_svc_gatt_init();
-    ble_svc_gap_device_name_set("ESP32-S3 Bridge");
+    ble_svc_gap_device_name_set(s_device_name);
     int rc = ble_gatts_count_cfg(s_svcs);
     if (rc != 0) { ESP_LOGE(TAG, "gatts_count_cfg: %d", rc); }
     rc = ble_gatts_add_svcs(s_svcs);

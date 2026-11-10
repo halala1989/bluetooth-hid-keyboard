@@ -75,6 +75,7 @@
   2. **卡键看门狗**：`s_key_down` 标记 + 保活任务每 200ms 重试"松开所有键"
   3. **USB 保活**：每 5 秒发一个空键盘报文，防止 Windows 空闲挂起（挂起后 `tud_ready()=false`，发送必失败）
   4. **急停**：按一下 BOOT(GPIO0) → `clear_pending_input()`：清空缓冲 + 强制松开所有键；协议里 `STOP` 同效
+5. **BLE 与 USB 解耦启动**：`app_main()` 不再等待 `tud_mounted()` 后才初始化 NimBLE。即使原生 USB 尚未接电脑，板子也会立即广播 `ESP32-S3 Bridge`，方便手机先连接和检查设备。
 - **日志**：控制台改成 UART0（USB 让给 HID），所以 HID 模式下**看不到串口日志**；
   需要诊断时用 BLE 发 `DEBUG`，会回 `DBG:mount=… susp=… ready=… hidrdy=…`
 

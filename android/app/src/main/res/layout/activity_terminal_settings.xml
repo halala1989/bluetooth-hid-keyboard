@@ -98,7 +98,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="终端源码已打包，选择即可切换；不再安装多个键盘 App。"
+                        android:text="手机蓝牙与 ESP32-S3 USB HID 桥接已整合，选择即可切换。"
                         android:textColor="@color/text_secondary"
                         android:textSize="10sp" />
                 </LinearLayout>
@@ -217,7 +217,7 @@
                         android:buttonTint="@color/clinical_teal"
                         android:paddingTop="7dp"
                         android:paddingBottom="7dp"
-                        android:text="ESP32-S3 Super Mini\nBLE 桥接 → USB HID"
+                        android:text="ESP32-S3 Super Mini\nESP32蓝牙键盘终端-0001 → USB HID"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp" />
 
@@ -228,7 +228,7 @@
                         android:buttonTint="@color/clinical_teal"
                         android:paddingTop="7dp"
                         android:paddingBottom="7dp"
-                        android:text="YD-ESP32-S3 N16R8\nN16R8 双 Type-C 桥接板"
+                        android:text="YD-ESP32-S3 N16R8\nESP32蓝牙键盘终端-0001 → USB HID"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp" />
 
@@ -243,6 +243,22 @@
                         android:textColor="@color/text_primary"
                         android:textSize="13sp" />
                 </RadioGroup>
+
+                <Button
+                    android:id="@+id/boardFirmwareHelpButton"
+                    style="@style/KeyButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:text="ESP32-S3 连接与 Bridge 固件说明" />
+
+                <Button
+                    android:id="@+id/exportBoardFirmwareButton"
+                    style="@style/KeyButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="4dp"
+                    android:text="导出所选板型的 ESP32-S3 固件" />
             </LinearLayout>
 
             <LinearLayout

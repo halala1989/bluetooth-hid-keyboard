@@ -43,11 +43,22 @@
 static const char *TAG = "DATA_SVC";
 
 #ifndef BRIDGE_DEVICE_NAME
-#define BRIDGE_DEVICE_NAME "ESP32-S3 Bridge"
+#define BRIDGE_DEVICE_NAME "ESP32蓝牙键盘终端"
 #endif
 #ifndef BRIDGE_USB_PRODUCT_NAME
-#define BRIDGE_USB_PRODUCT_NAME "ESP32-S3 Bridge Keyboard"
+#define BRIDGE_USB_PRODUCT_NAME "ESP32蓝牙键盘终端"
 #endif
+#ifndef BRIDGE_SERIAL_NUMBER
+#define BRIDGE_SERIAL_NUMBER "0001"
+#endif
+
+static char s_device_name[64];
+
+static void init_device_name(void)
+{
+    snprintf(s_device_name, sizeof(s_device_name), "%s-%s",
+             BRIDGE_DEVICE_NAME, BRIDGE_SERIAL_NUMBER);
+}
 
 /* ---------- 协议 UUID（与 Pico / Android App 一致） ---------- */
 #define DATA_SVC_UUID      0x1234
@@ -101,6 +112,7 @@ static void start_advertising(void);   // 前置声明（gap 回调里会用到�
 static uint8_t s_unicode_mode = UNI_MODE_ALTX;
 static uint8_t s_speed = 5;
 static volatile bool s_hid_failed = false;   // 本次命令里 HID 报告发送是否失败（电脑没连时会出现）
+static volatile bool s_stop_requested = false;
 static uint32_t s_scale = 1000;                 /* 千分比，速度 10 时 300 */
 
 static bool hid_send_report(uint8_t modifier, const uint8_t *keycode);   // 前置声明
@@ -205,6 +217,9 @@ static uint32_t scaled(uint32_t ms)
 static bool hid_send_report(uint8_t modifier, const uint8_t *keycode)
 {
     for (int i = 0; i < 1500; i++) {         // 最多等 15 秒
+        if (s_stop_requested && !(modifier == 0 && keycode == NULL)) {
+            return false;
+        }
         if (tud_hid_n_ready(0)) {
             return tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, modifier, keycode);
         }
@@ -221,6 +236,11 @@ static bool hid_send_report(uint8_t modifier, const uint8_t *keycode)
 static volatile bool s_key_down = false;   // 是否有键还按着（看门狗会持续尝试松开）
 static void hid_press(uint8_t modifier, uint8_t usage)
 {
+    if (s_stop_requested) {
+        if (s_key_down) hid_send_report(0, NULL);
+        s_key_down = false;
+        return;
+    }
     uint8_t keycode[6] = {0};
     keycode[0] = usage;
     if (!hid_send_report(modifier, keycode)) {
@@ -396,9 +416,11 @@ static uint32_t utf8_next(const uint8_t *s, size_t len, size_t *consumed)
 /* Alt+X：先打十六进制码（大写），再按 Alt+X */
 static void type_altx(uint32_t codepoint)
 {
+    if (s_stop_requested) return;
     char hex[12];
     int n = snprintf(hex, sizeof(hex), "%X", (unsigned)codepoint);
     for (int i = 0; i < n; i++) {
+        if (s_stop_requested) return;
         uint8_t mod = 0, usage = 0;
         if (ascii_to_hid(hex[i], &mod, &usage)) hid_press(mod, usage);
     }
@@ -428,6 +450,7 @@ static void handle_text(const char *payload)
     const uint8_t *p = (const uint8_t *)payload;
     size_t remain = strlen(payload);
     while (remain > 0) {
+        if (s_stop_requested) break;
         size_t used = 0;
         uint32_t cp = utf8_next(p, remain, &used);
         type_codepoint(cp);
@@ -450,13 +473,17 @@ static void handle_command(char *line)
     if (!strcasecmp(cmd, "TEXT")) {
         s_hid_failed = false;
         handle_text(arg);
-        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        if (!s_stop_requested) {
+            notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        }
     } else if (!strcasecmp(cmd, "KEY")) {
         uint8_t usage = key_from_name(arg);
         if (!usage) { notify_status("ERR:INVALID_KEY"); return; }
         s_hid_failed = false;
         hid_press(0, usage);
-        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        if (!s_stop_requested) {
+            notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        }
     } else if (!strcasecmp(cmd, "MOD")) {
         char buf[128];
         strncpy(buf, arg, sizeof(buf) - 1);
@@ -479,13 +506,17 @@ static void handle_command(char *line)
         if (!usage) { notify_status("ERR:INVALID_KEY"); return; }
         s_hid_failed = false;
         hid_press(mod, usage);
-        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        if (!s_stop_requested) {
+            notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        }
     } else if (!strcasecmp(cmd, "UNI")) {
         uint32_t cp = (uint32_t)strtoul(arg, NULL, 0);
         if (cp == 0 || cp > 0x10FFFF) { notify_status("ERR:INVALID_CODEPOINT"); return; }
         s_hid_failed = false;
         type_codepoint(cp);
-        notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        if (!s_stop_requested) {
+            notify_status(s_hid_failed ? "ERR:HID_NOT_READY" : "OK");
+        }
     } else if (!strcasecmp(cmd, "UMOD")) {
         int mode = atoi(arg);
         if (mode < 0 || mode > 3) { notify_status("ERR:INVALID_MODE"); return; }
@@ -517,6 +548,14 @@ static void data_task(void *arg)
     size_t len = 0;
     ESP_LOGI(TAG, "data task started, ring buffer %u bytes", (unsigned)s_rb_cap);
     while (1) {
+        if (s_stop_requested) {
+            s_stop_requested = false;
+            hid_send_report(0, NULL);
+            s_key_down = false;
+            notify_status("OK:STOPPED");
+            ESP_LOGI(TAG, "STOP consumed: output interrupted and buffer cleared");
+            continue;
+        }
         uint8_t ch;
         if (!rb_pop(&ch)) {
             vTaskDelay(pdMS_TO_TICKS(20)); // 注意：ESP-IDF 默认 tick=10ms，pdMS_TO_TICKS(5)=0 会让任务空转触发看门狗
@@ -540,6 +579,21 @@ static void data_task(void *arg)
 }
 
 /* ---------- BLE GATT ---------- */
+static bool contains_stop_command(const uint8_t *data, size_t len)
+{
+    for (size_t i = 0; i + 4 <= len; i++) {
+        if (data[i] != 'S' || data[i + 1] != 'T' ||
+            data[i + 2] != 'O' || data[i + 3] != 'P') {
+            continue;
+        }
+        bool starts_token = i == 0 || data[i - 1] == '\n' || data[i - 1] == '\r';
+        bool ends_token = i + 4 == len ||
+            data[i + 4] == '\n' || data[i + 4] == '\r';
+        if (starts_token && ends_token) return true;
+    }
+    return false;
+}
+
 static int gatt_cmd_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
@@ -552,6 +606,15 @@ static int gatt_cmd_access(uint16_t conn_handle, uint16_t attr_handle,
     int rc = ble_hs_mbuf_to_flat(ctxt->om, tmp, to_copy, &copied);
     if (rc != 0) return BLE_ATT_ERR_UNLIKELY;
     s_conn_handle = conn_handle;
+    if (contains_stop_command(tmp, copied)) {
+        s_stop_requested = true;
+        if (s_rb_mtx) {
+            xSemaphoreTake(s_rb_mtx, portMAX_DELAY);
+            s_rb_head = s_rb_tail = 0;
+            xSemaphoreGive(s_rb_mtx);
+        }
+        return 0;
+    }
     size_t written = rb_push(tmp, copied);
     if (written < copied) notify_status("ERR:OVERFLOW");
     return 0;
@@ -626,8 +689,8 @@ static const uint8_t hid_report_descriptor[] = {
 static const char *hid_string_descriptor[5] = {
     (char[]){0x09, 0x04},              // 语言
     "PhoneKeyboard",                   // 厂商
-    BRIDGE_USB_PRODUCT_NAME,           // 产品名
-    "000001",                          // 序列号
+    s_device_name,                     // 产品名（产品名-唯一序列号）
+    BRIDGE_SERIAL_NUMBER,              // 唯一序列号
     "USB HID Keyboard",                // HID 接口
 };
 
@@ -652,11 +715,13 @@ static void usb_hid_init(void)
         .configuration_descriptor = hid_configuration_descriptor,
     };
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
-    ESP_LOGI(TAG, "USB HID keyboard installed, waiting for mount...");
-    while (!tud_mounted()) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-    ESP_LOGI(TAG, "USB HID mounted");
+    /*
+     * Do not block the whole application on USB enumeration. For the YD board,
+     * the USB HID port and the COM/flash port are separate connectors; users may
+     * power the board before attaching the HID cable. BLE must advertise and
+     * accept phone commands even while USB is not yet mounted.
+     */
+    ESP_LOGI(TAG, "USB HID keyboard installed (mount is checked when typing)");
 }
 
 /* ================= BLE（NimBLE 数据通道）================= */
@@ -664,14 +729,11 @@ static void start_advertising(void)
 {
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
+    struct ble_hs_adv_fields response_fields;
     int rc;
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    static const char *name = BRIDGE_DEVICE_NAME;
-    fields.name = (uint8_t *)name;
-    fields.name_len = strlen(name);
-    fields.name_is_complete = 1;
     static ble_uuid16_t uuid = BLE_UUID16_INIT(DATA_SVC_UUID);
     fields.uuids16 = &uuid;
     fields.num_uuids16 = 1;
@@ -679,6 +741,18 @@ static void start_advertising(void)
 
     rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) { ESP_LOGE(TAG, "adv set fields failed: %d", rc); return; }
+
+    /*
+     * The Chinese display name is 28 UTF-8 bytes and does not fit in the
+     * legacy 31-byte advertising packet together with flags and service UUID.
+     * Put discovery data in ADV_IND and the full name in the scan response.
+     */
+    memset(&response_fields, 0, sizeof(response_fields));
+    response_fields.name = (uint8_t *)s_device_name;
+    response_fields.name_len = strlen(s_device_name);
+    response_fields.name_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&response_fields);
+    if (rc != 0) { ESP_LOGE(TAG, "adv scan response failed: %d", rc); return; }
 
     memset(&adv_params, 0, sizeof(adv_params));
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
@@ -709,6 +783,8 @@ static void host_task(void *param)
 
 void app_main(void)
 {
+    init_device_name();
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -735,7 +811,7 @@ void app_main(void)
     ESP_ERROR_CHECK(nimble_port_init());
     ble_svc_gap_init();
     ble_svc_gatt_init();
-    ble_svc_gap_device_name_set(BRIDGE_DEVICE_NAME);
+    ble_svc_gap_device_name_set(s_device_name);
     int rc = ble_gatts_count_cfg(s_svcs);
     if (rc != 0) { ESP_LOGE(TAG, "gatts_count_cfg: %d", rc); }
     rc = ble_gatts_add_svcs(s_svcs);

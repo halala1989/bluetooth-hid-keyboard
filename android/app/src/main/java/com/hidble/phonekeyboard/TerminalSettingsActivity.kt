@@ -32,7 +32,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TerminalSettingsActivity : AppCompatActivity() {
 
@@ -62,10 +64,16 @@ class TerminalSettingsActivity : AppCompatActivity() {
     private lateinit var showTokenCheck: CheckBox
     private lateinit var testModelButton: Button
     private lateinit var modelTestState: TextView
+    private lateinit var boardFirmwareHelpButton: Button
+    private lateinit var exportBoardFirmwareButton: Button
 
     private val radioByTerminal = mutableMapOf<String, Int>()
     private var currentTerminal: TerminalDefinition = TerminalRegistry.byId(TerminalRegistry.PHONE_HID)
     private var loading = false
+    private var pendingBoardDevice: BluetoothDevice? = null
+    private var attemptingSavedAddress = false
+    private var scanInProgress = false
+    private var pendingFirmwareAsset: String? = null
 
     private val phoneStateListener: (KeyboardSnapshot) -> Unit = { snapshot ->
         runOnUiThread {
@@ -100,6 +108,14 @@ class TerminalSettingsActivity : AppCompatActivity() {
         } else {
             connectionState.text = "未开启可见性，电脑可能无法发现手机"
         }
+    }
+
+    private val firmwareExporter = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        val asset = pendingFirmwareAsset
+        pendingFirmwareAsset = null
+        if (uri != null && asset != null) writeFirmwareAsset(uri, asset)
     }
 
     private val devices = mutableListOf<BluetoothDevice>()
@@ -139,6 +155,7 @@ class TerminalSettingsActivity : AppCompatActivity() {
         boardManager.stopScan()
         boardManager.onDeviceFound = null
         boardManager.onConnectionStateChanged = null
+        boardManager.onScanStateChanged = null
         boardManager.onDataReceived = null
         boardManager.onError = null
         KeyboardRuntime.removeStateListener(phoneStateListener)
@@ -163,6 +180,8 @@ class TerminalSettingsActivity : AppCompatActivity() {
         showTokenCheck = findViewById(R.id.showTokenCheck)
         testModelButton = findViewById(R.id.testModelButton)
         modelTestState = findViewById(R.id.modelTestState)
+        boardFirmwareHelpButton = findViewById(R.id.boardFirmwareHelpButton)
+        exportBoardFirmwareButton = findViewById(R.id.exportBoardFirmwareButton)
 
         radioByTerminal[TerminalRegistry.PHONE_HID] = R.id.terminalPhone
         radioByTerminal[TerminalRegistry.PICO_W] = R.id.terminalPico
@@ -191,10 +210,15 @@ class TerminalSettingsActivity : AppCompatActivity() {
                 BoardLink.get(this).disconnect()
             }
             connecting = false
+            pendingBoardDevice = null
+            attemptingSavedAddress = false
+            scanInProgress = false
             refreshConnectionUi()
         }
 
         connectButton.setOnClickListener { connectCurrentTerminal() }
+        boardFirmwareHelpButton.setOnClickListener { showBoardFirmwareHelp() }
+        exportBoardFirmwareButton.setOnClickListener { exportBoardFirmware() }
 
         val modeAdapter = ArrayAdapter(
             this,
@@ -260,7 +284,8 @@ class TerminalSettingsActivity : AppCompatActivity() {
 
         deviceList.setOnItemClickListener { _, _, position, _ ->
             val device = devices.getOrNull(position) ?: return@setOnItemClickListener
-            TerminalRegistry.saveAddress(this, currentTerminal, device)
+            pendingBoardDevice = device
+            attemptingSavedAddress = false
             connecting = true
             connectButton.isEnabled = false
             connectButton.text = "连接中…"
@@ -283,10 +308,34 @@ class TerminalSettingsActivity : AppCompatActivity() {
         boardManager.onConnectionStateChanged = { connected ->
             runOnUiThread {
                 connecting = false
+                scanInProgress = false
                 refreshConnectionUi()
                 if (connected) {
+                    pendingBoardDevice?.let { device ->
+                        TerminalRegistry.saveAddress(this, currentTerminal, device)
+                    }
+                    pendingBoardDevice = null
+                    attemptingSavedAddress = false
                     OutputRouter.applySettingsToBoard(this)
                     Toast.makeText(this, "${currentTerminal.displayName} 已连接", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        boardManager.onScanStateChanged = { active ->
+            runOnUiThread {
+                scanInProgress = active
+                if (active) {
+                    connecting = true
+                } else if (connecting && !boardManager.isConnected()) {
+                    connecting = false
+                }
+                refreshConnectionUi()
+                if (!active && !boardManager.isConnected()) {
+                    connectionState.text = if (devices.isEmpty()) {
+                        "未发现可连接的 ESP32-S3，请检查板子电源、固件和蓝牙权限"
+                    } else {
+                        "发现 ${devices.size} 个终端，点击下方设备连接"
+                    }
                 }
             }
         }
@@ -295,9 +344,17 @@ class TerminalSettingsActivity : AppCompatActivity() {
         }
         boardManager.onError = { message ->
             runOnUiThread {
+                val retryWithScan = attemptingSavedAddress
                 connecting = false
                 connectionState.text = message
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                if (retryWithScan) {
+                    attemptingSavedAddress = false
+                    pendingBoardDevice = null
+                    TerminalRegistry.clearAddress(this, currentTerminal)
+                    beginScan()
+                    return@runOnUiThread
+                }
                 refreshConnectionUi()
             }
         }
@@ -435,6 +492,7 @@ class TerminalSettingsActivity : AppCompatActivity() {
         deviceAdapter.notifyDataSetChanged()
         deviceList.visibility = View.VISIBLE
         connecting = true
+        scanInProgress = true
         connectButton.isEnabled = false
         connectButton.text = "扫描中…"
         connectionState.text = "正在扫描 ${currentTerminal.displayName}…"
@@ -463,9 +521,10 @@ class TerminalSettingsActivity : AppCompatActivity() {
             } else {
                 "点击右侧“连接”，自动连接已保存的 ${terminal.displayName}；首次使用会扫描设备。"
             }
-            connectButton.isEnabled = !connected && !connecting
+            connectButton.isEnabled = !connected && !connecting && !scanInProgress
             connectButton.text = when {
                 connected -> "已连接"
+                scanInProgress -> "扫描中…"
                 connecting -> "连接中…"
                 else -> "连接"
             }
@@ -507,16 +566,99 @@ class TerminalSettingsActivity : AppCompatActivity() {
         val savedAddress = TerminalRegistry.address(this, currentTerminal)
         if (savedAddress != null) {
             connecting = true
+            attemptingSavedAddress = true
+            pendingBoardDevice = null
             connectButton.isEnabled = false
             connectButton.text = "连接中…"
             connectionState.text = "正在连接已保存的 ${currentTerminal.displayName}…"
             if (!OutputRouter.connectSavedBoard(this, currentTerminal)) {
                 connecting = false
+                attemptingSavedAddress = false
+                TerminalRegistry.clearAddress(this, currentTerminal)
                 Toast.makeText(this, "无法使用已保存地址，开始扫描", Toast.LENGTH_SHORT).show()
                 beginScan()
             }
         } else {
             beginScan()
+        }
+    }
+
+    private fun showBoardFirmwareHelp() {
+        val message = """
+            ESP32-S3 不是直接与电脑蓝牙配对，而是使用：
+            手机 → BLE 数据通道 → ESP32-S3 → USB HID → 电脑
+
+            当前 App 已内置两种 ESP32-S3 Bridge 固件，可在选择板型后导出。
+
+            设备需烧录 Bridge 固件，BLE 广播名通常为：
+            · ESP32蓝牙键盘终端-0001
+
+            0001 是该设备的唯一序列号，也会写入 USB 设备序列号。
+
+            检查顺序：
+            1. 板子已上电，未停留在下载模式；
+            2. 原生 USB 口连接目标电脑，电脑识别为 HID 键盘；
+            3. 手机已授予“附近的设备/蓝牙扫描与连接”权限；
+            4. 在下方选择正确板型后点击“连接”；
+            5. 如果系统蓝牙里绑定过旧设备，先取消绑定再重新扫描。
+
+            注意：旧 BLE HID 固件与 Bridge 固件不是同一协议，旧 HID 版本不能用于当前 USB HID 桥接输出。
+        """.trimIndent()
+        AlertDialog.Builder(this)
+            .setTitle("ESP32-S3 连接与固件说明")
+            .setMessage(message)
+            .setPositiveButton("知道了", null)
+            .show()
+    }
+
+    private fun exportBoardFirmware() {
+        val (asset, fileName) = when (currentTerminal.id) {
+            TerminalRegistry.ESP32_S3 ->
+                "firmware/ESP32-S3-SuperMini-0001-bridge-merged.bin" to
+                    "ESP32-S3-SuperMini-0001-bridge-merged.bin"
+            TerminalRegistry.YD_ESP32_S3 ->
+                "firmware/YD-ESP32-S3-N16R8-0001-bridge-merged.bin" to
+                    "YD-ESP32-S3-N16R8-0001-bridge-merged.bin"
+            TerminalRegistry.ESP32_LEGACY -> {
+                Toast.makeText(
+                    this,
+                    "旧 BLE HID 固件不能用于 USB HID 桥接，请选择 Super Mini 或 YD-N16R8",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+            else -> {
+                Toast.makeText(
+                    this,
+                    "请先选择 ESP32-S3 Super Mini 或 YD-ESP32-S3 N16R8",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        }
+        pendingFirmwareAsset = asset
+        firmwareExporter.launch(fileName)
+    }
+
+    private fun writeFirmwareAsset(uri: android.net.Uri, asset: String) {
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    assets.open(asset).use { input ->
+                        contentResolver.openOutputStream(uri)?.use { output ->
+                            input.copyTo(output)
+                        } ?: error("无法创建固件文件")
+                    }
+                }
+            }.onSuccess {
+                Toast.makeText(this@TerminalSettingsActivity, "ESP32-S3 固件已导出", Toast.LENGTH_LONG).show()
+            }.onFailure { error ->
+                Toast.makeText(
+                    this@TerminalSettingsActivity,
+                    "固件导出失败：${error.message ?: "请检查存储权限"}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 

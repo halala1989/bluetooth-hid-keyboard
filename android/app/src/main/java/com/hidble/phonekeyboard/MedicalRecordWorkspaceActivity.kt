@@ -216,9 +216,6 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
     fun pauseNativeOutput() {
         if (!outputBusy) return
         outputControl?.paused = true
-        if (OutputRouter.selected(this).isBoard) {
-            BoardLink.get(this).sendCommand("STOP")
-        }
         outputCallbackId?.let { postOutputProgress(it, outputIndex, outputTotal, "paused", "输出已暂停") }
     }
 
@@ -234,7 +231,7 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         outputJob?.cancel()
         outputJob = null
         if (OutputRouter.selected(this).isBoard) {
-            BoardLink.get(this).sendCommand("STOP")
+            BoardLink.get(this).stopOutput()
         }
         outputBusy = false
         if (postState && callbackId != null) {

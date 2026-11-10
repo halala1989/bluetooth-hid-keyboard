@@ -36,7 +36,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="蓝牙键盘 · 已配对设备"
+                android:text="手机蓝牙 · ESP32-S3 外接板"
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary" />
         </LinearLayout>
@@ -102,7 +102,7 @@
                 android:id="@+id/deviceNameText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="打开开关后自动开启蓝牙并模拟成蓝牙键盘；弹出“对附近设备可见”时请点允许，然后到电脑上 设置 → 蓝牙 → 添加设备，搜索“手机蓝牙键盘”并配对。"
+                android:text="任一连接有效时状态灯变绿；这里会显示当前连接的电脑或 ESP32-S3 外接板。"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="6dp" />
@@ -167,7 +167,7 @@
                 android:id="@+id/boardStatusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="未连接：点下面按钮扫描并连接 ESP32-S3 Keyboard"
+                android:text="未连接：点下面按钮扫描并连接 ESP32蓝牙键盘终端-0001"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary" />
 

@@ -47,17 +47,27 @@ object TerminalRegistry {
         TerminalDefinition(
             id = ESP32_S3,
             displayName = "ESP32-S3 Super Mini",
-            description = "ESP32-S3 桥接固件，BLE 接收数据并通过 USB HID 输出",
+            description = "ESP32蓝牙键盘终端-0001，BLE 接收数据并通过 USB HID 输出",
             protocol = "BLE 1234/1235/1236 → USB HID",
-            boardNameHints = listOf("ESP32-S3 Bridge", "ESP32-S3 Keyboard", "ESP32"),
+            boardNameHints = listOf(
+                "ESP32蓝牙键盘终端",
+                "ESP32-S3 Bridge",
+                "ESP32-S3 Keyboard",
+                "ESP32"
+            ),
             isBoard = true
         ),
         TerminalDefinition(
             id = YD_ESP32_S3,
             displayName = "YD-ESP32-S3 N16R8",
             description = "YD-ESP32-23-2022-V1.3，N16R8，双 Type-C 桥接板",
-            protocol = "YD-ESP32-S3 Bridge → USB HID",
-            boardNameHints = listOf("YD-ESP32-S3", "ESP32-S3 Bridge", "ESP32"),
+            protocol = "ESP32蓝牙键盘终端-0001 → USB HID",
+            boardNameHints = listOf(
+                "ESP32蓝牙键盘终端",
+                "YD-ESP32-S3",
+                "ESP32-S3 Bridge",
+                "ESP32"
+            ),
             isBoard = true
         ),
         TerminalDefinition(
@@ -94,6 +104,13 @@ object TerminalRegistry {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(addressKey(terminal.id), device.address)
+            .apply()
+    }
+
+    fun clearAddress(context: Context, terminal: TerminalDefinition) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(addressKey(terminal.id))
             .apply()
     }
 
