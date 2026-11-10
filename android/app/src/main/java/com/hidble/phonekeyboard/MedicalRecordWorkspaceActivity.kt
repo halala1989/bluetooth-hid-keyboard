@@ -377,9 +377,9 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
             val sourceInputs = jsonArrayToText(request.optJSONArray("sourceInputs"))
             val previousOutputs = jsonArrayToText(request.optJSONArray("previousOutputs"))
             val plans = jsonArrayToText(request.optJSONArray("plans"))
-            val writingSkill = WritingSkillStore.load(activity)
-            val skillName = writingSkill?.name.orEmpty()
-            val skillMarkdown = writingSkill?.content.orEmpty().take(12_000)
+            val writingSkills = WritingSkillStore.selected(activity)
+            val skillName = writingSkills.joinToString("、") { it.name }
+            val skillMarkdown = WritingSkillStore.promptMarkdown(activity)
             return """
                 患者基本信息：
                 姓名：${patient?.optString("name").orEmpty()}
@@ -401,7 +401,7 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
                 医生录入的手术方案（仅手术同意书使用）：
                 $plans
 
-                医生导入的 Markdown Skill：${skillName.ifBlank { "无" }}
+                医生已启用的 Markdown Skill（${writingSkills.size} 个）：${skillName.ifBlank { "无" }}
                 ${skillMarkdown.ifBlank { "无" }}
 
                 左侧全部已保存患者资料：

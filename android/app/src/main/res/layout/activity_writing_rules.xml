@@ -40,13 +40,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="全局 Markdown Skill · 应用于所有病历模块"
+                    android:text="Markdown Skill 库 · 可单独或组合应用于所有病历模块"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 
-    <androidx.core.widget.NestedScrollView
+    <ScrollView
         android:id="@+id/rulesScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -81,10 +81,59 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="导入 .md 文件后，所有入院记录、首次病程、手术同意书等模块都会使用该规则。医疗安全规范仍优先于 Skill 中的要求。"
+                    android:text="可导入多个 Markdown Skill，勾选后会共同用于入院记录、首次病程、手术同意书等模块。医疗安全规范仍优先于所有 Skill。"
                     android:textColor="@color/text_secondary"
                     android:textSize="10sp"
                     android:lineSpacingExtra="2dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="15dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Skill 库"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/skillLibraryState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 个 Skill"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="勾选表示启用。点击某一项可在下方预览；多个已选项会按列表顺序组合应用。"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="9sp"
+                    android:lineSpacingExtra="2dp" />
+
+                <LinearLayout
+                    android:id="@+id/skillLibraryContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical" />
             </LinearLayout>
 
             <LinearLayout
@@ -203,31 +252,20 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <androidx.core.widget.NestedScrollView
-                    android:id="@+id/skillPreviewScroll"
+                <TextView
+                    android:id="@+id/skillPreview"
                     android:layout_width="match_parent"
                     android:layout_height="280dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/bg_log"
-                    android:fillViewport="true"
-                    android:nestedScrollingEnabled="true"
-                    android:overScrollMode="ifContentScrolls"
+                    android:fontFamily="monospace"
+                    android:gravity="top|start"
+                    android:lineSpacingExtra="2dp"
+                    android:padding="12dp"
                     android:scrollbars="vertical"
-                    android:scrollbarStyle="insideInset">
-
-                    <TextView
-                        android:id="@+id/skillPreview"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="monospace"
-                        android:gravity="top|start"
-                        android:lineSpacingExtra="2dp"
-                        android:minHeight="280dp"
-                        android:padding="12dp"
-                        android:text="尚未导入 Markdown Skill。"
-                        android:textColor="@color/text_primary"
-                        android:textSize="10sp" />
-                </androidx.core.widget.NestedScrollView>
+                    android:text="尚未导入 Markdown Skill。"
+                    android:textColor="@color/text_primary"
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -241,16 +279,24 @@
                     style="@style/PrimaryButton"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_weight="1.4"
-                    android:text="导入 Markdown Skill" />
+                    android:layout_weight="1.2"
+                    android:text="导入 Skill" />
+
+                <Button
+                    android:id="@+id/exportSelectedButton"
+                    style="@style/KeyButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="0.9"
+                    android:text="导出所选" />
 
                 <Button
                     android:id="@+id/clearSkillButton"
                     style="@style/KeyButton"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_weight="0.8"
-                    android:text="清空规则" />
+                    android:layout_weight="0.7"
+                    android:text="删除全部" />
             </LinearLayout>
 
             <TextView
@@ -262,5 +308,5 @@
                 android:textSize="9sp"
                 android:lineSpacingExtra="2dp" />
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </ScrollView>
 </LinearLayout>

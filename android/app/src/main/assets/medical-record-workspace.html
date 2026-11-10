@@ -1057,8 +1057,8 @@
       </section>
 
       <section class="config-section">
-        <div class="config-section-title"><strong>当前书写规范</strong><span>在主界面“书写规范”中统一设置</span></div>
-        <div class="import-status success" id="globalWritingSkill">未配置 Markdown Skill</div>
+        <div class="config-section-title"><strong>当前组合书写规范</strong><span>在主界面“书写规范”中勾选一个或多个 Skill</span></div>
+        <div class="import-status success" id="globalWritingSkill">未启用 Markdown Skill</div>
       </section>
 
       <section class="config-section">
@@ -1540,7 +1540,7 @@
           return AndroidMedicalBridge.getWritingSkillLabel();
         }
       } catch { }
-      return "未配置 Markdown Skill";
+      return "未启用 Markdown Skill";
     }
 
     function togglePreset(button) {

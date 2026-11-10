@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="7dp"
+    android:background="@drawable/bg_log"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="7dp"
+    android:paddingTop="5dp"
+    android:paddingEnd="7dp"
+    android:paddingBottom="5dp">
+
+    <CheckBox
+        android:id="@+id/skillEnabledCheck"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:buttonTint="@color/clinical_teal"
+        android:contentDescription="启用此 Skill"
+        android:gravity="center" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="2dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:id="@+id/skillItemName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="middle"
+            android:maxLines="1"
+            android:text="Skill"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/skillItemMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/skillExportButton"
+        style="@style/KeyButton"
+        android:layout_width="52dp"
+        android:layout_height="38dp"
+        android:minWidth="0dp"
+        android:text="导出"
+        android:textSize="9sp" />
+
+    <Button
+        android:id="@+id/skillDeleteButton"
+        style="@style/KeyButton"
+        android:layout_width="52dp"
+        android:layout_height="38dp"
+        android:minWidth="0dp"
+        android:text="删除"
+        android:textSize="9sp" />
+</LinearLayout>
