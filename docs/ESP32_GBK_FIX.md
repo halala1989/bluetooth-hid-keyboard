@@ -23,6 +23,8 @@ ERR:UNI_MODE_NOT_READY
 
 - `gbk_table.c/.h`：Unicode→GBK(CP936) 映射表。
 - GBK 模式：按住左 Alt，输入 GBK 十进制机内码，松开 Alt 触发转换。
+- GBK/十六进制小键盘输入前，固件会自动读取主机 NumLock LED 状态；关闭时自动切换开启并等待主机确认。
+- 手机蓝牙 HID 收到 NumLock 关闭状态时，也会自动切换并等待 LED 状态更新。
 - Unicode 十进制模式：Alt + 前导 0 + Unicode 十进制码点。
 - Alt 十六进制模式：Alt + 小键盘加号 + Unicode 十六进制码点。
 - Alt+X 模式保持原有行为。
@@ -59,7 +61,7 @@ YD-ESP32-S3 N16R8 使用：
 
 ## 烧录后验证
 
-1. 目标 Windows 中文系统开启 NumLock。
+1. 不需要手动开启 NumLock，固件会尝试自动确保开启。
 2. 让 ESP32-S3 原生 USB 口连接电脑，电脑识别为 HID 键盘。
 3. 在 App 选择 GBK。
 4. 先测试 `你好好`，再测试纯英文和数字。

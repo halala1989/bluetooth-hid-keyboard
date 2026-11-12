@@ -97,6 +97,7 @@ static void init_device_name(void)
 #define KEY_SPACE 0x2C
 #define KEY_KP_ADD 0x57
 #define KEY_KP_0 0x62
+#define KEY_NUMLOCK 0x53
 
 typedef enum {
     UNI_MODE_DECIMAL = 0,
@@ -114,6 +115,9 @@ static void start_advertising(void);   // 前置声明（gap 回调里会用到�
 
 static uint8_t s_unicode_mode = UNI_MODE_ALTX;
 static uint8_t s_speed = 5;
+static volatile bool s_num_lock_on = false;
+static volatile bool s_num_lock_known = false;
+static volatile bool s_num_lock_fallback_on = false;
 static volatile bool s_hid_failed = false;   // 本次命令里 HID 报告发送是否失败（电脑没连时会出现）
 static volatile bool s_stop_requested = false;
 static uint32_t s_scale = 1000;                 /* 千分比，速度 10 时 300 */
@@ -471,6 +475,45 @@ static void release_alt_after_combo(void)
     vTaskDelay(pdMS_TO_TICKS(scaled(T_ALT_FINAL_MS)));
 }
 
+static bool wait_for_num_lock_state(bool expected, uint32_t timeout_ms)
+{
+    uint32_t waited = 0;
+    while (waited < timeout_ms) {
+        if (s_num_lock_known && s_num_lock_on == expected) return true;
+        vTaskDelay(pdMS_TO_TICKS(20));
+        waited += 20;
+    }
+    return s_num_lock_known && s_num_lock_on == expected;
+}
+
+/*
+ * GBK Alt 码要求 NumLock 开启。电脑通过 HID OUT 报告回报 LED 状态；
+ * 如果读到关闭状态，固件自动按一次 NumLock，并等待主机确认 LED 已开启。
+ * 若首次状态未知，也按一次，再根据主机回报判断是否需要恢复为开启。
+ */
+static void ensure_num_lock_on(void)
+{
+    if (s_num_lock_known && s_num_lock_on) return;
+    if (!s_num_lock_known && s_num_lock_fallback_on) return;
+    if (!s_num_lock_known) s_num_lock_fallback_on = true;
+    ESP_LOGI(TAG, "NumLock unknown/off, toggling automatically");
+    hid_press(0, KEY_NUMLOCK);
+    if (wait_for_num_lock_state(true, 800)) {
+        ESP_LOGI(TAG, "NumLock confirmed ON");
+        return;
+    }
+    if (s_num_lock_known && !s_num_lock_on) {
+        hid_press(0, KEY_NUMLOCK);
+        if (wait_for_num_lock_state(true, 800)) {
+            ESP_LOGI(TAG, "NumLock confirmed ON after second toggle");
+        } else {
+            ESP_LOGW(TAG, "NumLock state did not confirm ON");
+        }
+    } else if (!s_num_lock_known) {
+        ESP_LOGW(TAG, "Host did not report NumLock LED state");
+    }
+}
+
 /* Alt + 小键盘十进制。GBK 使用不带前导 0 的机内码，Unicode 十进制使用前导 0。 */
 static void type_alt_numpad_decimal(uint32_t value, bool leading_zero)
 {
@@ -480,6 +523,7 @@ static void type_alt_numpad_decimal(uint32_t value, bool leading_zero)
     } else {
         snprintf(digits, sizeof(digits), "%u", (unsigned)value);
     }
+    ensure_num_lock_on();
     if (!hid_send_report(MOD_LALT, NULL)) {
         s_hid_failed = true;
         return;
@@ -499,6 +543,7 @@ static void type_alt_hex(uint32_t codepoint)
 {
     char digits[12];
     snprintf(digits, sizeof(digits), "%X", (unsigned)codepoint);
+    ensure_num_lock_on();
     if (!hid_send_report(MOD_LALT, NULL)) {
         s_hid_failed = true;
         return;
@@ -801,7 +846,15 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) { return hid_repor
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type,
                                uint8_t *buffer, uint16_t reqlen) { return 0; }
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type,
-                           uint8_t const *buffer, uint16_t bufsize) {}
+                           uint8_t const *buffer, uint16_t bufsize)
+{
+    if (report_type == HID_REPORT_TYPE_OUTPUT && buffer && bufsize > 0) {
+        s_num_lock_on = (buffer[0] & 0x01u) != 0;
+        s_num_lock_known = true;
+        ESP_LOGI(TAG, "Host LED report: NumLock=%d CapsLock=%d",
+                 s_num_lock_on ? 1 : 0, (buffer[0] & 0x02u) ? 1 : 0);
+    }
+}
 
 static void usb_hid_init(void)
 {

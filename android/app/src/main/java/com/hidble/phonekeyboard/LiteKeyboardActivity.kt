@@ -46,7 +46,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
         "Alt+X（推荐）" to TypingEngine.MODE_ALTX,
         "十六进制" to TypingEngine.MODE_HEX,
         "十进制" to TypingEngine.MODE_DECIMAL,
-        "GBK（需 NumLock）" to TypingEngine.MODE_GBK
+        "GBK（自动确保 NumLock）" to TypingEngine.MODE_GBK
     )
     private var suppressModeEvent = false
     private var sending = false

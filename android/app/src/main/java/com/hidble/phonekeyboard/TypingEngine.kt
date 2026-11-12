@@ -205,6 +205,7 @@ class TypingEngine(
     var speedLevel: Int = 5
 
     private var capsLock = false
+    @Volatile
     private var numLock = false
     private var ledKnown = false
     private var gbkNumLockWarned = false
@@ -336,7 +337,15 @@ class TypingEngine(
             MODE_GBK -> {
                 val gbk = gbkValue(cp)
                 val digits = if (gbk != null) gbk.toString() else "0$cp"
-                // NumLock 未开启时小键盘数字会变成方向键：提示用户，避免误全选/误删
+                // 主机回报 NumLock 关闭时，先模拟一次 NumLock 按键并等待 LED 状态更新。
+                if (ledKnown && !numLock) {
+                    queue(0, HidKeys.KEY_NUM_LOCK, KEY_DOWN_MS)
+                    val deadline = System.currentTimeMillis() + 800
+                    while (!numLock && System.currentTimeMillis() < deadline) {
+                        delay(20)
+                    }
+                }
+                // 若主机没有回报开启状态，仍提示一次，避免静默把方向键输入目标软件。
                 if (ledKnown && !numLock && !gbkNumLockWarned) {
                     gbkNumLockWarned = true
                     onGbkNumLockWarning?.invoke()
