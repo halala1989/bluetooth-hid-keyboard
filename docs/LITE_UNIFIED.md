@@ -6,7 +6,7 @@
 
 - 应用名称：`全终端 Lite 键盘`
 - applicationId：`com.hidble.carekeyboard.lite`
-- 版本：`4.0-test30-lite5`
+- 版本：`4.0-test30-lite6`
 - 可与医疗住院管理正式测试版同时安装。
 
 ## 聚合的终端

@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$IdfPath,
     [string]$BuildDir = "C:\esp32_supermini_bridge_build",
-    [string]$OutputDir = ""
+    [string]$OutputDir = "",
+    [string]$SourceDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,11 @@ if (-not (Test-Path (Join-Path $IdfPath "export.ps1"))) {
 
 . (Join-Path $IdfPath "export.ps1")
 
-$source = Join-Path $PSScriptRoot "esp32_bridge_firmware"
+$source = if ($SourceDir) {
+    [IO.Path]::GetFullPath($SourceDir)
+} else {
+    Join-Path $PSScriptRoot "esp32_bridge_firmware"
+}
 $defaults = Join-Path $source "sdkconfig.defaults"
 
 New-Item -ItemType Directory -Force $BuildDir | Out-Null

@@ -67,4 +67,20 @@ YD-ESP32-S3 N16R8 使用：
 4. 先测试 `你好好`，再测试纯英文和数字。
 5. 如果输出乱码，检查目标电脑当前代码页是否为中文 GBK/CP936。
 
-当前这台电脑未安装 ESP-IDF，因此本次只能完成源码修复和 Android 构建，不能生成新的固件二进制。
+## 本次实机烧录
+
+- 开发板：ESP32-S3 Super Mini
+- 芯片：ESP32-S3 QFN56 rev v0.2，4 MB Flash，2 MB PSRAM
+- MAC：`28:84:85:6D:74:50`
+- 下载口：`COM3`
+- 固件 SHA-256：`7EE804080A73F85CF4AE701CCCED4D156CA2D4CBE7B5213B675D792E60AD5B62`
+- 烧录后三个分区均显示 `Hash of data verified`
+- 重启后已重新识别为 `VID_303A&PID_4004` USB HID 键盘
+
+烧录使用的固件已保存到：
+
+```text
+releases\v4.0-test30-lite6\firmware\ESP32-S3-SuperMini-0001-bridge-merged.bin
+```
+
+该固件也已放入 App 内置 `assets/firmware`，以后可以直接从 App 导出。
