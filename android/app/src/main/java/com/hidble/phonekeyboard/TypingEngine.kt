@@ -179,10 +179,10 @@ class TypingEngine(
         // 避免 Alt+X 来得太早导致不转换/丢字（此停顿随速度缩放，最慢档最稳）
         private const val ALT_PRE_MS = 100
         private const val ALT_FINAL_MS = 40
-        // 1-8 档使用 9ms 稳定下限；9、10 档进一步提高极限速度。
-        private const val STABLE_MIN_DELAY_MS = 9L
-        private const val LEVEL_9_MIN_DELAY_MS = 6L
-        private const val LEVEL_10_MIN_DELAY_MS = 3L
+        // 1-8 档使用 8ms 稳定下限；9、10 档进一步提高极限速度。
+        private const val STABLE_MIN_DELAY_MS = 8L
+        private const val LEVEL_9_MIN_DELAY_MS = 5L
+        private const val LEVEL_10_MIN_DELAY_MS = 2L
         /** 长文本自动分段：每段字符数 */
         const val CHUNK_SIZE = 40
         /** 段间暂停，让蓝牙发送缓冲消化，避免长文本高速发送时丢字 */
@@ -190,8 +190,8 @@ class TypingEngine(
         /** 单份报告发送失败的最大重试次数（约 1 秒），仍失败视为连接中断 */
         private const val SEND_MAX_RETRIES = 50
         private const val SEND_RETRY_WAIT_MS = 20L
-        // 每一档速度相对上版提高约 10%，即延迟系数除以 1.1；9/10 档继续突破保护下限。
-        private val SPEED_SCALES = intArrayOf(1473, 1215, 995, 774, 589, 424, 287, 185, 96, 30)
+        // 每一档速度相对上版再提高约 10%，即延迟系数除以 1.1；9/10 档继续突破保护下限。
+        private val SPEED_SCALES = intArrayOf(1339, 1105, 905, 704, 535, 385, 261, 168, 87, 27)
 
         private val gbkEncoder = Charset.forName("GBK").newEncoder()
             .onMalformedInput(CodingErrorAction.REPORT)

@@ -668,7 +668,7 @@ static void handle_command(char *line)
     } else if (!strcasecmp(cmd, "SPEED")) {
         int level = atoi(arg);
         if (level < 1 || level > 10) { notify_status("ERR:INVALID_SPEED"); return; }
-        static const uint32_t scales[10] = {1250, 1000, 800, 600, 500, 400, 325, 250, 200, 150};
+        static const uint32_t scales[10] = {1136, 909, 727, 545, 455, 364, 295, 227, 182, 136};
         s_speed = (uint8_t)level;
         s_scale = scales[level - 1];
         notify_status("OK");
