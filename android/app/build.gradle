@@ -24,7 +24,7 @@ android {
         lite {
             initWith debug
             applicationIdSuffix ".lite"
-            versionNameSuffix "-lite1"
+            versionNameSuffix "-lite2"
             signingConfig signingConfigs.debug
             resValue "bool", "lite_edition", "true"
         }

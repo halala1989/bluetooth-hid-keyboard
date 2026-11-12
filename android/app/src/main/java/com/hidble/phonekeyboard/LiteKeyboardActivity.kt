@@ -72,7 +72,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
         unicodeModeSpinner = findViewById(R.id.liteUnicodeModeSpinner)
 
         findViewById<Button>(R.id.liteManageConnectionButton).setOnClickListener {
-            startActivity(Intent(this, TerminalSettingsActivity::class.java))
+            startActivity(Intent(this, LiteConnectionActivity::class.java))
         }
         findViewById<Button>(R.id.litePhraseButton).setOnClickListener {
             showPhrasesDialog()
@@ -177,7 +177,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
             sendState.text = "${terminal.displayName} 尚未连接"
             sendState.setTextColor(ContextCompat.getColor(this, R.color.clinical_warning))
             Toast.makeText(this, "请先选择终端并完成连接", Toast.LENGTH_SHORT).show()
-            startActivity(Intent(this, TerminalSettingsActivity::class.java))
+            startActivity(Intent(this, LiteConnectionActivity::class.java))
             return
         }
 
@@ -230,7 +230,11 @@ class LiteKeyboardActivity : AppCompatActivity() {
 
     private fun requestBluetoothPermissions() {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            )
         } else {
             arrayOf(
                 Manifest.permission.BLUETOOTH,
