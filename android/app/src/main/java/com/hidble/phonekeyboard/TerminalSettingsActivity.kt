@@ -141,6 +141,12 @@ class TerminalSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_terminal_settings)
+        if (resources.getBoolean(R.bool.lite_edition)) {
+            findViewById<TextView>(R.id.settingsTitle).text = "全终端连接与输出"
+            findViewById<TextView>(R.id.settingsSubtitle).text =
+                "一套 App · 手机、Pico W、ESP32-S3 统一选择"
+            findViewById<View>(R.id.llmSettingsCard).visibility = View.GONE
+        }
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         boardManager = BoardLink.get(this)
         bindViews()

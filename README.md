@@ -1,5 +1,8 @@
 # 手机蓝牙键盘（Android → 蓝牙 HID → 电脑）
 
+> **全终端 Lite 简明版｜独立分支 `codex/lite-unified`**
+> 把原先按手机蓝牙、Pico W、ESP32-S3、YD-ESP32-S3 分开的 Lite 应用聚合为一个独立 APK。默认首页只保留终端选择、连接状态、文字发送、速度、中文输入模式和常用语；不包含大模型与住院病历。详见 [`docs/LITE_UNIFIED.md`](docs/LITE_UNIFIED.md)。
+
 > **v3.0 Beta：住院全流程管理**
 > App 首页现已改为患者列表，支持基本信息、病例文书、草稿保存和一键蓝牙 HID 输出。原键盘功能保留在「键盘工具」中。
 > 实现与安全边界见 [`docs/INPATIENT_APP.md`](docs/INPATIENT_APP.md)。

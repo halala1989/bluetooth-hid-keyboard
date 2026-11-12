@@ -29,6 +29,7 @@
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/settingsTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="键盘与模型设置"
@@ -37,6 +38,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/settingsSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -404,6 +406,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/llmSettingsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="11dp"
