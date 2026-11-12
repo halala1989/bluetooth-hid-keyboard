@@ -39,6 +39,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "nvs_flash.h"
+#include "gbk_table.h"
 
 static const char *TAG = "DATA_SVC";
 
@@ -94,6 +95,8 @@ static void init_device_name(void)
 #define KEY_BACKSPACE 0x2A
 #define KEY_TAB 0x2B
 #define KEY_SPACE 0x2C
+#define KEY_KP_ADD 0x57
+#define KEY_KP_0 0x62
 
 typedef enum {
     UNI_MODE_DECIMAL = 0,
@@ -429,6 +432,91 @@ static void type_altx(uint32_t codepoint)
     vTaskDelay(pdMS_TO_TICKS(scaled(T_ALT_FINAL_MS)));
 }
 
+static uint8_t numpad_digit_key(char digit)
+{
+    if (digit == '0') return KEY_KP_0;
+    if (digit >= '1' && digit <= '9') return (uint8_t)(0x59 + (digit - '1'));
+    return 0;
+}
+
+/* 按住 Alt 输入一个键，随后只松开该键但保持 Alt 按下。 */
+static bool alt_hold_key(uint8_t usage)
+{
+    if (s_stop_requested) return false;
+    uint8_t keycode[6] = {0};
+    keycode[0] = usage;
+    if (!hid_send_report(MOD_LALT, keycode)) {
+        s_hid_failed = true;
+        s_key_down = false;
+        return false;
+    }
+    s_key_down = true;
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_DOWN_MS)));
+    if (!hid_send_report(MOD_LALT, NULL)) {
+        s_hid_failed = true;
+        return false;
+    }
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_KEY_UP_MS + T_CHAR_GAP_MS)));
+    return true;
+}
+
+static void release_alt_after_combo(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_ALT_FINAL_MS)));
+    if (hid_send_report(0, NULL)) {
+        s_key_down = false;
+    } else {
+        s_hid_failed = true;
+    }
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_ALT_FINAL_MS)));
+}
+
+/* Alt + 小键盘十进制。GBK 使用不带前导 0 的机内码，Unicode 十进制使用前导 0。 */
+static void type_alt_numpad_decimal(uint32_t value, bool leading_zero)
+{
+    char digits[16];
+    if (leading_zero) {
+        snprintf(digits, sizeof(digits), "0%u", (unsigned)value);
+    } else {
+        snprintf(digits, sizeof(digits), "%u", (unsigned)value);
+    }
+    if (!hid_send_report(MOD_LALT, NULL)) {
+        s_hid_failed = true;
+        return;
+    }
+    s_key_down = true;
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_CHAR_GAP_MS)));
+    for (const char *p = digits; *p; p++) {
+        if (s_stop_requested) break;
+        uint8_t key = numpad_digit_key(*p);
+        if (!key || !alt_hold_key(key)) break;
+    }
+    release_alt_after_combo();
+}
+
+/* Alt + 小键盘加号 + 十六进制码点（需要 Windows EnableHexNumpad 和 NumLock）。 */
+static void type_alt_hex(uint32_t codepoint)
+{
+    char digits[12];
+    snprintf(digits, sizeof(digits), "%X", (unsigned)codepoint);
+    if (!hid_send_report(MOD_LALT, NULL)) {
+        s_hid_failed = true;
+        return;
+    }
+    s_key_down = true;
+    vTaskDelay(pdMS_TO_TICKS(scaled(T_CHAR_GAP_MS)));
+    if (alt_hold_key(KEY_KP_ADD)) {
+        for (const char *p = digits; *p; p++) {
+            if (s_stop_requested) break;
+            uint8_t usage = 0;
+            if (*p >= '0' && *p <= '9') usage = numpad_digit_key(*p);
+            else if (*p >= 'A' && *p <= 'F') usage = (uint8_t)(KEY_A + (*p - 'A'));
+            if (!usage || !alt_hold_key(usage)) break;
+        }
+    }
+    release_alt_after_combo();
+}
+
 static void type_codepoint(uint32_t cp)
 {
     if (cp == 0) return;
@@ -439,8 +527,18 @@ static void type_codepoint(uint32_t cp)
     }
     if (s_unicode_mode == UNI_MODE_ALTX) {
         type_altx(cp);
+    } else if (s_unicode_mode == UNI_MODE_GBK) {
+        uint16_t gbk = gbk_from_unicode(cp);
+        if (gbk == 0xFFFFu) {
+            type_alt_numpad_decimal(cp, true);
+        } else {
+            type_alt_numpad_decimal(gbk, false);
+        }
+    } else if (s_unicode_mode == UNI_MODE_HEX) {
+        type_alt_hex(cp);
+    } else if (s_unicode_mode == UNI_MODE_DECIMAL) {
+        type_alt_numpad_decimal(cp, true);
     } else {
-        /* GBK / 十进制 / 十六进制小键盘模式后续移植（需要 gbk 码表） */
         notify_status("ERR:UNI_MODE_NOT_READY");
     }
 }

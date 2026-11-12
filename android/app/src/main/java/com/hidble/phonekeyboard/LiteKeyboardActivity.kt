@@ -90,6 +90,29 @@ class LiteKeyboardActivity : AppCompatActivity() {
         KeyboardRuntime.addStateListener(phoneStateListener)
         BoardLink.get(this).apply {
             onConnectionStateChanged = { runOnUiThread { refreshTerminalStatus() } }
+            onDataReceived = { data ->
+                if (data.startsWith("ERR")) {
+                    runOnUiThread {
+                        val message = if (data.contains("UNI_MODE_NOT_READY")) {
+                            "当前开发板固件不支持此中文模式，请更新开发板固件"
+                        } else {
+                            "开发板返回错误：$data"
+                        }
+                        sendState.text = message
+                        sendState.setTextColor(
+                            ContextCompat.getColor(
+                                this@LiteKeyboardActivity,
+                                R.color.clinical_danger
+                            )
+                        )
+                        Toast.makeText(
+                            this@LiteKeyboardActivity,
+                            message,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
             onError = { message ->
                 runOnUiThread {
                     sendState.text = "连接错误：$message"
@@ -106,6 +129,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
         KeyboardRuntime.removeStateListener(phoneStateListener)
         BoardLink.get(this).apply {
             onConnectionStateChanged = null
+            onDataReceived = null
             onError = null
         }
     }
