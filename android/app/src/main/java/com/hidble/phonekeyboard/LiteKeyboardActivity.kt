@@ -86,6 +86,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         KeyboardRuntime.refreshConnection()
+        LiteConnectionMemory.load(this)?.let { LiteConnectionMemory.applyToRouter(this, it) }
         KeyboardRuntime.addStateListener(phoneStateListener)
         BoardLink.get(this).apply {
             onConnectionStateChanged = { runOnUiThread { refreshTerminalStatus() } }
@@ -172,11 +173,12 @@ class LiteKeyboardActivity : AppCompatActivity() {
             Toast.makeText(this, "请先输入要发送的文字", Toast.LENGTH_SHORT).show()
             return
         }
+        val deviceName = connectedDeviceName()
         val terminal = OutputRouter.selected(this)
         if (!OutputRouter.isConnected(this, terminal)) {
-            sendState.text = "${terminal.displayName} 尚未连接"
+            sendState.text = "当前设备尚未连接"
             sendState.setTextColor(ContextCompat.getColor(this, R.color.clinical_warning))
-            Toast.makeText(this, "请先选择终端并完成连接", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "请先连接上次设备或扫描新设备", Toast.LENGTH_SHORT).show()
             startActivity(Intent(this, LiteConnectionActivity::class.java))
             return
         }
@@ -184,13 +186,13 @@ class LiteKeyboardActivity : AppCompatActivity() {
         sending = true
         sendButton.isEnabled = false
         sendButton.text = "发送中…"
-        sendState.text = "正在通过 ${terminal.displayName} 输出…"
+        sendState.text = "正在发送到 ${deviceName ?: "当前设备"}…"
         sendState.setTextColor(ContextCompat.getColor(this, R.color.accent))
         OutputRouter.sendText(this, text) { success, message ->
             runOnUiThread {
                 sending = false
                 sendButton.isEnabled = true
-                sendButton.text = "发送到当前终端"
+                sendButton.text = "发送到当前设备"
                 sendState.text = message
                 sendState.setTextColor(
                     ContextCompat.getColor(
@@ -205,20 +207,32 @@ class LiteKeyboardActivity : AppCompatActivity() {
 
     private fun refreshTerminalStatus() {
         if (!::terminalName.isInitialized) return
-        val terminal = OutputRouter.selected(this)
-        val connected = OutputRouter.isConnected(this, terminal)
-        terminalName.text = terminal.displayName
+        val remembered = LiteConnectionMemory.load(this)
+        val computerConnected = KeyboardRuntime.snapshot().connected
+        val boardConnected = BoardLink.isConnected()
+        val connected = computerConnected || boardConnected
+        if (boardConnected) {
+            TerminalRegistry.select(this, TerminalRegistry.byId(TerminalRegistry.ESP32_S3))
+        } else if (computerConnected) {
+            TerminalRegistry.select(this, TerminalRegistry.byId(TerminalRegistry.PHONE_HID))
+        }
+        terminalName.text = when {
+            computerConnected -> KeyboardRuntime.snapshot().deviceName ?: "已连接电脑"
+            boardConnected -> BoardLink.connectedName() ?: "已连接设备"
+            remembered != null -> "上次设备：${remembered.name.ifBlank { "未命名设备" }}"
+            else -> "尚未连接"
+        }
         terminalDot.setTextColor(
             ContextCompat.getColor(this, if (connected) R.color.connected else R.color.disconnected)
         )
         terminalDetail.text = when {
-            connected && terminal.id == TerminalRegistry.PHONE_HID ->
-                "已连接：${KeyboardRuntime.snapshot().deviceName ?: "目标电脑"}"
-            connected -> "已连接：${BoardLink.connectedAddress() ?: "外接板"}"
-            else -> terminal.description
+            computerConnected -> "● 当前已连接 · MAC：${KeyboardRuntime.lastComputerAddress().orEmpty()}"
+            boardConnected -> "● 当前已连接 · MAC：${BoardLink.connectedAddress().orEmpty()}"
+            remembered != null -> "MAC：${remembered.address} · 点击连接可主动重连"
+            else -> "点击“选择终端并连接”扫描并记住设备"
         }
         if (!sending) {
-            sendState.text = if (connected) "终端已连接，可以发送" else "连接终端后即可发送"
+            sendState.text = if (connected) "设备已连接，可以发送" else "连接设备后即可发送"
             sendState.setTextColor(
                 ContextCompat.getColor(
                     this,
@@ -226,6 +240,12 @@ class LiteKeyboardActivity : AppCompatActivity() {
                 )
             )
         }
+    }
+
+    private fun connectedDeviceName(): String? = when {
+        KeyboardRuntime.snapshot().connected -> KeyboardRuntime.snapshot().deviceName
+        BoardLink.isConnected() -> BoardLink.connectedName()
+        else -> LiteConnectionMemory.load(this)?.name
     }
 
     private fun requestBluetoothPermissions() {

@@ -6,7 +6,7 @@
 
 - 应用名称：`全终端 Lite 键盘`
 - applicationId：`com.hidble.carekeyboard.lite`
-- 版本：`4.0-test30-lite2`
+- 版本：`4.0-test30-lite3`
 - 可与医疗住院管理正式测试版同时安装。
 
 ## 聚合的终端
@@ -21,11 +21,12 @@
 
 ## 精简后的功能
 
-- 主界面直接显示当前输出终端和连接状态。
-- “选择终端并连接”进入二级页面：上方专门处理蓝牙 HID 与电脑配对，下方选择开发板并扫描。
-- 选择开发板后会询问是否扫描；扫描结果显示附近全部 BLE 设备的实际名称、MAC 地址和信号强度。
-- 已配对设备会合并到同一个设备列表，不再单独占用一个列表区域。
-- 保留文字输入、发送到当前终端、1–10 档速度、四种中文输入模式和常用语。
+- 主界面直接显示当前连接设备名称和 MAC，不显示具体开发板类型。
+- “扫描、配对或主动连接”进入统一设备页，电脑和所有开发板使用同一个扫描列表。
+- 点击设备后，程序根据真实蓝牙类型自动选择电脑 HID 或开发板 BLE 连接方式。
+- 首次连接成功后永久保存设备名称、MAC 和连接类别。
+- 下次进入连接页会先主动重连上次设备；失败时再扫描并选择新设备。
+- 保留文字输入、发送到当前设备、1–10 档速度、四种中文输入模式和常用语。
 - 不显示大模型、API Token、住院患者和病历文书入口。
 - Lite 构建使用独立包名、独立图标和独立应用名称，不和完整医疗版互相覆盖。
 
@@ -56,6 +57,8 @@ android/app/build/outputs/apk/lite/app-lite.apk
 
 ```text
 android/app/src/main/java/com/hidble/phonekeyboard/LiteKeyboardActivity.kt
+android/app/src/main/java/com/hidble/phonekeyboard/LiteConnectionActivity.kt
+android/app/src/main/java/com/hidble/phonekeyboard/LiteConnectionMemory.kt
 android/app/src/main/res/layout/activity_lite_keyboard.xml
 android/app/src/lite/AndroidManifest.xml
 android/app/src/lite/res/drawable/ic_lite_launcher.xml

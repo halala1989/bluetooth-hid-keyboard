@@ -4,8 +4,10 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -14,16 +16,12 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.ListView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -32,7 +30,7 @@ class LiteConnectionActivity : AppCompatActivity() {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 3201
-        private const val SCAN_DURATION_MS = 12_000L
+        private const val SCAN_DURATION_MS = 15_000L
     }
 
     private data class ScanDevice(
@@ -41,51 +39,80 @@ class LiteConnectionActivity : AppCompatActivity() {
         var rssi: Int
     )
 
-    private lateinit var phoneDot: TextView
-    private lateinit var phoneStatus: TextView
-    private lateinit var phoneDetail: TextView
-    private lateinit var phoneButton: Button
-    private lateinit var boardSpinner: Spinner
-    private lateinit var boardStatus: TextView
-    private lateinit var scanButton: Button
+    private lateinit var statusDot: TextView
+    private lateinit var statusTitle: TextView
+    private lateinit var statusDetail: TextView
+    private lateinit var reconnectButton: Button
+    private lateinit var scanPairButton: Button
+    private lateinit var scanState: TextView
     private lateinit var emptyText: TextView
     private lateinit var deviceList: ListView
 
     private val handler = Handler(Looper.getMainLooper())
-    private val boardOptions = TerminalRegistry.all.filter { it.isBoard }
     private val devices = linkedMapOf<String, ScanDevice>()
-    private lateinit var deviceAdapter: ScanDeviceAdapter
+    private lateinit var deviceAdapter: UnifiedDeviceAdapter
     private lateinit var boardManager: BoardBleManager
-    private var suppressBoardSelection = true
     private var scanning = false
+    private var autoReconnectAttempted = false
+    private var pendingComputerAddress: String? = null
 
-    private val phoneStateListener: (KeyboardSnapshot) -> Unit = {
-        runOnUiThread { refreshPhoneHid() }
+    private val phoneStateListener: (KeyboardSnapshot) -> Unit = { snapshot ->
+        runOnUiThread {
+            if (snapshot.connected) {
+                val address = KeyboardRuntime.lastComputerAddress()
+                val remembered = LiteConnectionMemory.load(this)
+                val name = snapshot.deviceName
+                    ?: remembered?.takeIf { it.address == address }?.name
+                    ?: "已配对电脑"
+                if (!address.isNullOrBlank()) {
+                    LiteConnectionMemory.save(
+                        this,
+                        LiteConnectionMemory.KIND_COMPUTER,
+                        address,
+                        name
+                    )
+                }
+                refreshUnifiedStatus()
+            } else if (LiteConnectionMemory.load(this)?.kind == LiteConnectionMemory.KIND_COMPUTER) {
+                refreshUnifiedStatus()
+            }
+        }
+    }
+
+    private val discoveryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device = intent.bluetoothDevice() ?: return
+                    val name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
+                    val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, 0).toInt()
+                    addDevice(device, name, rssi)
+                }
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                    val device = intent.bluetoothDevice() ?: return
+                    val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
+                    if (
+                        state == BluetoothDevice.BOND_BONDED &&
+                        pendingComputerAddress == device.address
+                    ) {
+                        pendingComputerAddress = null
+                        connectComputer(device)
+                    }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    updateScanText()
+                }
+            }
+        }
     }
 
     private val enableBluetoothLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK && KeyboardRuntime.isBluetoothOn()) {
-            KeyboardRuntime.enable()
-            handler.postDelayed({ showPhonePairingChoices() }, 600)
-        } else {
-            Toast.makeText(this, "需要开启手机蓝牙", Toast.LENGTH_SHORT).show()
-            refreshPhoneHid()
-        }
-    }
-
-    private val discoverableLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
         if (result.resultCode == RESULT_OK) {
-            Toast.makeText(
-                this,
-                "请在电脑蓝牙设置中搜索“${HidDeviceManager.KEYBOARD_NAME}”并完成配对",
-                Toast.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, "蓝牙已开启，请再次点击操作", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "未开启可发现状态，电脑可能搜索不到手机", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "需要开启蓝牙才能扫描和连接", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -95,31 +122,41 @@ class LiteConnectionActivity : AppCompatActivity() {
         KeyboardRuntime.initialize(this)
         boardManager = BoardLink.get(this)
 
-        phoneDot = findViewById(R.id.litePhoneHidDot)
-        phoneStatus = findViewById(R.id.litePhoneHidStatus)
-        phoneDetail = findViewById(R.id.litePhoneHidDetail)
-        phoneButton = findViewById(R.id.litePhoneHidButton)
-        boardSpinner = findViewById(R.id.liteBoardSpinner)
-        boardStatus = findViewById(R.id.liteBoardStatus)
-        scanButton = findViewById(R.id.liteBoardScanButton)
-        emptyText = findViewById(R.id.liteBoardEmptyText)
-        deviceList = findViewById(R.id.liteBoardDeviceList)
+        statusDot = findViewById(R.id.liteUnifiedStatusDot)
+        statusTitle = findViewById(R.id.liteUnifiedStatus)
+        statusDetail = findViewById(R.id.liteUnifiedDetail)
+        reconnectButton = findViewById(R.id.liteReconnectButton)
+        scanPairButton = findViewById(R.id.liteScanPairButton)
+        scanState = findViewById(R.id.liteUnifiedScanState)
+        emptyText = findViewById(R.id.liteUnifiedEmptyText)
+        deviceList = findViewById(R.id.liteUnifiedDeviceList)
 
         findViewById<Button>(R.id.liteConnectionBackButton).setOnClickListener { finish() }
-        phoneButton.setOnClickListener { preparePhoneHidPairing() }
-        scanButton.setOnClickListener { askToScanBoard() }
-        setupBoardSelector()
-        setupDeviceList()
+        reconnectButton.setOnClickListener { reconnectRemembered(false) }
+        scanPairButton.setOnClickListener { startUnifiedScan() }
+
+        deviceAdapter = UnifiedDeviceAdapter()
+        deviceList.adapter = deviceAdapter
+        deviceList.setOnItemClickListener { _, _, position, _ ->
+            val entry = devices.values.toList().getOrNull(position) ?: return@setOnItemClickListener
+            stopUnifiedScan()
+            connectSelectedDevice(entry)
+        }
         setupBoardCallbacks()
+        registerDiscoveryReceiver()
         requestBluetoothPermissions()
+        refreshUnifiedStatus()
     }
 
     override fun onResume() {
         super.onResume()
         KeyboardRuntime.refreshConnection()
         KeyboardRuntime.addStateListener(phoneStateListener)
-        refreshPhoneHid()
-        refreshBoardStatus()
+        refreshUnifiedStatus()
+        if (!autoReconnectAttempted && LiteConnectionMemory.load(this) != null) {
+            autoReconnectAttempted = true
+            handler.postDelayed({ reconnectRemembered(true) }, 350)
+        }
     }
 
     override fun onPause() {
@@ -129,7 +166,8 @@ class LiteConnectionActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        boardManager.stopScan()
+        stopUnifiedScan()
+        runCatching { unregisterReceiver(discoveryReceiver) }
         boardManager.onDeviceFound = null
         boardManager.onScanStateChanged = null
         boardManager.onConnectionStateChanged = null
@@ -137,274 +175,283 @@ class LiteConnectionActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun setupBoardSelector() {
-        val labels = boardOptions.map { terminal ->
-            "${terminal.displayName}\n${terminal.description}"
-        }
-        val adapter = ArrayAdapter(this, R.layout.item_spinner, R.id.spinnerText, labels)
-        adapter.setDropDownViewResource(R.layout.item_spinner)
-        boardSpinner.adapter = adapter
-        val selected = TerminalRegistry.selected(this)
-        val selectedIndex = boardOptions.indexOfFirst { it.id == selected.id }
-            .takeIf { it >= 0 }
-            ?: 0
-        suppressBoardSelection = true
-        boardSpinner.setSelection(selectedIndex, false)
-        suppressBoardSelection = false
-        boardSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                if (suppressBoardSelection) return
-                val terminal = boardOptions.getOrElse(position) { boardOptions.first() }
-                OutputRouter.select(this@LiteConnectionActivity, terminal)
-                refreshBoardStatus()
-                askToScanBoard()
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
-    }
-
-    private fun setupDeviceList() {
-        deviceAdapter = ScanDeviceAdapter()
-        deviceList.adapter = deviceAdapter
-        deviceList.setOnItemClickListener { _, _, position, _ ->
-            val entry = devices.values.toList().getOrNull(position) ?: return@setOnItemClickListener
-            val terminal = selectedBoard()
-            OutputRouter.connectBoard(this, terminal, entry.device)
-            boardStatus.text = "正在连接 ${displayName(entry)}\nMAC：${entry.device.address}"
-            boardStatus.setTextColor(ContextCompat.getColor(this, R.color.accent))
-            boardManager.stopScan()
-        }
-    }
-
     private fun setupBoardCallbacks() {
         boardManager.onDeviceFound = { device, rssi, name ->
-            runOnUiThread {
-                val existing = devices[device.address]
-                if (existing == null) {
-                    devices[device.address] = ScanDevice(device, name, rssi)
-                } else {
-                    if (!name.isNullOrBlank()) existing.name = name
-                    existing.rssi = rssi
-                }
-                deviceAdapter.notifyDataSetChanged()
-                updateDeviceListVisibility()
-            }
-        }
-        boardManager.onScanStateChanged = { active ->
-            runOnUiThread {
-                scanning = active
-                scanButton.isEnabled = !active
-                scanButton.text = if (active) "扫描中…（显示全部蓝牙设备）" else "扫描附近全部蓝牙设备"
-                if (!active) {
-                    updateDeviceListVisibility()
-                    if (devices.isEmpty()) {
-                        boardStatus.text = "扫描结束：附近没有发现蓝牙设备"
-                        boardStatus.setTextColor(ContextCompat.getColor(this, R.color.clinical_warning))
-                    } else {
-                        boardStatus.text = "扫描结束：发现 ${devices.size} 个蓝牙设备"
-                        boardStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
-                    }
-                }
-            }
+            runOnUiThread { addDevice(device, name, rssi) }
         }
         boardManager.onConnectionStateChanged = { connected ->
             runOnUiThread {
                 if (connected) {
-                    val name = BoardLink.connectedName() ?: selectedBoard().displayName
                     val address = BoardLink.connectedAddress().orEmpty()
-                    boardStatus.text = "● 已连接：$name\nMAC：$address"
-                    boardStatus.setTextColor(ContextCompat.getColor(this, R.color.connected))
-                    scanButton.isEnabled = true
-                    Toast.makeText(this, "开发板连接成功", Toast.LENGTH_SHORT).show()
+                    val name = BoardLink.connectedName() ?: "已连接开发板"
+                    if (address.isNotBlank()) {
+                        LiteConnectionMemory.save(
+                            this,
+                            LiteConnectionMemory.KIND_BOARD,
+                            address,
+                            name
+                        )
+                        TerminalRegistry.select(
+                            this,
+                            TerminalRegistry.byId(TerminalRegistry.ESP32_S3)
+                        )
+                    }
+                    Toast.makeText(this, "连接成功", Toast.LENGTH_SHORT).show()
+                    refreshUnifiedStatus()
                 } else {
-                    refreshBoardStatus()
+                    refreshUnifiedStatus()
                 }
             }
         }
         boardManager.onError = { message ->
             runOnUiThread {
-                boardStatus.text = "连接错误：$message"
-                boardStatus.setTextColor(ContextCompat.getColor(this, R.color.clinical_danger))
+                statusTitle.text = "连接失败"
+                statusDetail.text = message
+                statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private fun selectedBoard(): TerminalDefinition =
-        boardOptions.getOrElse(boardSpinner.selectedItemPosition) { boardOptions.first() }
-
-    private fun askToScanBoard() {
-        if (scanning) return
-        val terminal = selectedBoard()
-        if (boardSpinner.selectedItemPosition < 0) return
-        AlertDialog.Builder(this)
-            .setTitle("扫描附近蓝牙设备？")
-            .setMessage(
-                "将使用 ${terminal.displayName} 协议扫描周围全部 BLE 设备。" +
-                    "扫描结果会显示设备的实际广播名称和 MAC 地址。"
-            )
-            .setPositiveButton("扫描") { _, _ -> startBoardScan() }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun startBoardScan() {
-        if (!hasBluetoothPermission()) {
+    private fun startUnifiedScan() {
+        if (!hasBluetoothPermissions()) {
             requestBluetoothPermissions()
             return
         }
-        if (!boardManager.isBleAvailable()) {
-            Toast.makeText(this, "请先在手机系统设置中开启蓝牙", Toast.LENGTH_SHORT).show()
+        val adapter = bluetoothAdapter()
+        if (adapter == null || !adapter.isEnabled) {
+            enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
             return
         }
+        if (scanning) return
         devices.clear()
         deviceAdapter.notifyDataSetChanged()
         deviceList.visibility = View.GONE
         emptyText.visibility = View.VISIBLE
         emptyText.text = "正在扫描附近全部蓝牙设备…"
-        boardStatus.text = "正在扫描，请保持开发板通电并处于广播状态"
-        boardStatus.setTextColor(ContextCompat.getColor(this, R.color.accent))
-        addBondedDevices()
+        scanState.text = "扫描中：电脑和开发板会出现在同一个列表"
+        scanState.setTextColor(ContextCompat.getColor(this, R.color.accent))
+        scanPairButton.isEnabled = false
+        scanPairButton.text = "扫描中…"
+        scanning = true
+
+        addBondedDevices(adapter)
+        runCatching { adapter.startDiscovery() }
         boardManager.startScan()
-        handler.postDelayed({
-            if (scanning) boardManager.stopScan()
-        }, SCAN_DURATION_MS)
+        handler.postDelayed({ stopUnifiedScan() }, SCAN_DURATION_MS)
     }
 
-    private fun addBondedDevices() {
-        val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter ?: return
+    private fun stopUnifiedScan() {
+        if (!scanning) return
+        scanning = false
+        runCatching { bluetoothAdapter()?.cancelDiscovery() }
+        boardManager.stopScan()
+        scanPairButton.isEnabled = true
+        scanPairButton.text = "扫描并配对"
+        updateDeviceListVisibility()
+        updateScanText()
+    }
+
+    private fun addBondedDevices(adapter: BluetoothAdapter) {
         try {
             adapter.bondedDevices.orEmpty().forEach { device ->
-                if (!devices.containsKey(device.address)) {
-                    devices[device.address] = ScanDevice(
-                        device,
-                        runCatching { device.name }.getOrNull(),
-                        0
-                    )
-                }
+                addDevice(device, runCatching { device.name }.getOrNull(), 0)
             }
-            deviceAdapter.notifyDataSetChanged()
-            updateDeviceListVisibility()
         } catch (_: SecurityException) {
-            // Permission result is handled by the scan permission prompt.
+            // The permission prompt handles missing scan/connect access.
         }
+    }
+
+    private fun addDevice(device: BluetoothDevice, discoveredName: String?, rssi: Int) {
+        val existing = devices[device.address]
+        val safeName = discoveredName?.takeIf { it.isNotBlank() }
+            ?: runCatching { device.name }.getOrNull()
+        if (existing == null) {
+            devices[device.address] = ScanDevice(device, safeName, rssi)
+        } else {
+            if (safeName != null) existing.name = safeName
+            if (rssi != 0) existing.rssi = rssi
+        }
+        deviceAdapter.notifyDataSetChanged()
+        updateDeviceListVisibility()
     }
 
     private fun updateDeviceListVisibility() {
         val hasDevices = devices.isNotEmpty()
         deviceList.visibility = if (hasDevices) View.VISIBLE else View.GONE
         emptyText.visibility = if (hasDevices) View.GONE else View.VISIBLE
-        if (!hasDevices) emptyText.text = if (scanning) "正在扫描…" else "没有发现蓝牙设备"
+        if (!hasDevices) {
+            emptyText.text = if (scanning) "正在扫描…" else "没有发现设备"
+        }
     }
 
-    private fun preparePhoneHidPairing() {
-        if (!hasBluetoothPermission()) {
-            requestBluetoothPermissions()
-            return
+    private fun updateScanText() {
+        if (!::scanState.isInitialized || scanning) return
+        scanState.text = if (devices.isEmpty()) {
+            "扫描结束：附近没有发现蓝牙设备"
+        } else {
+            "扫描结束：发现 ${devices.size} 个设备，点击设备名称连接"
         }
-        if (!KeyboardRuntime.isBluetoothOn()) {
-            enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-            return
-        }
-        KeyboardRuntime.enable()
-        handler.postDelayed({ showPhonePairingChoices() }, 500)
+        scanState.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
     }
 
-    private fun showPhonePairingChoices() {
-        val pairs = KeyboardRuntime.pairRequests().filterNot { (_, device) ->
-            boardOptions.any { terminal -> TerminalRegistry.matches(terminal, device, null) }
+    private fun connectSelectedDevice(entry: ScanDevice) {
+        val name = displayName(entry)
+        statusTitle.text = "正在连接 $name"
+        statusDetail.text = "MAC：${entry.device.address}"
+        statusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
+        if (isBoardDevice(entry.device, entry.name)) {
+            val terminal = TerminalRegistry.byId(TerminalRegistry.ESP32_S3)
+            TerminalRegistry.select(this, terminal)
+            OutputRouter.connectBoard(this, terminal, entry.device)
+        } else {
+            connectComputer(entry.device)
         }
-        if (pairs.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle("首次适配电脑")
-                .setMessage(
-                    "当前没有已配对电脑。开启手机可发现状态后，" +
-                        "请到电脑蓝牙设置中搜索“${HidDeviceManager.KEYBOARD_NAME}”并完成配对。"
-                )
-                .setPositiveButton("让电脑发现手机") { _, _ -> makePhoneDiscoverable() }
-                .setNegativeButton("取消", null)
-                .show()
-            return
-        }
-        val labels = pairs.map { (name, device) -> "$name\nMAC：${device.address}" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("连接已配对电脑")
-            .setMessage("选择电脑后，由手机主动发起蓝牙 HID 连接。")
-            .setItems(labels) { _, index ->
-                val device = pairs[index].second
-                KeyboardRuntime.connectComputer(device)
-                phoneDetail.text = "正在主动连接 ${pairs[index].first}"
+    }
+
+    private fun isBoardDevice(device: BluetoothDevice, name: String?): Boolean {
+        val type = runCatching { device.type }.getOrDefault(BluetoothDevice.DEVICE_TYPE_UNKNOWN)
+        if (type == BluetoothDevice.DEVICE_TYPE_LE) return true
+        if (type == BluetoothDevice.DEVICE_TYPE_CLASSIC) return false
+        val visible = name?.takeIf { it.isNotBlank() }
+            ?: runCatching { device.name }.getOrNull()
+            .orEmpty()
+        return listOf("ESP32", "Pico", "键盘", "Keyboard")
+            .any { visible.contains(it, ignoreCase = true) }
+    }
+
+    private fun connectComputer(device: BluetoothDevice) {
+        val name = runCatching { device.name }.getOrNull() ?: "电脑"
+        if (device.bondState != BluetoothDevice.BOND_BONDED) {
+            pendingComputerAddress = device.address
+            statusTitle.text = "正在与 $name 配对"
+            statusDetail.text = "请在手机和电脑上确认配对；完成后会自动连接"
+            val started = runCatching { device.createBond() }.getOrDefault(false)
+            if (!started) {
+                pendingComputerAddress = null
+                Toast.makeText(this, "无法发起配对，请让电脑进入可发现状态", Toast.LENGTH_LONG).show()
             }
-            .setNeutralButton("让电脑发现手机") { _, _ -> makePhoneDiscoverable() }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun makePhoneDiscoverable() {
+            return
+        }
         KeyboardRuntime.enable()
         handler.postDelayed({
-            runCatching {
-                discoverableLauncher.launch(
-                    Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                        putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-                    }
-                )
-            }.onFailure {
-                Toast.makeText(this, "请手动开启“对附近设备可见”", Toast.LENGTH_LONG).show()
-            }
-        }, 500)
+            KeyboardRuntime.connectComputer(device)
+            LiteConnectionMemory.save(
+                this,
+                LiteConnectionMemory.KIND_COMPUTER,
+                device.address,
+                name
+            )
+            TerminalRegistry.select(this, TerminalRegistry.byId(TerminalRegistry.PHONE_HID))
+            statusTitle.text = "正在主动连接 $name"
+            statusDetail.text = "MAC：${device.address}"
+        }, 650)
     }
 
-    private fun refreshPhoneHid() {
-        if (!::phoneStatus.isInitialized) return
-        val snapshot = KeyboardRuntime.snapshot()
-        when {
-            snapshot.connected -> {
-                phoneDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
-                phoneStatus.text = "● 已连接电脑"
-                phoneDetail.text = listOfNotNull(
-                    snapshot.deviceName ?: "目标电脑",
-                    KeyboardRuntime.lastComputerAddress()?.let { "MAC：$it" }
-                ).joinToString("\n")
-                phoneButton.text = "重新选择电脑 / 重新配对"
-            }
-            snapshot.registered -> {
-                phoneDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
-                phoneStatus.text = "● 蓝牙键盘已启动"
-                phoneDetail.text = "等待电脑连接，或从已配对电脑列表中主动连接"
-                phoneButton.text = "连接已配对电脑"
-            }
-            else -> {
-                phoneDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
-                phoneStatus.text = "蓝牙键盘未启动"
-                phoneDetail.text = "点击下方按钮启动键盘并完成电脑适配"
-                phoneButton.text = "启动键盘 / 配对电脑"
-            }
+    private fun reconnectRemembered(auto: Boolean) {
+        val remembered = LiteConnectionMemory.load(this)
+        if (remembered == null) {
+            if (!auto) startUnifiedScan()
+            return
+        }
+        if (
+            remembered.kind == LiteConnectionMemory.KIND_BOARD &&
+            BoardLink.isConnected()
+        ) {
+            refreshUnifiedStatus()
+            return
+        }
+        if (
+            remembered.kind == LiteConnectionMemory.KIND_COMPUTER &&
+            KeyboardRuntime.snapshot().connected
+        ) {
+            refreshUnifiedStatus()
+            return
+        }
+        if (!hasBluetoothPermissions()) {
+            if (!auto) requestBluetoothPermissions()
+            return
+        }
+        val adapter = bluetoothAdapter()
+        if (adapter == null || !adapter.isEnabled) {
+            if (!auto) enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            return
+        }
+        val device = runCatching { adapter.getRemoteDevice(remembered.address) }.getOrNull()
+        if (device == null) {
+            if (!auto) startUnifiedScan()
+            return
+        }
+        statusTitle.text = "正在主动连接 ${remembered.name.ifBlank { "上次设备" }}"
+        statusDetail.text = "MAC：${remembered.address}"
+        statusDot.setTextColor(ContextCompat.getColor(this, R.color.accent))
+        if (remembered.kind == LiteConnectionMemory.KIND_BOARD) {
+            TerminalRegistry.select(this, TerminalRegistry.byId(TerminalRegistry.ESP32_S3))
+            BoardLink.get(this).connect(device)
+        } else {
+            TerminalRegistry.select(this, TerminalRegistry.byId(TerminalRegistry.PHONE_HID))
+            KeyboardRuntime.enable()
+            handler.postDelayed({ KeyboardRuntime.connectComputer(device) }, 650)
         }
     }
 
-    private fun refreshBoardStatus() {
-        if (!::boardStatus.isInitialized) return
-        val terminal = selectedBoard()
-        if (OutputRouter.isConnected(this, terminal)) {
-            val name = BoardLink.connectedName() ?: terminal.displayName
-            val address = BoardLink.connectedAddress().orEmpty()
-            boardStatus.text = "● 已连接：$name\nMAC：$address"
-            boardStatus.setTextColor(ContextCompat.getColor(this, R.color.connected))
-        } else {
-            boardStatus.text = "已选择：${terminal.displayName}\n选择后可以扫描附近全部蓝牙设备"
-            boardStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+    private fun refreshUnifiedStatus() {
+        if (!::statusTitle.isInitialized) return
+        val remembered = LiteConnectionMemory.load(this)
+        reconnectButton.visibility = if (remembered == null) View.GONE else View.VISIBLE
+        val computer = KeyboardRuntime.snapshot()
+        val boardConnected = BoardLink.isConnected()
+        when {
+            computer.connected -> {
+                val address = KeyboardRuntime.lastComputerAddress().orEmpty()
+                statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
+                statusTitle.text = "● ${computer.deviceName ?: remembered?.name ?: "电脑"}"
+                statusDetail.text = buildString {
+                    append("连接成功")
+                    if (address.isNotBlank()) append(" · MAC：$address")
+                }
+            }
+            boardConnected -> {
+                val address = BoardLink.connectedAddress().orEmpty()
+                statusDot.setTextColor(ContextCompat.getColor(this, R.color.connected))
+                statusTitle.text = "● ${BoardLink.connectedName() ?: remembered?.name ?: "开发板"}"
+                statusDetail.text = buildString {
+                    append("连接成功")
+                    if (address.isNotBlank()) append(" · MAC：$address")
+                }
+            }
+            remembered != null -> {
+                statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+                statusTitle.text = "上次设备：${remembered.name.ifBlank { "未命名设备" }}"
+                statusDetail.text = "MAC：${remembered.address} · 下次会自动主动连接"
+            }
+            else -> {
+                statusDot.setTextColor(ContextCompat.getColor(this, R.color.disconnected))
+                statusTitle.text = "尚未连接设备"
+                statusDetail.text = "首次使用时点击“扫描并配对”"
+            }
         }
     }
 
     private fun displayName(entry: ScanDevice): String =
         entry.name?.takeIf { it.isNotBlank() } ?: "未命名蓝牙设备"
+
+    private fun bluetoothAdapter(): BluetoothAdapter? =
+        (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+
+    private fun registerDiscoveryReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            discoveryReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
 
     private fun requestBluetoothPermissions() {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -432,7 +479,7 @@ class LiteConnectionActivity : AppCompatActivity() {
         }
     }
 
-    private fun hasBluetoothPermission(): Boolean {
+    private fun hasBluetoothPermissions(): Boolean {
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
@@ -447,7 +494,15 @@ class LiteConnectionActivity : AppCompatActivity() {
         }
     }
 
-    private inner class ScanDeviceAdapter : BaseAdapter() {
+    private fun Intent.bluetoothDevice(): BluetoothDevice? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+        }
+
+    private inner class UnifiedDeviceAdapter : BaseAdapter() {
         private val inflater = LayoutInflater.from(this@LiteConnectionActivity)
 
         override fun getCount(): Int = devices.size
