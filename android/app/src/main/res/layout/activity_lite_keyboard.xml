@@ -157,13 +157,45 @@
                     android:textColorHint="@color/text_hint"
                     android:textSize="14sp" />
 
-                <Button
-                    android:id="@+id/liteSendButton"
-                    style="@style/PrimaryButton"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="发送到当前设备" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/liteSendButton"
+                        style="@style/PrimaryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1.15"
+                        android:text="发送" />
+
+                    <Button
+                        android:id="@+id/litePauseButton"
+                        style="@style/KeyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="0.8"
+                        android:text="暂停" />
+
+                    <Button
+                        android:id="@+id/liteStopButton"
+                        style="@style/KeyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="0.8"
+                        android:text="停止" />
+
+                    <Button
+                        android:id="@+id/liteClearButton"
+                        style="@style/KeyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="0.8"
+                        android:text="清空" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/liteSendState"

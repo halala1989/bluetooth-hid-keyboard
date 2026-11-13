@@ -19,6 +19,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 
 class LiteKeyboardActivity : AppCompatActivity() {
@@ -37,6 +41,9 @@ class LiteKeyboardActivity : AppCompatActivity() {
     private lateinit var terminalDetail: TextView
     private lateinit var textInput: EditText
     private lateinit var sendButton: Button
+    private lateinit var pauseButton: Button
+    private lateinit var stopButton: Button
+    private lateinit var clearButton: Button
     private lateinit var sendState: TextView
     private lateinit var speedSeekBar: SeekBar
     private lateinit var speedValue: TextView
@@ -49,7 +56,14 @@ class LiteKeyboardActivity : AppCompatActivity() {
         "GBK（自动确保 NumLock）" to TypingEngine.MODE_GBK
     )
     private var suppressModeEvent = false
-    private var sending = false
+    private var outputControl: TextOutputControl? = null
+    private var sendJob: Job? = null
+    private var outputGeneration = 0
+    private var outputPaused = false
+    private var activeOutputIsBoard = false
+    private var activeDeviceLabel = ""
+    private var sentCharacters = 0
+    private var totalCharacters = 0
 
     private val phoneStateListener: (KeyboardSnapshot) -> Unit = {
         runOnUiThread { refreshTerminalStatus() }
@@ -66,6 +80,9 @@ class LiteKeyboardActivity : AppCompatActivity() {
         terminalDetail = findViewById(R.id.liteTerminalDetail)
         textInput = findViewById(R.id.liteTextInput)
         sendButton = findViewById(R.id.liteSendButton)
+        pauseButton = findViewById(R.id.litePauseButton)
+        stopButton = findViewById(R.id.liteStopButton)
+        clearButton = findViewById(R.id.liteClearButton)
         sendState = findViewById(R.id.liteSendState)
         speedSeekBar = findViewById(R.id.liteSpeedSeekBar)
         speedValue = findViewById(R.id.liteSpeedValue)
@@ -77,9 +94,13 @@ class LiteKeyboardActivity : AppCompatActivity() {
         findViewById<Button>(R.id.litePhraseButton).setOnClickListener {
             showPhrasesDialog()
         }
-        sendButton.setOnClickListener { sendText() }
+        sendButton.setOnClickListener { handleSendButton() }
+        pauseButton.setOnClickListener { pauseOutput() }
+        stopButton.setOnClickListener { stopOutput() }
+        clearButton.setOnClickListener { clearInput() }
         setupSpeed()
         setupUnicodeMode()
+        refreshOutputControls()
         requestBluetoothPermissions()
     }
 
@@ -132,6 +153,18 @@ class LiteKeyboardActivity : AppCompatActivity() {
             onDataReceived = null
             onError = null
         }
+    }
+
+    override fun onDestroy() {
+        if (outputControl != null) {
+            outputGeneration++
+            outputControl?.cancel()
+            sendJob?.cancel()
+            if (activeOutputIsBoard) BoardLink.stopOutput() else KeyboardRuntime.releaseAll()
+            outputControl = null
+            sendJob = null
+        }
+        super.onDestroy()
     }
 
     private fun setupSpeed() {
@@ -190,43 +223,177 @@ class LiteKeyboardActivity : AppCompatActivity() {
         BoardLink.setUnicodeMode(mode)
     }
 
-    private fun sendText() {
-        if (sending) return
+    private fun handleSendButton() {
+        val control = outputControl
+        if (control != null) {
+            if (outputPaused) resumeOutput()
+            return
+        }
+        startOutputFromBeginning()
+    }
+
+    private fun startOutputFromBeginning() {
         val text = textInput.text.toString()
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
         if (text.isBlank()) {
             Toast.makeText(this, "请先输入要发送的文字", Toast.LENGTH_SHORT).show()
             return
         }
-        val deviceName = connectedDeviceName()
         val terminal = OutputRouter.selected(this)
         if (!OutputRouter.isConnected(this, terminal)) {
             sendState.text = "当前设备尚未连接"
             sendState.setTextColor(ContextCompat.getColor(this, R.color.clinical_warning))
-            Toast.makeText(this, "请先连接上次设备或扫描新设备", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "请先连接设备或扫描新设备", Toast.LENGTH_SHORT).show()
             startActivity(Intent(this, LiteConnectionActivity::class.java))
             return
         }
 
-        sending = true
-        sendButton.isEnabled = false
-        sendButton.text = "发送中…"
-        sendState.text = "正在发送到 ${deviceName ?: "当前设备"}…"
-        sendState.setTextColor(ContextCompat.getColor(this, R.color.accent))
-        OutputRouter.sendText(this, text) { success, message ->
+        val generation = ++outputGeneration
+        val control = TextOutputControl()
+        outputControl = control
+        outputPaused = false
+        activeOutputIsBoard = terminal.isBoard
+        activeDeviceLabel = connectedDeviceName() ?: terminal.displayName
+        sentCharacters = 0
+        totalCharacters = text.codePointCount(0, text.length)
+        control.onProgress = { sent, total ->
             runOnUiThread {
-                sending = false
-                sendButton.isEnabled = true
-                sendButton.text = "发送到当前设备"
-                sendState.text = message
-                sendState.setTextColor(
-                    ContextCompat.getColor(
-                        this,
-                        if (success) R.color.connected else R.color.clinical_danger
-                    )
-                )
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                if (generation == outputGeneration && outputControl === control) {
+                    sentCharacters = sent
+                    totalCharacters = total
+                    if (!outputPaused) updateRunningState()
+                }
             }
         }
+        updateRunningState()
+        refreshOutputControls()
+
+        if (terminal.id == TerminalRegistry.PHONE_HID) {
+            KeyboardRuntime.typeTextControlled(
+                text = text,
+                speed = prefs.getInt(KEY_SPEED_LEVEL, 5).coerceIn(1, 10),
+                control = control
+            ) { success, message ->
+                runOnUiThread { finishOutput(generation, success, message) }
+            }
+        } else {
+            sendJob = lifecycleScope.launch {
+                try {
+                    sendToBoardControlled(text, control)
+                    finishOutput(generation, true, "发送完成")
+                } catch (error: CancellationException) {
+                    if (generation == outputGeneration && !control.cancelled) {
+                        finishOutput(generation, false, "发送已中断")
+                    }
+                } catch (error: Exception) {
+                    finishOutput(
+                        generation,
+                        false,
+                        error.message ?: "发送失败"
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun sendToBoardControlled(text: String, control: TextOutputControl) {
+        val board = BoardLink.get(this)
+        if (!board.isConnected()) error("当前设备尚未连接")
+        val speedResponse = board.sendCommandAwait(
+            "SPEED:${prefs.getInt(KEY_SPEED_LEVEL, 5).coerceIn(1, 10)}"
+        )
+        if (speedResponse.startsWith("ERR")) error(speedResponse)
+        val modeResponse = board.sendCommandAwait(
+            "UMOD:${prefs.getInt(KEY_UNICODE_MODE, TypingEngine.MODE_ALTX)}"
+        )
+        if (modeResponse.startsWith("ERR")) error(modeResponse)
+        val codePoints = text.codePoints().toArray()
+        for ((index, codePoint) in codePoints.withIndex()) {
+            control.checkpoint()
+            if (control.cancelled) throw CancellationException("Output stopped")
+            val character = String(Character.toChars(codePoint))
+            val response = board.sendTextAwait(character)
+            if (response.startsWith("ERR")) error(response)
+            control.onProgress?.invoke(index + 1, codePoints.size)
+        }
+    }
+
+    private fun pauseOutput() {
+        val control = outputControl ?: return
+        if (outputPaused) return
+        control.paused = true
+        outputPaused = true
+        sendState.text = "已暂停，点击“发送”从当前位置继续"
+        sendState.setTextColor(ContextCompat.getColor(this, R.color.clinical_warning))
+        refreshOutputControls()
+    }
+
+    private fun resumeOutput() {
+        val control = outputControl ?: return
+        if (!outputPaused) return
+        control.paused = false
+        outputPaused = false
+        updateRunningState()
+        refreshOutputControls()
+    }
+
+    private fun stopOutput(statusMessage: String = "已停止，再次发送将从头开始") {
+        if (outputControl == null) return
+        outputGeneration++
+        outputControl?.cancel()
+        sendJob?.cancel()
+        sendJob = null
+        if (activeOutputIsBoard) BoardLink.stopOutput() else KeyboardRuntime.releaseAll()
+        outputControl = null
+        outputPaused = false
+        sendState.text = statusMessage
+        sendState.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        refreshOutputControls()
+    }
+
+    private fun clearInput() {
+        if (outputControl != null) stopOutput("输出已停止，输入内容已清空")
+        textInput.setText("")
+        textInput.requestFocus()
+        if (outputControl == null) {
+            sendState.text = "输入内容已清空"
+            sendState.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        }
+    }
+
+    private fun finishOutput(generation: Int, success: Boolean, message: String) {
+        if (generation != outputGeneration) return
+        outputControl = null
+        sendJob = null
+        outputPaused = false
+        sendState.text = when {
+            success -> "发送完成：${sentCharacters.coerceAtLeast(totalCharacters)} / $totalCharacters"
+            else -> message
+        }
+        sendState.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (success) R.color.connected else R.color.clinical_danger
+            )
+        )
+        refreshOutputControls()
+    }
+
+    private fun updateRunningState() {
+        sendState.text = "正在发送到 $activeDeviceLabel：$sentCharacters / $totalCharacters"
+        sendState.setTextColor(ContextCompat.getColor(this, R.color.accent))
+    }
+
+    private fun refreshOutputControls() {
+        val active = outputControl != null && !outputControl!!.cancelled
+        sendButton.isEnabled = !active || outputPaused
+        pauseButton.isEnabled = active && !outputPaused
+        stopButton.isEnabled = active
+        clearButton.isEnabled = true
+        textInput.isEnabled = !active
+        sendButton.text = "发送"
+        pauseButton.text = if (outputPaused) "已暂停" else "暂停"
     }
 
     private fun refreshTerminalStatus() {
@@ -255,7 +422,7 @@ class LiteKeyboardActivity : AppCompatActivity() {
             remembered != null -> "MAC：${remembered.address} · 点击连接可主动重连"
             else -> "点击“选择终端并连接”扫描并记住设备"
         }
-        if (!sending) {
+        if (outputControl == null) {
             sendState.text = if (connected) "设备已连接，可以发送" else "连接设备后即可发送"
             sendState.setTextColor(
                 ContextCompat.getColor(

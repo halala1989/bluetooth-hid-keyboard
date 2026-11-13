@@ -11,7 +11,7 @@ android {
         applicationId "com.hidble.carekeyboard"
         minSdk 28
         targetSdk 34
-        versionCode 40029
+        versionCode 40030
         versionName "4.0-test30"
         resValue "bool", "lite_edition", "false"
     }
@@ -24,7 +24,7 @@ android {
         lite {
             initWith debug
             applicationIdSuffix ".lite"
-            versionNameSuffix "-lite7"
+            versionNameSuffix "-lite8"
             signingConfig signingConfigs.debug
             resValue "bool", "lite_edition", "true"
         }

@@ -14,7 +14,10 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 
 /**
  * 外接键盘板（ESP32-S3）BLE 客户端。
@@ -56,6 +59,7 @@ class BoardBleManager(private val context: Context) {
     private var connectedAddress: String? = null
     private var connectedDeviceName: String? = null
     private var pendingAddress: String? = null
+    private var pendingCommandAck: CompletableDeferred<String>? = null
     private var mtu = 20
     private var writing = false
     private val writeQueue = ArrayDeque<ByteArray>()
@@ -150,6 +154,8 @@ class BoardBleManager(private val context: Context) {
         pendingAddress = null
         connectedAddress = null
         connectedDeviceName = null
+        pendingCommandAck?.cancel(CancellationException("Board disconnected"))
+        pendingCommandAck = null
         try {
             gatt?.disconnect()
             gatt?.close()
@@ -249,6 +255,8 @@ class BoardBleManager(private val context: Context) {
         connectedAddress = null
         connectedDeviceName = null
         pendingAddress = null
+        pendingCommandAck?.cancel(CancellationException("Board connection failed"))
+        pendingCommandAck = null
         writeQueue.clear()
         writing = false
         cmdCharacteristic = null
@@ -281,6 +289,8 @@ class BoardBleManager(private val context: Context) {
         ready = false
         connectedAddress = null
         connectedDeviceName = null
+        pendingCommandAck?.cancel(CancellationException("Board connection closed"))
+        pendingCommandAck = null
     }
 
     /**
@@ -302,6 +312,31 @@ class BoardBleManager(private val context: Context) {
             }
             if (idx != lines.lastIndex) {
                 sendCommand("KEY:ENTER")   // 原来的换行
+            }
+        }
+    }
+
+    suspend fun sendCommandAwait(command: String, timeoutMs: Long = 15_000): String =
+        awaitCommandAck(timeoutMs) { sendCommand(command) }
+
+    suspend fun sendTextAwait(text: String, timeoutMs: Long = 15_000): String =
+        awaitCommandAck(timeoutMs) { sendText(text) }
+
+    private suspend fun awaitCommandAck(
+        timeoutMs: Long,
+        sendAction: () -> Unit
+    ): String {
+        val ack = CompletableDeferred<String>()
+        synchronized(this) {
+            pendingCommandAck?.cancel(CancellationException("Superseded"))
+            pendingCommandAck = ack
+        }
+        return try {
+            sendAction()
+            withTimeout(timeoutMs) { ack.await() }
+        } finally {
+            synchronized(this) {
+                if (pendingCommandAck === ack) pendingCommandAck = null
             }
         }
     }
@@ -385,6 +420,8 @@ class BoardBleManager(private val context: Context) {
                 connectedAddress = null
                 connectedDeviceName = null
                 pendingAddress = null
+                pendingCommandAck?.cancel(CancellationException("Board disconnected"))
+                pendingCommandAck = null
                 writeQueue.clear()
                 writing = false
                 this@BoardBleManager.gatt = null
@@ -447,7 +484,17 @@ class BoardBleManager(private val context: Context) {
             if (characteristic.uuid == NOTIFY_CHAR_UUID) {
                 @Suppress("DEPRECATION")
                 val data = characteristic.value?.toString(Charsets.UTF_8).orEmpty()
-                if (data.isNotEmpty()) handler.post { onDataReceived?.invoke(data) }
+                if (data.isNotEmpty()) {
+                    handler.post { onDataReceived?.invoke(data) }
+                    if (!data.startsWith("STATUS")) {
+                        synchronized(this@BoardBleManager) {
+                            pendingCommandAck?.also { ack ->
+                                pendingCommandAck = null
+                                ack.complete(data)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -522,6 +569,16 @@ object BoardLink {
         if (!m.isConnected()) return false
         m.sendText(text)
         return true
+    }
+    suspend fun sendTextAwait(text: String): String {
+        val m = manager ?: error("外接键盘板未连接")
+        if (!m.isConnected()) error("外接键盘板未连接")
+        return m.sendTextAwait(text)
+    }
+    suspend fun sendCommandAwait(command: String): String {
+        val m = manager ?: error("外接键盘板未连接")
+        if (!m.isConnected()) error("外接键盘板未连接")
+        return m.sendCommandAwait(command)
     }
     fun stopOutput(): Boolean = manager?.stopOutput() == true
     fun setSpeed(level: Int) { manager?.takeIf { it.isConnected() }?.setSpeed(level) }
