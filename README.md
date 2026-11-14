@@ -46,6 +46,8 @@ The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 The Lite edition does not diagnose, summarize, or generate medical records. It only delivers text and key events selected by the user. The target computer application remains responsible for accepting and displaying that text.
 
+The branch may retain optional model or chat tools inherited from the engineering lineage. They are separate from the Lite text-delivery workflow and do not require configuration for normal use.
+
 See the suite [getting-started guide](https://github.com/halala1989/carekey-suite/blob/main/docs/GETTING-STARTED.md) and [privacy guide](https://github.com/halala1989/carekey-suite/blob/main/docs/PRIVACY-AND-SAFETY.md).
 
 ## 简体中文
@@ -85,5 +87,7 @@ APK 输出位置：`android/app/build/outputs/apk/debug/app-debug.apk`。
 ### 产品边界
 
 Lite 版不进行诊断、总结或病历生成，只输出用户主动选择的文字和按键事件。文字是否被接受和显示，由目标电脑上的软件决定。
+
+本分支可能保留工程历史中的可选模型或对话工具。这些工具与 Lite 文字输出流程相互独立，正常使用不要求配置模型账号或 API Key。
 
 套件说明见[快速开始](https://github.com/halala1989/carekey-suite/blob/main/docs/GETTING-STARTED.md)与[隐私安全](https://github.com/halala1989/carekey-suite/blob/main/docs/PRIVACY-AND-SAFETY.md)。
