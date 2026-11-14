@@ -1,162 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="64dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <Button
+            android:id="@+id/llmBackButton"
+            style="@style/KeyButton"
+            android:layout_width="48dp"
+            android:layout_height="46dp"
+            android:text="‹"
+            android:textSize="26sp" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="模型设置"
-            android:textSize="20sp"
-            android:textStyle="bold"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="大模型配置"
             android:textColor="@color/text_primary"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="4dp" />
+            android:textSize="21sp"
+            android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="选择提供方后，模型会自动填入预设；只需填写 API Token 即可开始工作。"
-            android:textSize="12sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="14dp" />
+        <View
+            android:layout_width="48dp"
+            android:layout_height="46dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
+            android:paddingStart="18dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="24dp">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="提供方"
-                android:textSize="12sp"
+                android:layout_marginBottom="12dp"
+                android:text="选择大模型提供方、填写 API Key，并在获取模型列表后选择当前使用的模型。"
                 android:textColor="@color/text_secondary"
-                android:layout_marginBottom="4dp" />
+                android:textSize="11sp" />
 
-            <Spinner
-                android:id="@+id/llmProviderSpinner"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="17dp">
+
+                <TextView
+                    style="@style/FormLabel"
+                    android:layout_marginTop="0dp"
+                    android:text="提供方" />
+
+                <Spinner
+                    android:id="@+id/llmProviderSpinner"
+                    style="@style/FormSpinner" />
+
+                <TextView
+                    style="@style/FormLabel"
+                    android:layout_marginTop="15dp"
+                    android:text="API Key" />
+
+                <EditText
+                    android:id="@+id/llmTokenInput"
+                    style="@style/FormInput"
+                    android:hint="输入 DeepSeek 或 MIMO 的 API Key"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:importantForAutofill="no" />
+
+                <TextView
+                    style="@style/FormLabel"
+                    android:layout_marginTop="15dp"
+                    android:text="当前模型" />
+
+                <EditText
+                    android:id="@+id/llmModelInput"
+                    style="@style/FormInput"
+                    android:hint="模型 ID"
+                    android:maxLines="1"
+                    android:importantForAutofill="no" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/llmFetchModelsButton"
+                        style="@style/SecondaryButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="0dp"
+                        android:minWidth="132dp"
+                        android:paddingStart="15dp"
+                        android:paddingEnd="15dp"
+                        android:text="获取模型列表" />
+
+                    <TextView
+                        android:id="@+id/llmModelListStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="尚未获取"
+                        android:textColor="@color/text_hint"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <Spinner
+                    android:id="@+id/llmModelSpinner"
+                    style="@style/FormSpinner"
+                    android:layout_marginTop="9dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/llmBaseUrlText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/text_hint"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/llmProviderHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/llmTestButton"
+                style="@style/KeyButton"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@drawable/bg_input"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:layout_marginBottom="14dp" />
+                android:layout_marginTop="13dp"
+                android:layout_marginStart="0dp"
+                android:layout_marginEnd="0dp"
+                android:text="测试模型连接" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="API Token"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginBottom="4dp" />
-
-            <EditText
-                android:id="@+id/llmTokenInput"
+            <Button
+                android:id="@+id/llmSaveButton"
+                style="@style/PrimaryButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_input"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:hint="sk-..."
-                android:inputType="textPassword"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="14sp"
-                android:importantForAutofill="no"
-                android:layout_marginBottom="14dp" />
-
-            <TextView
-                android:id="@+id/llmDataproLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="科学文献检索专用 Key（可选）"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginBottom="4dp"
-                android:visibility="gone" />
-
-            <EditText
-                android:id="@+id/llmDataproKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_input"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:hint="留空=使用上方 Agent Plan Token；需控制台开启“专业数据集”Harness"
-                android:inputType="textPassword"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="14sp"
-                android:importantForAutofill="no"
-                android:layout_marginBottom="14dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="模型"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginBottom="4dp" />
-
-            <EditText
-                android:id="@+id/llmModelInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_input"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:hint="已按提供方预设，可按需修改"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="14sp"
-                android:importantForAutofill="no"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:id="@+id/llmBaseUrlText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:textColor="@color/text_hint"
-                android:paddingBottom="4dp" />
-
-            <TextView
-                android:id="@+id/llmProviderHint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:textColor="@color/text_secondary"
-                android:paddingTop="2dp"
-                android:visibility="gone" />
+                android:layout_height="54dp"
+                android:layout_marginTop="9dp"
+                android:layout_marginStart="0dp"
+                android:layout_marginEnd="0dp"
+                android:text="保存模型配置" />
         </LinearLayout>
-
-        <Button
-            android:id="@+id/llmTestButton"
-            style="@style/KeyButton"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="测试连接"
-            android:layout_marginBottom="10dp" />
-
-        <Button
-            android:id="@+id/llmSaveButton"
-            style="@style/PrimaryButton"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="保存（保存后自动返回）" />
-    </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>

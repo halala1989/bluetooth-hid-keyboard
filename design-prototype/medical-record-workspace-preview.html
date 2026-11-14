@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>医键住院管理 · 病历书写</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a20;--surface2:#1b2027;--line:#2a303a;
+  --text:#eef2f7;--text2:#b1bac6;--text3:#7b8795;--teal:#35d7c4;
+  --teal-soft:#12302e;--blue:#65a9ff;--blue-soft:#17283f;
+  --green:#66d884;--amber:#ffb86b;--amber-soft:#2b2319;
+}
+*{box-sizing:border-box}
+html,body{width:390px;height:844px;margin:0;overflow:hidden;background:var(--bg)}
+body{color:var(--text);font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit}
+.screen{position:relative;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 100% 0%,rgba(53,215,196,.065),transparent 32%),linear-gradient(180deg,#101419 0%,var(--bg) 42%,#0d1014 100%)}
+.system-bar{height:27px;padding:5px 17px 0;display:flex;align-items:center;justify-content:space-between;color:#f8fbff;font-size:10.5px;font-weight:700}
+.system-icons{display:flex;align-items:center;gap:6px}.system-icons svg{display:block}
+.appbar{height:64px;padding:7px 13px 8px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.055);background:rgba(15,17,21,.74);backdrop-filter:blur(18px)}
+.back-button{width:44px;height:44px;flex:0 0 44px;padding:0;display:grid;place-items:center;border:1px solid var(--line);border-radius:14px;background:rgba(23,26,32,.9);color:#dce3ec}.back-button svg{width:21px;height:21px}
+.patient-title{min-width:0;flex:1}.patient-title h1{overflow:hidden;margin:0;color:#f4f7fb;font-size:18px;font-weight:750;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}.patient-title p{margin:4px 0 0;color:var(--text2);font-size:10.5px}
+.save-draft{height:38px;padding:0 11px;display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:12px;background:#171a20;color:#cdd6e1;font-size:10.5px;font-weight:650;white-space:nowrap}.save-draft svg{width:15px;height:15px}
+.workspace{height:calc(100% - 91px);padding:12px 12px 0;display:flex;flex-direction:column;gap:11px}
+.pane{position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:19px;background:linear-gradient(135deg,rgba(255,255,255,.022),transparent 48%),var(--surface);box-shadow:0 11px 26px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.025)}
+.input-pane{flex:0 0 311px}.output-pane{min-height:0;flex:1}
+.pane-head{height:54px;padding:0 13px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line)}
+.pane-icon{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:9px;background:var(--teal-soft);color:#8bece0}.pane-icon.output{background:var(--blue-soft);color:#a5ceff}.pane-icon svg{width:18px;height:18px}
+.pane-title{color:#f1f5f9;font-size:15px;font-weight:750}.input-count{margin-left:auto;color:var(--text3);font-size:9.5px}
+.input-list{padding:10px 10px 57px;display:flex;flex-direction:column;gap:8px;overflow:hidden}.source-card{flex:0 0 57px;padding:8px 11px;border:1px solid rgba(255,255,255,.06);border-radius:13px;background:#15191f}.source-top{display:flex;align-items:center;gap:6px}.source-tag{padding:2px 6px;border-radius:5px;background:rgba(53,215,196,.1);color:var(--teal);font-size:8px;font-weight:700}.source-tag.exam{background:var(--amber-soft);color:var(--amber)}.source-time{margin-left:auto;color:#687482;font-size:8px}.source-title{margin-top:5px;color:#edf2f7;font-size:11.5px;font-weight:700}.source-preview{margin-top:3px;overflow:hidden;color:#8f9ba9;font-size:9px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.input-add{position:absolute;right:18px;bottom:19px;width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(149,242,231,.35);border-radius:50%;background:linear-gradient(145deg,#5ce3d3,#2cc3b4);color:#071817;box-shadow:0 10px 22px rgba(53,215,196,.2)}.input-add svg{width:22px;height:22px}
+.output-head{height:57px;padding:0 9px 0 13px}.output-head .pane-icon{width:29px;height:29px;flex-basis:29px}.output-head .pane-title{font-size:14.5px;white-space:nowrap}
+.terminal-area{margin-left:auto;display:flex;align-items:center;gap:6px}.terminal-status{height:32px;padding:0 7px;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(102,216,132,.16);border-radius:9px;background:rgba(102,216,132,.055);color:#9ee8ac}.terminal-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(102,216,132,.72)}.terminal-status span{font-size:8.5px;font-weight:700;white-space:nowrap}
+.terminal-action{height:34px;padding:0 9px;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(149,242,231,.28);border-radius:10px;background:linear-gradient(145deg,#48d9ca,#2cb8aa);color:#071817;font-size:9.5px;font-weight:800;white-space:nowrap}.terminal-action svg{width:14px;height:14px}.terminal-action:disabled{opacity:.45;color:#9faab6;background:#252b33}
+.output-body{position:relative;min-height:0;flex:1;padding:10px 10px 58px}.doc-tabs{display:flex;gap:7px;overflow:hidden}.doc-tab{height:28px;padding:0 10px;display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:#14181e;color:#8b97a5;font-size:9px;font-weight:650;white-space:nowrap}.doc-tab.active{border-color:rgba(101,169,255,.3);background:var(--blue-soft);color:#b2d5ff}
+.doc-card{margin-top:10px;padding:12px;border:1px solid rgba(101,169,255,.18);border-radius:14px;background:linear-gradient(135deg,rgba(101,169,255,.06),transparent 58%),#15191f}.doc-meta{display:flex;align-items:center;color:#8793a1;font-size:8.5px}.doc-badge{padding:2px 6px;border-radius:5px;background:rgba(101,169,255,.1);color:#9dc8ff;font-size:8px;font-weight:700}.doc-meta span:last-child{margin-left:auto}.doc-title{margin:8px 0 6px;color:#f2f5f9;font-size:13px;font-weight:750}.doc-text{margin:0;color:#c5ced8;font-size:10px;line-height:1.72}.doc-text strong{color:#eef2f7}.doc-footer{margin-top:10px;padding-top:9px;display:flex;align-items:center;border-top:1px solid rgba(255,255,255,.06);color:#768290;font-size:8.5px}.doc-footer span:last-child{margin-left:auto;color:#87aee6}
+.output-add{position:absolute;right:17px;bottom:16px;width:44px;height:44px;display:grid;place-items:center;border:1px solid rgba(163,206,255,.35);border-radius:50%;background:linear-gradient(145deg,#72b6ff,#448bd9);color:#071019;box-shadow:0 10px 22px rgba(68,139,217,.23)}.output-add svg{width:21px;height:21px}
+.home-indicator{position:absolute;left:50%;bottom:7px;width:118px;height:4px;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,.25)}
+</style></head>
+<body>
+<main class="screen" aria-label="病历书写主界面预览">
+<div class="system-bar"><span>08:30</span><div class="system-icons" aria-hidden="true">
+<svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="0" y="7" width="2" height="4" rx=".5" fill="currentColor"/><rect x="4" y="5" width="2" height="6" rx=".5" fill="currentColor"/><rect x="8" y="2.5" width="2" height="8.5" rx=".5" fill="currentColor"/><rect x="12" y="0" width="2" height="11" rx=".5" fill="currentColor"/></svg>
+<svg width="15" height="11" viewBox="0 0 15 11" fill="none"><path d="M1 3.2C4.7-.15 10.3-.15 14 3.2M3.5 5.7C5.8 3.65 9.2 3.65 11.5 5.7M6.1 8.1C7 7.35 8 7.35 8.9 8.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="10" r=".8" fill="currentColor"/></svg>
+<span style="font-size:9px">5G</span><svg width="18" height="9" viewBox="0 0 18 9" fill="none"><rect x=".5" y=".5" width="14.5" height="8" rx="2" stroke="currentColor"/><rect x="2" y="2" width="11.5" height="5" rx="1" fill="currentColor"/><path d="M16.2 3V6" stroke="currentColor" stroke-linecap="round"/></svg>
+</div></div>
+<header class="appbar"><button class="back-button" aria-label="返回患者列表"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="patient-title"><h1>王建国</h1><p>男 · 67岁</p></div><button class="save-draft"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h11.3L19 7.2v12.3H5V4.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.2 4.7v4.5h7.2V4.7M8.5 15.2h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>保存草稿</button></header>
+<section class="workspace">
+<article class="pane input-pane">
+<header class="pane-head"><span class="pane-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h11.2L19 7.3v12.2H5V4.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h5M8 12.4h7M8 15.8h5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span class="pane-title">输入资料</span><span class="input-count">3 条资料</span></header>
+<div class="input-list">
+<article class="source-card"><div class="source-top"><span class="source-tag">对话</span><span class="source-time">今天 08:16</span></div><div class="source-title">患者主诉与现病史</div><div class="source-preview">患者诉3天前受凉后出现发热、咳嗽，最高体温38.6℃……</div></article>
+<article class="source-card"><div class="source-top"><span class="source-tag">查体</span><span class="source-time">今天 08:21</span></div><div class="source-title">专科查体</div><div class="source-preview">神清，精神一般。双肺呼吸音粗，右下肺可闻及少量湿啰音。</div></article>
+<article class="source-card"><div class="source-top"><span class="source-tag exam">检验检查</span><span class="source-time">今天 08:24</span></div><div class="source-title">辅助检查结果</div><div class="source-preview">胸部CT：右下肺叶斑片状高密度影，考虑感染性病变。</div></article>
+</div>
+<button class="input-add" aria-label="新增输入资料"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+</article>
+
+<article class="pane output-pane">
+<header class="pane-head output-head"><span class="pane-icon output"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h11.2L19 7.3v12.2H5V4.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h5M8 12.4h7M8 15.8h5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span class="pane-title">病历输出</span>
+<div class="terminal-area"><button class="terminal-status" aria-label="终端已连接，长按进入连接配置"><span class="terminal-dot"></span><span>已连接</span></button><button class="terminal-action"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>输出到终端</button></div>
+</header>
+<div class="output-body">
+<div class="doc-tabs"><span class="doc-tab active">日常病程</span><span class="doc-tab">首次病程</span><span class="doc-tab">查房记录</span></div>
+<article class="doc-card"><div class="doc-meta"><span class="doc-badge">日常病程</span><span>今天 08:31</span></div><h2 class="doc-title">11月14日 呼吸内科查房记录</h2><p class="doc-text">患者今日一般情况可，仍有阵发性咳嗽，体温较前下降。查体：双肺呼吸音粗，右下肺可闻及少量湿啰音。<strong>诊疗计划：</strong>继续抗感染治疗，监测体温及炎症指标变化。</p><div class="doc-footer"><span>已生成 · 186 字</span><span>医生可编辑</span></div></article>
+<button class="output-add" aria-label="新建病历输出"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+</div>
+</article>
+</section>
+<div class="home-indicator" aria-hidden="true"></div>
+</main></body></html>

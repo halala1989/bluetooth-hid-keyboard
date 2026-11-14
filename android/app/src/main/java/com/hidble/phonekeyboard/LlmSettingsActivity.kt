@@ -15,36 +15,35 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
-/**
- * 模型设置二级页面：选择提供方 -> 自动填入预设模型 -> 只填 Token 即可使用。
- */
 class LlmSettingsActivity : AppCompatActivity() {
 
     private lateinit var providerSpinner: Spinner
     private lateinit var tokenInput: EditText
     private lateinit var modelInput: EditText
+    private lateinit var modelSpinner: Spinner
     private lateinit var baseUrlText: TextView
     private lateinit var providerHint: TextView
-    private lateinit var dataproLabel: TextView
-    private lateinit var dataproKeyInput: EditText
+    private lateinit var modelListStatus: TextView
     private lateinit var testButton: Button
+    private lateinit var fetchModelsButton: Button
     private lateinit var saveButton: Button
     private lateinit var prefs: android.content.SharedPreferences
+    private var selectingFetchedModel = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_llm_settings)
 
         prefs = getSharedPreferences(LlmPrefs.PREFS_NAME, Context.MODE_PRIVATE)
-
         providerSpinner = findViewById(R.id.llmProviderSpinner)
         tokenInput = findViewById(R.id.llmTokenInput)
         modelInput = findViewById(R.id.llmModelInput)
+        modelSpinner = findViewById(R.id.llmModelSpinner)
         baseUrlText = findViewById(R.id.llmBaseUrlText)
         providerHint = findViewById(R.id.llmProviderHint)
-        dataproLabel = findViewById(R.id.llmDataproLabel)
-        dataproKeyInput = findViewById(R.id.llmDataproKeyInput)
+        modelListStatus = findViewById(R.id.llmModelListStatus)
         testButton = findViewById(R.id.llmTestButton)
+        fetchModelsButton = findViewById(R.id.llmFetchModelsButton)
         saveButton = findViewById(R.id.llmSaveButton)
 
         val providers = LlmProviders.list
@@ -58,21 +57,28 @@ class LlmSettingsActivity : AppCompatActivity() {
 
         val savedProvider = prefs.getString(LlmPrefs.KEY_PROVIDER, null)
         providerSpinner.setSelection(LlmProviders.indexOf(savedProvider ?: providers.first().id))
-        tokenInput.setText(prefs.getString(LlmPrefs.KEY_API_KEY, "") ?: "")
-        modelInput.setText(prefs.getString(LlmPrefs.KEY_MODEL, "") ?: "")
-        dataproKeyInput.setText(prefs.getString(LlmPrefs.KEY_DATAPRO_KEY, "") ?: "")
-
-        // 首次进入：保留已保存的模型，没有则用预设
+        tokenInput.setText(prefs.getString(LlmPrefs.KEY_API_KEY, "").orEmpty())
+        modelInput.setText(prefs.getString(LlmPrefs.KEY_MODEL, "").orEmpty())
         refreshPreset(overwriteModel = false)
 
         providerSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 refreshPreset(overwriteModel = true)
             }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (!selectingFetchedModel) {
+                    val model = parent?.selectedItem?.toString().orEmpty()
+                    if (model.isNotBlank()) modelInput.setText(model)
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
 
+        findViewById<Button>(R.id.llmBackButton).setOnClickListener { finish() }
+        fetchModelsButton.setOnClickListener { fetchModels() }
         testButton.setOnClickListener { testConnection() }
         saveButton.setOnClickListener { saveAndFinish() }
     }
@@ -80,75 +86,109 @@ class LlmSettingsActivity : AppCompatActivity() {
     private fun currentProvider(): LlmProvider = LlmProviders.list[providerSpinner.selectedItemPosition]
 
     private fun refreshPreset(overwriteModel: Boolean) {
-        val p = currentProvider()
-        baseUrlText.text = "API 地址：${p.baseUrl.trimEnd('/')}/chat/completions"
-        if (overwriteModel || modelInput.text.isBlank()) {
-            modelInput.setText(p.defaultModel)
-        }
-        if (p.hint.isNotBlank()) {
-            providerHint.text = "提示：${p.hint}"
-            providerHint.visibility = View.VISIBLE
-        } else {
-            providerHint.visibility = View.GONE
-        }
+        val provider = currentProvider()
+        baseUrlText.text = "接口：${provider.baseUrl.trimEnd('/')}"
+        if (overwriteModel || modelInput.text.isBlank()) modelInput.setText(provider.defaultModel)
+        providerHint.text = provider.hint
+        providerHint.visibility = if (provider.hint.isBlank()) View.GONE else View.VISIBLE
         tokenInput.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        tokenInput.hint = "sk-..."
-        // 科学文献检索专用 Key：仅火山 AI Hub(Agent Plan) 需要；留空则用上方 Agent Plan Token
-        val showDatapro = p.id == "volcano-agent-plan"
-        dataproLabel.visibility = if (showDatapro) View.VISIBLE else View.GONE
-        dataproKeyInput.visibility = if (showDatapro) View.VISIBLE else View.GONE
+        modelSpinner.visibility = View.GONE
+        modelListStatus.text = "尚未获取"
+        modelListStatus.setTextColor(getColor(R.color.text_hint))
+    }
+
+    private fun fetchModels() {
+        val provider = currentProvider()
+        val key = tokenInput.text.toString().trim()
+        if (key.isBlank()) {
+            Toast.makeText(this, "请先填写 API Key", Toast.LENGTH_SHORT).show()
+            return
+        }
+        fetchModelsButton.isEnabled = false
+        fetchModelsButton.text = "获取中..."
+        modelListStatus.text = "正在连接 ${provider.displayName}…"
+        modelListStatus.setTextColor(getColor(R.color.accent))
+        lifecycleScope.launch {
+            runCatching { LlmClient.listModels(provider, key) }
+                .onSuccess { models ->
+                    if (models.isEmpty()) {
+                        modelSpinner.visibility = View.GONE
+                        modelListStatus.text = "接口未返回模型，可直接填写模型 ID"
+                        modelListStatus.setTextColor(getColor(R.color.clinical_warning))
+                    } else {
+                        selectingFetchedModel = true
+                        modelSpinner.adapter = ArrayAdapter(
+                            this@LlmSettingsActivity,
+                            android.R.layout.simple_spinner_item,
+                            models
+                        ).apply {
+                            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                        }
+                        val current = modelInput.text.toString().trim()
+                        val index = models.indexOf(current)
+                        if (index >= 0) modelSpinner.setSelection(index)
+                        selectingFetchedModel = false
+                        modelSpinner.visibility = View.VISIBLE
+                        modelListStatus.text = "已获取 ${models.size} 个模型，点击选择"
+                        modelListStatus.setTextColor(getColor(R.color.clinical_teal))
+                    }
+                }
+                .onFailure {
+                    modelSpinner.visibility = View.GONE
+                    modelListStatus.text = it.message ?: "获取失败"
+                    modelListStatus.setTextColor(getColor(R.color.clinical_danger))
+                }
+            fetchModelsButton.isEnabled = true
+            fetchModelsButton.text = "获取模型列表"
+        }
     }
 
     private fun testConnection() {
-        val p = currentProvider()
-        val token = tokenInput.text.toString().trim()
+        val provider = currentProvider()
+        val key = tokenInput.text.toString().trim()
         val model = modelInput.text.toString().trim()
-        if (model.isEmpty()) {
-            Toast.makeText(this, "请先填写模型名", Toast.LENGTH_SHORT).show()
+        if (model.isBlank()) {
+            Toast.makeText(this, "请先选择或填写模型", Toast.LENGTH_SHORT).show()
             return
         }
-        if (token.isEmpty()) {
-            Toast.makeText(this, "请填写 API Token", Toast.LENGTH_SHORT).show()
+        if (key.isBlank()) {
+            Toast.makeText(this, "请填写 API Key", Toast.LENGTH_SHORT).show()
             return
         }
         testButton.isEnabled = false
         testButton.text = "测试中..."
-        Toast.makeText(this, "正在测试连接...", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
-            val ok = try {
-                LlmClient.chat(p, token, model, listOf("user" to "请只回复：OK"))
-                true
-            } catch (e: Exception) {
-                Toast.makeText(this@LlmSettingsActivity, "连接失败：${e.message}", Toast.LENGTH_LONG).show()
-                false
-            }
-            if (ok) {
-                Toast.makeText(this@LlmSettingsActivity, "连接成功", Toast.LENGTH_LONG).show()
-            }
+            val ok = runCatching {
+                LlmClient.chat(provider, key, model, listOf("user" to "请只回复：OK"))
+            }.onFailure {
+                Toast.makeText(this@LlmSettingsActivity, "连接失败：${it.message}", Toast.LENGTH_LONG).show()
+            }.isSuccess
+            if (ok) Toast.makeText(this@LlmSettingsActivity, "连接成功", Toast.LENGTH_LONG).show()
             testButton.isEnabled = true
-            testButton.text = "测试连接"
+            testButton.text = "测试模型连接"
         }
     }
 
     private fun saveAndFinish() {
-        val p = currentProvider()
-        val token = tokenInput.text.toString().trim()
+        val provider = currentProvider()
+        val key = tokenInput.text.toString().trim()
         val model = modelInput.text.toString().trim()
-        if (token.isEmpty()) {
-            Toast.makeText(this, "请填写 API Token", Toast.LENGTH_SHORT).show()
+        if (key.isBlank()) {
+            tokenInput.error = "请填写 API Key"
+            tokenInput.requestFocus()
             return
         }
-        if (model.isEmpty()) {
-            Toast.makeText(this, "请填写模型名", Toast.LENGTH_SHORT).show()
+        if (model.isBlank()) {
+            modelInput.error = "请选择或填写模型"
+            modelInput.requestFocus()
             return
         }
         prefs.edit()
-            .putString(LlmPrefs.KEY_PROVIDER, p.id)
-            .putString(LlmPrefs.KEY_API_KEY, token)
+            .putString(LlmPrefs.KEY_PROVIDER, provider.id)
+            .putString(LlmPrefs.KEY_API_KEY, key)
             .putString(LlmPrefs.KEY_MODEL, model)
-            .putString(LlmPrefs.KEY_DATAPRO_KEY, dataproKeyInput.text.toString().trim())
             .apply()
-        Toast.makeText(this, "已保存：${p.displayName}（$model）", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "已保存：${provider.displayName}（$model）", Toast.LENGTH_SHORT).show()
         finish()
     }
 }

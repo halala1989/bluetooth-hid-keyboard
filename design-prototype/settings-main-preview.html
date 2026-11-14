@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>医键住院管理 · 设置</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a20;--surface2:#1b2027;--line:#2a303a;
+  --text:#eef2f7;--text2:#a6b0be;--text3:#747f8d;
+  --teal:#35d7c4;--teal-soft:#12302e;--blue:#65a9ff;--blue-soft:#17283f;
+  --green:#66d884;--green-soft:#14291f;--amber:#ffb86b;--amber-soft:#2b2319;
+}
+*{box-sizing:border-box}
+html,body{width:390px;height:844px;margin:0;overflow:hidden;background:var(--bg)}
+body{color:var(--text);font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit}
+.screen{position:relative;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 92% 4%,rgba(53,215,196,.08),transparent 31%),linear-gradient(180deg,#101419 0%,var(--bg) 40%,#0d1014 100%)}
+.system-bar{height:27px;padding:5px 17px 0;display:flex;align-items:center;justify-content:space-between;color:#f8fbff;font-size:10.5px;font-weight:700}
+.system-icons{display:flex;align-items:center;gap:6px}.system-icons svg{display:block}
+.appbar{height:64px;padding:7px 16px 9px;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;border-bottom:1px solid rgba(255,255,255,.055);background:rgba(15,17,21,.72);backdrop-filter:blur(18px)}
+.back-button{width:44px;height:44px;padding:0;display:grid;place-items:center;border:1px solid var(--line);border-radius:14px;background:rgba(23,26,32,.9);color:#dce3ec}
+.back-button svg{width:21px;height:21px}
+.page-title{margin:0;text-align:center;color:#f4f7fb;font-size:20px;font-weight:750;letter-spacing:.2px}
+.content{padding:20px 16px 0}
+.group-label{margin:0 0 11px 3px;color:var(--text3);font-size:10px;font-weight:700;letter-spacing:1.35px;text-transform:uppercase}
+.menu{display:flex;flex-direction:column;gap:12px}
+.menu-card{position:relative;width:100%;min-height:92px;padding:14px 14px 14px 13px;display:flex;align-items:center;gap:13px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.028),transparent 46%),var(--surface);box-shadow:0 10px 24px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.025);color:inherit;text-align:left}
+.menu-card.featured{border-color:rgba(53,215,196,.24);background:linear-gradient(135deg,rgba(53,215,196,.07),transparent 56%),var(--surface)}
+.icon-tile{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;border-radius:15px;background:var(--teal-soft);color:#8cecdf}
+.icon-tile.blue{background:var(--blue-soft);color:#a3ceff}.icon-tile.green{background:var(--green-soft);color:#a5ecb6}.icon-tile.amber{background:var(--amber-soft);color:#ffd09b}
+.icon-tile svg{width:24px;height:24px}
+.menu-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px}
+.menu-title-row{display:flex;align-items:center;gap:7px}
+.menu-title{color:#f2f5f9;font-size:16.5px;font-weight:750;letter-spacing:.1px}
+.mini-status{padding:2px 6px;border-radius:5px;background:rgba(102,216,132,.1);color:#87e49b;font-size:8.5px;font-weight:700}
+.menu-subtitle{color:var(--text2);font-size:10.5px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chevron{width:18px;height:18px;flex:0 0 18px;color:#586372}
+.footer{position:absolute;left:18px;right:18px;bottom:27px;display:flex;align-items:center;gap:8px;color:#5f6a78;font-size:9.5px}
+.footer:before{content:"";width:20px;height:1px;background:#39424e}
+.home-indicator{position:absolute;left:50%;bottom:7px;width:118px;height:4px;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,.25)}
+</style></head>
+<body>
+<main class="screen" aria-label="设置主菜单预览">
+<div class="system-bar"><span>08:30</span><div class="system-icons" aria-hidden="true">
+<svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="0" y="7" width="2" height="4" rx=".5" fill="currentColor"/><rect x="4" y="5" width="2" height="6" rx=".5" fill="currentColor"/><rect x="8" y="2.5" width="2" height="8.5" rx=".5" fill="currentColor"/><rect x="12" y="0" width="2" height="11" rx=".5" fill="currentColor"/></svg>
+<svg width="15" height="11" viewBox="0 0 15 11" fill="none"><path d="M1 3.2C4.7-.15 10.3-.15 14 3.2M3.5 5.7C5.8 3.65 9.2 3.65 11.5 5.7M6.1 8.1C7 7.35 8 7.35 8.9 8.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="10" r=".8" fill="currentColor"/></svg>
+<span style="font-size:9px">5G</span><svg width="18" height="9" viewBox="0 0 18 9" fill="none"><rect x=".5" y=".5" width="14.5" height="8" rx="2" stroke="currentColor"/><rect x="2" y="2" width="11.5" height="5" rx="1" fill="currentColor"/><path d="M16.2 3V6" stroke="currentColor" stroke-linecap="round"/></svg>
+</div></div>
+<header class="appbar">
+<button class="back-button" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<h1 class="page-title">设置</h1><span aria-hidden="true"></span>
+</header>
+<section class="content">
+<div class="group-label">应用设置</div>
+<div class="menu">
+<button class="menu-card featured" aria-label="连接配置，当前已连接">
+<span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.5 7.3l9 8.1-4.7 4.1V4.5l4.7 4.1-9 8.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18.5" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg></span>
+<span class="menu-copy"><span class="menu-title-row"><span class="menu-title">连接配置</span><span class="mini-status">已连接</span></span><span class="menu-subtitle">蓝牙设备与开发板统一扫描、配对和连接</span></span>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<button class="menu-card" aria-label="大模型配置">
+<span class="icon-tile blue"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.2" stroke="currentColor" stroke-width="1.8"/><path d="M9.2 3.5v3.2M14.8 3.5v3.2M9.2 17.3v3.2M14.8 17.3v3.2M3.5 9.2h3.2M3.5 14.8h3.2M17.3 9.2h3.2M17.3 14.8h3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="2.1" stroke="currentColor" stroke-width="1.5"/></svg></span>
+<span class="menu-copy"><span class="menu-title-row"><span class="menu-title">大模型配置</span></span><span class="menu-subtitle">DeepSeek · MIMO · 模型选择与 API Key</span></span>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<button class="menu-card" aria-label="技能配置">
+<span class="icon-tile green"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.8 3.5h7l4.5 4.5v12.5H6.8a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.7 3.8v4.7h4.7M8.5 12h5.7M8.5 15.2h4.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M17.6 14.2l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7.7-1.6Z" fill="currentColor"/></svg></span>
+<span class="menu-copy"><span class="menu-title-row"><span class="menu-title">技能配置</span></span><span class="menu-subtitle">书写规范 · Skill 编辑、保存与导出</span></span>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<button class="menu-card" aria-label="关于">
+<span class="icon-tile amber"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.8v5.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="7.7" r="1.15" fill="currentColor"/></svg></span>
+<span class="menu-copy"><span class="menu-title-row"><span class="menu-title">关于</span></span><span class="menu-subtitle">当前版本、开发信息与作者信息</span></span>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+</div>
+</section>
+<div class="footer">医键住院管理 · 设置保存在本机</div>
+<div class="home-indicator" aria-hidden="true"></div>
+</main></body></html>

@@ -87,6 +87,40 @@ object LlmPrefs {
 /** OpenAI 兼容 Chat Completions 客户端（HttpURLConnection，无额外依赖，非流式） */
 object LlmClient {
 
+    /** 获取提供方当前 API Key 可见的模型列表，供设置页手动选择。 */
+    suspend fun listModels(provider: LlmProvider, apiKey: String): List<String> =
+        withContext(Dispatchers.IO) {
+            val url = URL(provider.baseUrl.trimEnd('/') + "/models")
+            val conn = url.openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 30_000
+                conn.setRequestProperty("Accept", "application/json")
+                if (apiKey.isNotBlank()) {
+                    conn.setRequestProperty("Authorization", "Bearer $apiKey")
+                }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val raw = stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) {
+                    val message = runCatching {
+                        JSONObject(raw).optJSONObject("error")?.optString("message")
+                    }.getOrNull().orEmpty().ifBlank { raw.ifBlank { "HTTP $code" } }
+                    throw RuntimeException("获取模型列表失败（$code）：$message")
+                }
+                val data = JSONObject(raw).optJSONArray("data") ?: JSONArray()
+                buildList {
+                    for (index in 0 until data.length()) {
+                        val id = data.optJSONObject(index)?.optString("id")?.trim().orEmpty()
+                        if (id.isNotBlank() && id !in this) add(id)
+                    }
+                }.sorted()
+            } finally {
+                conn.disconnect()
+            }
+        }
+
     /**
      * 发送一轮对话，返回助手回复文本。
      * messages 为 (role, content) 列表，如 ("user" to "你好")。

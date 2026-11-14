@@ -125,6 +125,16 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         })
     }
 
+    override fun onResume() {
+        super.onResume()
+        webView.post {
+            webView.evaluateJavascript(
+                "window.refreshTerminalStatus && window.refreshTerminalStatus()",
+                null
+            )
+        }
+    }
+
     override fun onDestroy() {
         webView.removeJavascriptInterface("AndroidMedicalBridge")
         webView.destroy()
@@ -145,9 +155,12 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
         webView.post { webView.evaluateJavascript(script, null) }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun startNativeOutput(callbackId: String, text: String, speed: Int) {
         stopNativeOutput(false)
         val terminal = OutputRouter.selected(this)
+        val outputSettings = OutputPreferences.load(this)
+        val effectiveSpeed = outputSettings.speedLevel.coerceIn(1, 10)
         if (!OutputRouter.isConnected(this, terminal)) {
             postOutputProgress(callbackId, 0, text.codePointCount(0, text.length), "failed", "${terminal.displayName} 尚未连接")
             return
@@ -163,7 +176,7 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
             postOutputProgress(callbackId, sent, total, "running", "正在输出")
         }
         if (terminal.id == TerminalRegistry.PHONE_HID) {
-            KeyboardRuntime.typeTextControlled(text, speed, control) { success, message ->
+            KeyboardRuntime.typeTextControlled(text, effectiveSpeed, control) { success, message ->
                 outputBusy = false
                 postOutputProgress(
                     callbackId,
@@ -177,9 +190,8 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
             outputJob = lifecycleScope.launch {
                 runCatching {
                     val board = BoardLink.get(this@MedicalRecordWorkspaceActivity)
-                    board.setSpeed(speed.coerceIn(1, 10))
-                    val prefs = getSharedPreferences("hidble_prefs", Context.MODE_PRIVATE)
-                    board.setUnicodeMode(prefs.getInt("unicode_mode", TypingEngine.MODE_ALTX))
+                    board.setSpeed(effectiveSpeed)
+                    board.setUnicodeMode(outputSettings.unicodeMode)
                     val cps = text.codePoints().toArray()
                     var offset = 0
                     val chunkSize = 32
@@ -190,7 +202,7 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
                         offset = end
                         outputIndex = offset
                         postOutputProgress(callbackId, offset, cps.size, "running", "正在输出")
-                        delay((640 - speed.coerceIn(1, 10) * 60).coerceAtLeast(40).toLong())
+                        delay((640 - effectiveSpeed * 60).coerceAtLeast(40).toLong())
                     }
                 }.onSuccess {
                     outputBusy = false
@@ -256,7 +268,33 @@ class MedicalRecordWorkspaceActivity : AppCompatActivity() {
 
     class TerminalBridge(private val activity: MedicalRecordWorkspaceActivity) {
         @JavascriptInterface
+        fun getTerminalStatus(): String {
+            val terminal = OutputRouter.selected(activity)
+            return JSONObject()
+                .put("connected", OutputRouter.isConnected(activity, terminal))
+                .put("label", terminal.displayName)
+                .toString()
+        }
+
+        @JavascriptInterface
         fun getTargetLabel(): String = OutputRouter.selected(activity).displayName
+
+        @JavascriptInterface
+        fun getOutputSettings(): String {
+            val settings = OutputPreferences.load(activity)
+            return JSONObject()
+                .put("speed", settings.speedLevel)
+                .put("mode", settings.unicodeMode)
+                .put("modeLabel", settings.modeLabel)
+                .toString()
+        }
+
+        @JavascriptInterface
+        fun openConnectionSettings() {
+            activity.runOnUiThread {
+                activity.startActivity(Intent(activity, ConnectionActivity::class.java))
+            }
+        }
 
         @JavascriptInterface
         fun getWritingSkillLabel(): String = WritingSkillStore.label(activity)

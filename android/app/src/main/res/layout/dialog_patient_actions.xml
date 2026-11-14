@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_sheet"
+    android:orientation="vertical"
+    android:paddingStart="18dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="18dp"
+    android:paddingBottom="22dp">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="17dp"
+        android:background="@color/card_stroke" />
+
+    <TextView
+        android:id="@+id/patientActionsTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="患者姓名"
+        android:textColor="@color/text_primary"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="13dp"
+        android:text="管理患者基本信息或从本机删除患者"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp" />
+
+    <Button
+        android:id="@+id/editPatientAction"
+        style="@style/SecondaryButton"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="0dp"
+        android:text="编辑基本信息" />
+
+    <Button
+        android:id="@+id/deletePatientAction"
+        style="@style/KeyButton"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="0dp"
+        android:text="删除该患者"
+        android:textColor="@color/clinical_danger" />
+
+    <Button
+        android:id="@+id/cancelPatientAction"
+        style="@style/KeyButton"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="0dp"
+        android:text="取消" />
+</LinearLayout>

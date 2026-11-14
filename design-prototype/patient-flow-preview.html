@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>医键住院管理 · 患者交互预览</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a20;--surface2:#1b2027;--line:#2a303a;
+  --text:#eef2f7;--text2:#b1bac6;--text3:#7b8795;--teal:#35d7c4;
+  --teal-soft:#12302e;--blue:#65a9ff;--blue-soft:#17283f;
+  --green:#66d884;--red:#ff727d;--red-soft:#341e24;--amber:#ffb86b;
+}
+*{box-sizing:border-box}
+html{background:#090c10}
+body{width:854px;height:910px;margin:0;padding:28px 24px;display:flex;gap:24px;background:radial-gradient(circle at 50% 0%,#101820,#090c10 55%);color:var(--text);font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+button,input{font:inherit}
+.preview{width:390px}
+.preview-label{margin:0 0 12px 4px;color:#82909f;font-size:11px;font-weight:700;letter-spacing:1.2px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border:1px solid #2b333e;border-radius:28px;background:radial-gradient(circle at 95% 0%,rgba(53,215,196,.075),transparent 30%),linear-gradient(180deg,#101419 0%,var(--bg) 42%,#0d1014 100%);box-shadow:0 24px 54px rgba(0,0,0,.42)}
+.system-bar{height:27px;padding:5px 17px 0;display:flex;align-items:center;justify-content:space-between;color:#f8fbff;font-size:10.5px;font-weight:700}
+.system-icons{display:flex;align-items:center;gap:6px}.system-icons svg{display:block}
+.appbar{height:64px;padding:7px 16px 9px;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;border-bottom:1px solid rgba(255,255,255,.055);background:rgba(15,17,21,.72);backdrop-filter:blur(18px)}
+.back-button{width:44px;height:44px;padding:0;display:grid;place-items:center;border:1px solid var(--line);border-radius:14px;background:rgba(23,26,32,.9);color:#dce3ec}
+.back-button svg{width:21px;height:21px}.page-title{margin:0;text-align:center;color:#f4f7fb;font-size:19px;font-weight:750;letter-spacing:.2px}
+.new-content{position:relative;height:calc(100% - 91px);padding:18px 16px 154px}
+.form-card{padding:18px 16px 17px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,.025),transparent 46%),var(--surface);box-shadow:0 12px 28px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.025)}
+.form-heading{display:flex;align-items:center;gap:12px;margin-bottom:23px}
+.patient-mark{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;border-radius:14px;background:var(--teal-soft);color:#8cecdf}
+.patient-mark svg{width:24px;height:24px}
+.form-heading h2{margin:0 0 4px;color:#f4f7fb;font-size:19px;font-weight:750}.form-heading p{margin:0;color:var(--text2);font-size:10.5px;line-height:1.4}
+.field{margin-top:18px}.field:first-of-type{margin-top:0}
+.field-label{display:flex;align-items:center;gap:5px;margin:0 0 8px 2px;color:#cdd5df;font-size:11.5px;font-weight:650}
+.required{color:var(--red);font-size:10px}.optional{margin-left:auto;color:var(--text3);font-size:9.5px;font-weight:500}
+.text-input{height:52px;padding:0 14px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:14px;background:var(--input,#12151b);color:var(--text3);font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.018)}
+.text-input svg{width:18px;height:18px;flex:0 0 18px;opacity:.75}.text-input .suffix{margin-left:auto;color:#919dab;font-size:12px}
+.segmented{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.segment{height:48px;border:1px solid var(--line);border-radius:13px;background:#14181e;color:#b9c2cd;font-size:12.5px;font-weight:650}.segment.selected{border-color:rgba(53,215,196,.5);background:rgba(53,215,196,.1);color:#a4f2e8}
+.form-help{display:flex;align-items:center;gap:7px;margin:15px 2px 0;color:var(--text3);font-size:9.5px}.form-help svg{width:14px;height:14px;flex:0 0 14px}
+.actions{position:absolute;left:16px;right:16px;bottom:23px;display:flex;flex-direction:column;gap:9px}
+.save-button,.cancel-button{height:51px;border-radius:15px;font-size:14px;font-weight:750}.save-button{border:1px solid rgba(149,242,231,.34);background:linear-gradient(145deg,#5ce3d3,#2cc3b4);color:#071817;box-shadow:0 12px 24px rgba(53,215,196,.18)}
+.cancel-button{border:1px solid var(--line);background:#171a20;color:#c7d0db}.save-button,.cancel-button{cursor:pointer}
+.home-indicator{position:absolute;left:50%;bottom:7px;width:118px;height:4px;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,.25)}
+.app-status{height:58px;padding:7px 16px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.055);background:rgba(15,17,21,.78)}
+.connection{height:42px;min-width:112px;padding:0 12px 0 10px;display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(102,216,132,.18);border-radius:14px;background:rgba(102,216,132,.06)}
+.status-dot-wrap{position:relative;width:18px;height:18px;display:grid;place-items:center}.status-halo{position:absolute;inset:1px;border-radius:50%;background:rgba(102,216,132,.13);border:1px solid rgba(102,216,132,.22)}.status-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 11px rgba(102,216,132,.7)}
+.connection-copy{display:flex;flex-direction:column;gap:1px;line-height:1}.connection-copy strong{color:#dff9e5;font-size:12px}.connection-copy span{color:#83a98d;font-size:9px}
+.settings-button{width:44px;height:44px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:#c5f2ec}.settings-button svg{width:38px;height:42px}
+.main-content{padding:18px 16px 0}.list-heading{display:flex;align-items:flex-end;justify-content:space-between}.list-heading h2{margin:0 0 4px;font-size:24px;line-height:1.1;font-weight:750}.list-heading p{margin:0;color:var(--text3);font-size:10.5px}.count{height:27px;padding:0 9px;display:flex;align-items:center;gap:5px;border-radius:8px;background:var(--teal-soft);color:#8ceae0;font-size:10.5px;font-weight:700}.count i{width:5px;height:5px;border-radius:50%;background:var(--teal)}
+.base-list{margin-top:18px;display:flex;flex-direction:column;gap:10px;transition:filter .2s}.patient-card{height:102px;padding:13px 12px;display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(135deg,rgba(255,255,255,.02),transparent 48%),var(--surface)}.patient-card.active{border-color:rgba(53,215,196,.32);background:linear-gradient(135deg,rgba(53,215,196,.075),transparent 58%),var(--surface)}
+.avatar{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border-radius:13px;background:var(--teal-soft);color:#86eadf;font-size:16px;font-weight:800}.avatar.blue{background:var(--blue-soft);color:#9bc8ff}
+.patient-main{min-width:0;flex:1}.patient-top{display:flex;align-items:center;gap:7px}.patient-name{color:#f4f7fb;font-size:16px;font-weight:750}.demographics{color:var(--text2);font-size:10px}.status{margin-left:auto;padding:3px 7px;border-radius:6px;background:rgba(53,215,196,.1);color:var(--teal);font-size:9px;font-weight:700}.patient-location{margin-top:5px;color:var(--text3);font-size:10.5px;white-space:nowrap}.patient-diagnosis{margin-top:7px;color:#d1d8e1;font-size:11.5px;font-weight:550;white-space:nowrap}
+.fab{position:absolute;right:22px;bottom:24px;width:58px;height:58px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#5ce3d3,#2cc3b4);color:#071817;box-shadow:0 12px 28px rgba(53,215,196,.22)}.fab svg{width:25px;height:25px}
+.scrim{position:absolute;inset:0;background:rgba(4,7,9,.66);backdrop-filter:blur(2px)}
+.action-sheet{position:absolute;left:0;right:0;bottom:0;padding:10px 16px 25px;border:1px solid #323b47;border-bottom:0;border-radius:27px 27px 0 0;background:linear-gradient(180deg,#1b2027 0%,#161a20 100%);box-shadow:0 -18px 42px rgba(0,0,0,.44)}
+.grabber{width:42px;height:4px;margin:0 auto 16px;border-radius:99px;background:#4a5563}.sheet-heading{display:flex;align-items:center;gap:12px;padding:0 2px 15px}.sheet-avatar{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;border-radius:14px;background:var(--teal-soft);color:#92eee4;font-size:17px;font-weight:800}.sheet-title{margin:0;color:#f3f6fa;font-size:18px;font-weight:750}.sheet-subtitle{margin-top:4px;color:var(--text2);font-size:10.5px}
+.sheet-actions{overflow:hidden;border:1px solid var(--line);border-radius:17px;background:#14181e}.sheet-action{width:100%;min-height:72px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:0;background:transparent;color:var(--text);text-align:left}.sheet-action+.sheet-action{border-top:1px solid var(--line)}.action-icon{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:11px;background:var(--blue-soft);color:#a5ceff}.action-icon.danger{background:var(--red-soft);color:#ff9aa3}.action-icon svg{width:20px;height:20px}.action-copy{min-width:0;flex:1}.action-title{display:block;color:#edf1f6;font-size:13.5px;font-weight:700}.action-title.danger{color:#ff8e98}.action-subtitle{display:block;margin-top:4px;color:var(--text3);font-size:9.5px}.sheet-chevron{width:17px;height:17px;color:#596573}
+</style></head>
+<body>
+<main class="board">
+<section class="preview"><div class="preview-label">01 · 新建患者</div><div class="phone" id="newPatientScreen">
+<div class="system-bar"><span>08:30</span><div class="system-icons" aria-hidden="true">
+<svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="0" y="7" width="2" height="4" rx=".5" fill="currentColor"/><rect x="4" y="5" width="2" height="6" rx=".5" fill="currentColor"/><rect x="8" y="2.5" width="2" height="8.5" rx=".5" fill="currentColor"/><rect x="12" y="0" width="2" height="11" rx=".5" fill="currentColor"/></svg>
+<svg width="15" height="11" viewBox="0 0 15 11" fill="none"><path d="M1 3.2C4.7-.15 10.3-.15 14 3.2M3.5 5.7C5.8 3.65 9.2 3.65 11.5 5.7M6.1 8.1C7 7.35 8 7.35 8.9 8.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="10" r=".8" fill="currentColor"/></svg>
+<span style="font-size:9px">5G</span><svg width="18" height="9" viewBox="0 0 18 9" fill="none"><rect x=".5" y=".5" width="14.5" height="8" rx="2" stroke="currentColor"/><rect x="2" y="2" width="11.5" height="5" rx="1" fill="currentColor"/><path d="M16.2 3V6" stroke="currentColor" stroke-linecap="round"/></svg>
+</div></div>
+<header class="appbar"><button class="back-button" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h1 class="page-title">新建患者</h1><span aria-hidden="true"></span></header>
+<section class="new-content">
+<div class="form-card">
+<div class="form-heading"><div class="patient-mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 19c.55-4.1 2.72-6.15 6.5-6.15S17.95 14.9 18.5 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h2>患者信息</h2><p>填写基本信息后即可开始书写病历</p></div></div>
+<div class="field"><div class="field-label"><span>患者姓名</span><span class="required">*</span></div><div class="text-input"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M6.5 19c.5-3.7 2.3-5.5 5.5-5.5s5 1.8 5.5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>请输入患者姓名</span></div></div>
+<div class="field"><div class="field-label"><span>性别</span><span class="required">*</span></div><div class="segmented"><button class="segment">男</button><button class="segment">女</button><button class="segment">其他</button></div></div>
+<div class="field"><div class="field-label"><span>年龄</span><span class="required">*</span></div><div class="text-input"><span>请输入年龄</span><span class="suffix">岁</span></div></div>
+</div>
+<div class="form-help"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 10.8v5.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="7.7" r="1" fill="currentColor"/></svg><span>三项信息均为必填，仅保存在本机</span></div>
+<div class="actions"><button class="save-button">保存患者资料</button><button class="cancel-button">取消</button></div>
+</section>
+<div class="home-indicator" aria-hidden="true"></div>
+</div></section>
+
+<section class="preview"><div class="preview-label">02 · 长按患者</div><div class="phone" id="patientActionsScreen">
+<div class="system-bar"><span>08:30</span><div class="system-icons" aria-hidden="true">
+<svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="0" y="7" width="2" height="4" rx=".5" fill="currentColor"/><rect x="4" y="5" width="2" height="6" rx=".5" fill="currentColor"/><rect x="8" y="2.5" width="2" height="8.5" rx=".5" fill="currentColor"/><rect x="12" y="0" width="2" height="11" rx=".5" fill="currentColor"/></svg>
+<svg width="15" height="11" viewBox="0 0 15 11" fill="none"><path d="M1 3.2C4.7-.15 10.3-.15 14 3.2M3.5 5.7C5.8 3.65 9.2 3.65 11.5 5.7M6.1 8.1C7 7.35 8 7.35 8.9 8.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="10" r=".8" fill="currentColor"/></svg>
+<span style="font-size:9px">5G</span><svg width="18" height="9" viewBox="0 0 18 9" fill="none"><rect x=".5" y=".5" width="14.5" height="8" rx="2" stroke="currentColor"/><rect x="2" y="2" width="11.5" height="5" rx="1" fill="currentColor"/><path d="M16.2 3V6" stroke="currentColor" stroke-linecap="round"/></svg>
+</div></div>
+<header class="app-status"><div class="connection"><div class="status-dot-wrap"><span class="status-halo"></span><span class="status-dot"></span></div><div class="connection-copy"><strong>已连接</strong><span>2 个终端</span></div></div><button class="settings-button" aria-label="软件设置"><svg viewBox="0 0 40 44" fill="none" aria-hidden="true"><path d="M1.5 22L11.25 5.1H28.75L38.5 22L28.75 38.9H11.25L1.5 22Z" stroke="#4fc3f7" stroke-width="1.8" stroke-linejoin="round"/><circle cx="20" cy="22" r="5.6" stroke="#d9faf5" stroke-width="1.8"/></svg></button></header>
+<section class="main-content base-list-wrap"><div class="list-heading"><div><h2>住院患者</h2><p>按最近更新排序 · 下拉刷新</p></div><div class="count"><i></i>6 位</div></div>
+<div class="base-list">
+<article class="patient-card active"><div class="avatar">王</div><div class="patient-main"><div class="patient-top"><span class="patient-name">王建国</span><span class="demographics">男 · 67岁</span><span class="status">在院</span></div><div class="patient-location">内科一病区 · 08床</div><div class="patient-diagnosis">社区获得性肺炎</div></div></article>
+<article class="patient-card"><div class="avatar blue">刘</div><div class="patient-main"><div class="patient-top"><span class="patient-name">刘秀兰</span><span class="demographics">女 · 72岁</span><span class="status">在院</span></div><div class="patient-location">内分泌科 · 12床</div><div class="patient-diagnosis">2型糖尿病伴血糖控制不佳</div></div></article>
+<article class="patient-card"><div class="avatar">陈</div><div class="patient-main"><div class="patient-top"><span class="patient-name">陈卫东</span><span class="demographics">男 · 58岁</span><span class="status">待出院</span></div><div class="patient-location">呼吸内科 · 21床</div><div class="patient-diagnosis">慢性阻塞性肺疾病急性加重</div></div></article>
+</div></section>
+<button class="fab" aria-label="新增患者"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+<div class="scrim"></div>
+<div class="action-sheet"><div class="grabber"></div><div class="sheet-heading"><div class="sheet-avatar">王</div><div><h2 class="sheet-title">管理患者</h2><div class="sheet-subtitle">王建国 · 男 · 67岁</div></div></div>
+<div class="sheet-actions">
+<button class="sheet-action"><span class="action-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4.2L18.7 9.5a2.1 2.1 0 0 0 0-3l-1.2-1.2a2.1 2.1 0 0 0-3 0L4 15.8V20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.3 6.5l4.2 4.2" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="action-copy"><span class="action-title">编辑基本信息</span><span class="action-subtitle">修改患者姓名、性别和年龄</span></span><svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+<button class="sheet-action"><span class="action-icon danger"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7h14M9 7V4.8h6V7M7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="action-copy"><span class="action-title danger">删除该患者</span><span class="action-subtitle">永久删除，患者不再显示在列表中</span></span><svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+</div></div>
+<div class="home-indicator" aria-hidden="true"></div>
+</div></section>
+</main></body></html>
