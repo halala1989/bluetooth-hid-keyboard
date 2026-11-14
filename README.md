@@ -26,9 +26,9 @@ Part of [CareKey Suite · 医键套件](https://github.com/halala1989/carekey-su
 ### Current test build
 
 - Version: `4.0-test33`
-- APK: [download](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
+- APK: [download](https://github.com/halala1989/carekey-suite/releases/download/v4.0-test33/CareKey-Clinical-4.0-test33.apk)
 - SHA256: `FEB14A98987A43130E03C1E02B6AE84E72434B495A2D5E0FA5958EBED0C7A049`
-- Release notes: [`releases/v4.0-test33/RELEASE_NOTES.md`](releases/v4.0-test33/RELEASE_NOTES.md)
+- Release notes: [v4.0-test33](https://github.com/halala1989/carekey-suite/releases/tag/v4.0-test33)
 
 ### Build
 
@@ -67,9 +67,9 @@ This is a development project, not a certified medical device. Read the suite [p
 ### 当前测试版
 
 - 版本：`4.0-test33`
-- APK：[下载](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
+- APK：[下载](https://github.com/halala1989/carekey-suite/releases/download/v4.0-test33/CareKey-Clinical-4.0-test33.apk)
 - SHA256：`FEB14A98987A43130E03C1E02B6AE84E72434B495A2D5E0FA5958EBED0C7A049`
-- 发布说明：[`releases/v4.0-test33/RELEASE_NOTES.md`](releases/v4.0-test33/RELEASE_NOTES.md)
+- 发布说明：[v4.0-test33](https://github.com/halala1989/carekey-suite/releases/tag/v4.0-test33)
 
 ### 构建
 
