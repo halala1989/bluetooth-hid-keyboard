@@ -1,218 +1,91 @@
-# 手机蓝牙键盘（Android → 蓝牙 HID → 电脑）
+# CareKey Clinical · 医键临床版
 
-> **v3.0 Beta：住院全流程管理**
-> App 首页现已改为患者列表，支持基本信息、病例文书、草稿保存和一键蓝牙 HID 输出。原键盘功能保留在「键盘工具」中。
-> 实现与安全边界见 [`docs/INPATIENT_APP.md`](docs/INPATIENT_APP.md)。
+**Inpatient management and clinical documentation with optional DeepSeek / MiMo support.**
+**住院患者管理与临床文书，可选接入 DeepSeek / MiMo 大模型。**
 
-> **v3.2 Beta：统一终端与蓝牙配对**
-> 手机蓝牙、Pico W、ESP32-S3 Super Mini、YD-ESP32-S3 N16R8 和旧 ESP32 BLE HID 已汇总到一个 App，通过设置页手动切换。全部源码与来源版本见 [`terminals/README.md`](terminals/README.md)。
+Part of [CareKey Suite · 医键套件](https://github.com/halala1989/carekey-suite).
+本分支属于 [CareKey Suite · 医键套件](https://github.com/halala1989/carekey-suite)。
 
-> **v4.0 Test：病历工作台测试版**
-> 患者详情中的“书写病历”会打开双栏病历工作台，包含资料输入、全部文书类型、生成前提示词设置、手术同意书、术前小结、术前讨论及暂停/继续/停止输出界面。
+[English](#english) | [简体中文](#简体中文)
 
-> **v4.0 Test2：竖屏修复**
-> 病历工作台改为竖屏显示，输入资料与病例输出上下排列并同屏可见；顶部返回按钮会真正回到病人详情。
+## English
 
-> **v4.0 Test3：主动连接终端**
-> 选择输出终端后，状态灯右侧显示主动连接按钮；手机蓝牙进入电脑配对菜单，外接板优先连接已保存地址或开始扫描。
+`medical-record-app-v4` is the full Clinical edition of CareKey. It combines patient management, a clinical documentation workspace, writing skills, optional model generation, and direct output to a paired computer or supported HID bridge board.
 
-> **v4.0 Test4：主动连接已配对电脑**
-> 手机成功配对并连接过电脑后会记住该电脑；再次点击“主动连接”由手机发起蓝牙 HID 连接，不再要求电脑重新连接手机。
+### Features
 
-> **v4.0 Test5：真实模型生成进度**
-> 病历生成改为调用已配置的 DeepSeek/MiMo，显示生成进度，成功后返回绿色“生成完成，可以开始输出”；缺少 Token 或接口失败时明确报错，不再回退示范病例。
+- Patient list with create, edit, open, and delete workflows
+- Clinical documentation workspace with input and generated-output panels
+- Global writing skills and document-specific prompts
+- Optional DeepSeek and MiMo configuration, model listing, and connection testing
+- Unified phone Bluetooth HID and ESP32-S3 terminal configuration
+- Output speed plus Alt+X, hexadecimal, decimal, and GBK character modes
+- Pause, resume, stop, draft recovery, and output status controls
+- Clinical record storage on the Android device
 
-> **v4.0 Test6：模型连接检查**
-> API Token 输入后可手动测试；保存非空 Token 时会先验证当前 DeepSeek/MiMo 模型是否可连接，验证成功后才写入设置。
+### Current test build
 
-> **v4.0 Test7：病历持久化与真实输出**
-> 生成结果按患者保存在本机，重新进入工作台会自动恢复；输出按钮已接入原生手机 HID 或外接板 BLE 输出，暂停/继续/停止控制真实输出任务。
+- Version: `4.0-test33`
+- APK: [download](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
+- SHA256: `FEB14A98987A43130E03C1E02B6AE84E72434B495A2D5E0FA5958EBED0C7A049`
+- Release notes: [`releases/v4.0-test33/RELEASE_NOTES.md`](releases/v4.0-test33/RELEASE_NOTES.md)
 
-> **v4.0 Test8：双倍输出速度**
-> 各档延时约为旧版一半，第 8 档仍是稳定上限；第 9、10 档突破保护下限，最高速度约为旧版两倍，可能因链路丢字。
-
-> **v4.0 Test9：医疗文本纠错与中医分栏**
-> 生成前自动纠正常见语音同音字、错别字和断句；中医鉴别诊断/辨证论治与西医依据严格分栏，首次病程支持联网检索公开指南和病例作为鉴别参考。
-
-> **v4.0 Test10：Markdown Skill 导入**
-> 每种病历生成前均可导入 Markdown Skill 作为本次书写规范；Skill 会随文书配置一同保存并发送给模型，指导栏目结构和写作方式。
-
-> **v4.0 Test11：仅保留 Skill 导入**
-> 移除误加的 Excel 导入入口，每个病历模块只提供 Markdown Skill 导入。
-
-> **v4.0 Test12：主界面全局书写规范**
-> “下午好，医生”右侧新增齿轮按钮“书写规范”；Markdown Skill 改为在主界面统一导入和管理，并自动应用到全部病历模块。
-
-> **v4.0 Test13：患者页精简与文书回显**
-> 患者基本信息只保留姓名、性别、年龄；“书写病历”按钮放大；生成文书同步到原生加密摘要存储并显示在患者详情下方。手术同意书只要求医生录入三个方案名称。
-
-> **v4.0 Test14：自然语言补充与动态手术方案**
-> 所有文书生成先合并左侧资料和本次补充自然语言；手术同意书不再手动填写方案，模型从自然语言中提取任意数量的推荐及备选方案，再逐项生成优缺点和风险。
-
-> **v4.0 Test15：病程时间线与历史资料回编**
-> 左侧每条自然语言资料带时间戳，生成时按时间顺序分析病情变化；点击历史资料可以修改正文并保留原记录时间。
-
-> **v4.0 Test16：模型筛选相关病程**
-> 全部文书必须调用大模型。模型读取完整时间线资料池，按当前文书目的选择相关记录，结合本次补充自然语言资料生成；未配置模型时不使用模板兜底。
-
-> **v4.0 Test17：病历内容纠偏**
-> 未提及内容直接省略，不输出任何缺失占位句；既往史无阳性信息时写阴性表述；专科查体只写西医内容；首次病程必须生成诊疗计划。
-
-> **v4.0 Test18：中医辨证与诊疗计划增强**
-> 入院记录和首次病程按阴性补全常规背景项目，并默认启用联网检索；医生给出的舌脉、中医诊断和证型作为权威依据，用于完善中医鉴别、诊断依据和可执行诊疗计划。
-
-> **v4.0 Test19：AI 修改书写 Skill**
-> “书写规范”页面下方新增自然语言修改框；调用当前 DeepSeek 或 MiMo，返回完整 Markdown Skill，成功后自动保存并全局应用，失败时保留原 Skill。
-
-> **v4.0 Test20：规则预览与修改定位**
-> “当前规则”区域支持独立上下拖动查看长文本；AI 修改保存后自动定位到变化段落，并用半透明色高亮显示。
-
-> **v4.0 Test21：多份文书草稿与显式保存**
-> 入院记录、首次病程、手术同意书等文书可重复生成多份；未保存草稿持续保留在病例输出区，点击底部“保存到患者详情”后才显示在患者页。长按顶部文书标签可确认删除。
-
-> **v4.0 Test22：病区统计与出院流程**
-> 首页统计精简为患者总数、病例总数和出院病例数；患者详情底部可办理出院或删除患者及全部本地文书；手术同意书改为与其他病历完全一致的直接生成流程。
-
-> **v4.0 Test23：同意书排序与速度增强**
-> 手术同意书固定按“疾病介绍 → 方案一至方案 N → 手术相关风险”显示并去除重复方案；全部输出档位再提速约 10%，第 10 档进一步突破限速，出现丢字时可手动降低速度。
-
-> **v4.0 Test24：修复书写规范页面闪退**
-> “今日病区概览 → 书写规范”入口现在可以稳定打开并显示当前 Markdown Skill。页面会安全读取旧版本模型配置，遇到异常配置时显示恢复页面而不是退出应用。
-
-> **v4.0 Test25：多 Skill 库与导入导出**
-> 书写规范升级为可管理的 Skill 库，支持一次导入多个 Markdown 文件或 ZIP，逐项导出，勾选后单独或组合应用到全部病历模块；旧版单 Skill 会自动迁移。
-
-> **v4.0 Test26：书写规范布局兼容修复**
-> 移除书写规范页面中兼容性较差的嵌套滚动控件，改用系统原生滚动视图；保留 Skill 长文本独立滚动预览，并增加错误详情复制入口。
-
-> **v4.0 Test27：ESP32-S3 Bridge 整合**
-> 修复 ESP32-S3 固件在 USB HID 未连接时阻塞 BLE 启动的问题；安卓端加强扫描、超时、GATT 回调和旧地址回退处理；App 内置 Super Mini 与 YD-N16R8 两套 Bridge 固件并支持导出。
-
-> **v4.0 Test28：ESP32 终端名称与序列号**
-> ESP32-S3 广播名和 USB 产品名统一为“ESP32蓝牙键盘终端-0001”，`0001` 同时写入 USB 序列号；中文名称通过 BLE 扫描响应发布，App 可识别并显示新名称。
-
-> **ESP32-S3 Super Mini 一键烧录**
-> 双击 `一键烧录_ESP32-S3-Mini-0001.cmd`，按住 BOOT 插 USB 进入下载模式后，脚本会自动检测 COM 口、烧录 `0001` 固件并回读校验。
-
-> **v4.0 Test29：连接管理聚合状态**
-> 连接管理页的总状态改为同时检查手机蓝牙 HID 与 ESP32-S3 外接板；任一连接有效即为绿色“已启动”，并用蓝色文字列出当前连接的电脑或板子。
-
-> **v4.0 Test30：ESP32 停止与 ASCII 修复**
-> “完全停止”改为插队控制帧，板子收到后立即中断当前字符、清空缓冲并松开按键；同时验证 `+`、`-` 和数字的 HID 键码输出。
-
-> **应用身份：医键住院管理**
-> 新版 applicationId 为 `com.hidble.carekeyboard`，可与旧版手机蓝牙键盘同时安装，不共享旧版应用数据。
-
-> 📦 **GitHub 仓库**：https://github.com/halala1989/bluetooth-hid-keyboard
-> 🌿 **两条产品线**：`phone-keyboard`（默认分支，手机蓝牙键盘 v1.x）｜ `master`（Pico W 方案 v10/v11）
-> 🔁 **换电脑迁移**：`git clone https://github.com/halala1989/bluetooth-hid-keyboard.git` 后见 `docs/MIGRATION.md`；
-> 📖 开发历史/对话记录整理见 `docs/HISTORY.md`
-
-## 🚀 零代码迁移（懒人专用：交给新电脑的 ChatGPT）
-
-不想自己敲命令？直接把仓库交给新电脑上的 ChatGPT，让它读指南、自己克隆：
-
-1. 复制 `docs/ONBOARDING.md` 里那段现成指令，粘贴给新电脑的 ChatGPT；
-2. ChatGPT 会自动克隆本仓库、读 `docs/MIGRATION.md`、跑 `tools/setup_check.ps1` 检查环境；
-3. 涉及密钥的部分（CC Switch 配置）它只负责提示你从旧电脑拷贝。
-
-> 完整执行细节见 `docs/MIGRATION.md`；给 ChatGPT 的现成话术见 `docs/ONBOARDING.md`。
-
-**2.0 Beta（开发版）**（分支 `phone-keyboard`）：手机直接把自己注册成标准蓝牙键盘
-（Android 9+ 系统的 `BluetoothHidDevice`），电脑蓝牙里添加“手机蓝牙键盘”配对后即可打字，**不依赖 Pico W**。
-App 里的中文输入、速度、常用语等体验沿袭旧版。
-
-```
-Android App  --Bluetooth HID Keyboard-->  Windows PC
-```
-
-目标电脑端**不需要安装任何程序、驱动或服务**，也不读取/监控屏幕。
-
-> 本应用与旧版互不覆盖：包名 `com.hidble.phonekeyboard`、应用名“手机蓝牙键盘”，可和旧 Pico W 版（`com.hidble.keyboard`）同时安装。
-> 旧 Pico W 产品线在 `master` 分支（v10/v11），固件源码保留在 `pico_firmware/`，仅作参考。
-
-## 中文/Unicode 输入方式（重要）
-
-蓝牙键盘只能发送标准按键，不能直接发送 Unicode/汉字，因此 App 在手机端模拟 Windows 内置的几种 Alt 码输入方式
-（逻辑原样移植自 v11 固件）。支持 4 种模式，App 里可一键切换：
-
-| 模式 | 原理 | 适用 |
-|---|---|---|
-| **Alt+X（默认）** | 输入十六进制码点后按 `Alt+X` 转换 | **Win11 记事本**、写字板、Word、OneNote、Outlook 等 RichEdit 应用；**无需注册表、无需 NumLock** |
-| 十六进制 | `Alt + 小键盘+ + 十六进制码` | 浏览器/聊天等大多数应用；需 `EnableHexNumpad` 注册表 + NumLock；**Win11 记事本无效**（小键盘 + 会被记事本拦截） |
-| 十进制 | `Alt + 0 + 十进制码点` | RichEdit 应用；无需注册表 |
-| GBK | `Alt + 小键盘十进制 GBK 机内码` | 仅中文版 Windows |
-
-> **验证结果（Pico W 方案时验证）**：Win11 自带记事本 + Alt+X 模式可正常输入中文；ChatGPT 等浏览器对话框不支持 Alt+X（非 RichEdit），需在浏览器里切换“十六进制”模式（需注册表+NumLock）。
-
-开启十六进制模式所需注册表（可选，只影响十六进制模式）：
+### Build
 
 ```powershell
-reg add "HKCU\Control Panel\Input Method" /v EnableHexNumpad /t REG_SZ /d 1 /f
-```
-
-这不是安装程序，只是打开 Windows 自带的 Unicode 十六进制输入功能。修改后需注销/重启一次。
-
-## 目录结构
-
-```
-android/                # Android Kotlin 客户端（本版本主体）
-  ├─ MainActivity.kt    # 界面与逻辑（输入/速度/常用语/连接）
-  ├─ HidDeviceManager.kt# 手机注册为蓝牙键盘（BluetoothHidDevice）
-  ├─ TypingEngine.kt    # 文本/按键/中文 Alt 码输入引擎（1:1 移植自 v11 固件）
-  └─ HidProtocol.kt     # 上层封装
-pico_firmware/          # 历史 Pico W 固件（v10/v11 方案，已不再需要）
-firmware/               # 历史预编译固件 UF2（已不再需要）
-releases/               # 版本化发布归档（本产品线 v1.0, v1.1, ...）
-docs/                   # 协议、设置、工作进度（LLM_PROVIDERS.md = 大模型提供方手册；CONTINUE_DEV.md = 开发交接）
-tools/                  # 构建/校验脚本
-```
-
-## 快速使用
-
-### 1. 安装 Android App
-
-用 Android Studio 打开 `android/` 连接手机编译安装；或直接用 `releases/v1.4/PhoneBluetoothKeyboard-v1.4.apk`（要求 Android 9+）：
-
-```powershell
+git clone https://github.com/halala1989/carekey-suite.git
+cd carekey-suite
+git switch medical-record-app-v4
 cd android
+$env:JAVA_HOME='D:\jdk17\jdk-17.0.20+8'
+$env:ANDROID_HOME='D:\Android'
+$env:ANDROID_SDK_ROOT='D:\Android'
 .\gradlew.bat assembleDebug
 ```
 
-APK 输出路径：
+### AI and privacy boundary
 
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
+The application does not capture the desktop screen. Patient records and API keys are stored by the Android app. When an AI feature is used, selected prompts and clinical text may be sent to the provider configured by the user. Generated text must be reviewed by a qualified clinician before use.
+
+This is a development project, not a certified medical device. Read the suite [privacy and safety guide](https://github.com/halala1989/carekey-suite/blob/main/docs/PRIVACY-AND-SAFETY.md) and [architecture guide](https://github.com/halala1989/carekey-suite/blob/main/docs/ARCHITECTURE.md).
+
+## 简体中文
+
+`medical-record-app-v4` 是医键套件的完整临床版，整合患者管理、临床文书工作台、书写 Skill、可选模型生成，以及向已配对电脑或受支持 HID 桥接板直接输出。
+
+### 功能
+
+- 患者列表，以及新建、编辑、打开和删除患者流程
+- 包含资料输入与病例输出区域的临床文书工作台
+- 全局书写 Skill 和各文书专用提示词
+- 可选 DeepSeek、MiMo 配置、模型列表获取和连接测试
+- 统一管理手机蓝牙 HID 与 ESP32-S3 终端
+- 输出速度，以及 Alt+X、十六进制、十进制和 GBK 输出方式
+- 暂停、继续、停止、草稿恢复和输出状态控制
+- 临床病例资料保存在 Android 本机
+
+### 当前测试版
+
+- 版本：`4.0-test33`
+- APK：[下载](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
+- SHA256：`FEB14A98987A43130E03C1E02B6AE84E72434B495A2D5E0FA5958EBED0C7A049`
+- 发布说明：[`releases/v4.0-test33/RELEASE_NOTES.md`](releases/v4.0-test33/RELEASE_NOTES.md)
+
+### 构建
+
+```powershell
+git clone https://github.com/halala1989/carekey-suite.git
+cd carekey-suite
+git switch medical-record-app-v4
+cd android
+$env:JAVA_HOME='D:\jdk17\jdk-17.0.20+8'
+$env:ANDROID_HOME='D:\Android'
+$env:ANDROID_SDK_ROOT='D:\Android'
+.\gradlew.bat assembleDebug
 ```
 
-### 2. 连接电脑（一键开关）
+### AI 与隐私边界
 
-1. 打开本 App，点底部「**模拟蓝牙键盘**」开关。
-2. 系统弹出“开启蓝牙”授权，点允许；随后弹出“**对附近设备可见**”，也点允许（否则电脑搜不到）。
-3. 电脑：设置 → 蓝牙 → 添加设备，搜索“**手机蓝牙键盘**”并配对（手机上确认配对码）。
-4. 首次配对后，若电脑未自动连接，可点底部“已配对设备”里的电脑手动连接。关闭开关即可停止。
+应用不捕获电脑屏幕。患者资料和 API Key 由 Android 应用保存在本机。用户使用 AI 功能时，所选提示词和临床文字可能发送到用户配置的模型服务商。生成内容在临床使用前必须由有资质的医生逐项审核。
 
-### 3. 输入
-
-1. 顶部文本框输入汉字/英文/数字，点发送；中文输入模式默认 Alt+X（记事本/Word 等用），浏览器等切“十六进制”或“GBK”。
-2. **输入速度**：文本框下方“速度”填 `1-10`（数字越大越快，默认 5），点“应用”立即生效并自动保存。
-   - 新版每档延时系数约为旧版一半；第 8 档保持稳定限速，第 9、10 档突破保护下限，最高约为旧版两倍，可能因蓝牙链路丢字。
-3. **常用语句**：点“常用语”可添加/编辑/删除常用语句（自动保存），点选一条插入输入框，再点发送。
-
-## 从源码构建
-
-- APK：见上方 `cd android; .\gradlew.bat assembleDebug`。
-- Pico W 固件（仅 v10/v11 历史方案需要）：`build_firmware.ps1`，详见 `releases/v10|v11` 发布说明。
-
-## 版本与回滚
-
-本产品线从 **v1.0** 开始递增归档（当前 **v2.0 Beta 开发版**）：
-
-- 产物：`releases/vNN/`（APK + 发布说明），最新版另存于仓库根目录 `PhoneBluetoothKeyboard-debug.apk`。
-- 代码：每次发布打同名 git tag（`git tag v1.0`、`git tag v1.1`、`git tag v1.2` …）。
-- 回滚：`git checkout v1.0` 回到本产品线旧版；切 `git checkout master` 回到 Pico W 产品线（v10/v11）。
-- 详细约定见 `releases/README.md`。
-
-## License
-
-MIT
+本项目是开发项目，不是经过认证的医疗器械。请阅读套件[隐私与安全说明](https://github.com/halala1989/carekey-suite/blob/main/docs/PRIVACY-AND-SAFETY.md)和[架构说明](https://github.com/halala1989/carekey-suite/blob/main/docs/ARCHITECTURE.md)。
