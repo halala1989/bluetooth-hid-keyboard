@@ -44,6 +44,7 @@ See [PROJECTS.md](PROJECTS.md) for the complete branch map and maintenance statu
 - Bluetooth HID and optional bridge-board workflows
 - Configurable typing speed and Chinese output modes
 - No model account, API key, or network service is required for basic text delivery
+- Optional model or chat tools retained from the engineering lineage are not required for this workflow
 
 ### Preview
 
@@ -53,8 +54,8 @@ See [PROJECTS.md](PROJECTS.md) for the complete branch map and maintenance statu
 
 ### Latest test build
 
-- Clinical edition: [v4.0-test33 APK](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
-- Release notes: [v4.0-test33](https://github.com/halala1989/carekey-suite/blob/medical-record-app-v4/releases/v4.0-test33/RELEASE_NOTES.md)
+- Clinical edition: [v4.0-test33 APK](https://github.com/halala1989/carekey-suite/releases/download/v4.0-test33/CareKey-Clinical-4.0-test33.apk)
+- Release notes: [v4.0-test33](https://github.com/halala1989/carekey-suite/releases/tag/v4.0-test33)
 - Build and setup instructions: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)
 
 Build from source with Android Studio or:
@@ -108,11 +109,12 @@ Read [docs/PRIVACY-AND-SAFETY.md](docs/PRIVACY-AND-SAFETY.md) before handling re
 - 支持手机蓝牙 HID，并可使用可选的桥接板
 - 可调输出速度和中文输出方式
 - 基础文字输出不要求模型账号、API Key 或网络服务
+- 工程历史中保留的可选模型或对话工具，不属于 Lite 核心工作流，也不要求配置
 
 ### 最新测试版
 
-- 临床版：[v4.0-test33 APK](https://raw.githubusercontent.com/halala1989/carekey-suite/medical-record-app-v4/releases/v4.0-test33/%E5%8C%BB%E9%94%AE%E4%BD%8F%E9%99%A2%E7%AE%A1%E7%90%86-v4.0-test33.apk)
-- 更新说明：[v4.0-test33](https://github.com/halala1989/carekey-suite/blob/medical-record-app-v4/releases/v4.0-test33/RELEASE_NOTES.md)
+- 临床版：[v4.0-test33 APK](https://github.com/halala1989/carekey-suite/releases/download/v4.0-test33/CareKey-Clinical-4.0-test33.apk)
+- 更新说明：[v4.0-test33](https://github.com/halala1989/carekey-suite/releases/tag/v4.0-test33)
 - 安装与构建：[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)
 
 ### 隐私与安全
