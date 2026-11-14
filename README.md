@@ -5,6 +5,10 @@
 
 [English](#english) | [简体中文](#简体中文)
 
+> Former repository name: `bluetooth-hid-keyboard`. Existing GitHub links redirect automatically.
+
+> 原仓库名：`bluetooth-hid-keyboard`。旧 GitHub 链接会自动跳转到新仓库。
+
 ---
 
 ## English
@@ -21,6 +25,8 @@ The suite contains two primary product editions and several engineering or legac
 | **Legacy branches** | `master`, `phone-keyboard`, `plain-bluetooth` | Varies | Historical Pico W and earlier Android product lines |
 
 See [PROJECTS.md](PROJECTS.md) for the complete branch map and maintenance status.
+
+`codex/lite-unified` is retained as the Lite engineering history; `lite-input` is the promoted long-term Lite branch.
 
 ### What the Clinical edition includes
 
@@ -83,6 +89,8 @@ Read [docs/PRIVACY-AND-SAFETY.md](docs/PRIVACY-AND-SAFETY.md) before handling re
 | **历史分支** | `master`、`phone-keyboard`、`plain-bluetooth` | 不定 | Pico W 和早期 Android 产品线 |
 
 完整分支职责与维护状态见 [PROJECTS.md](PROJECTS.md)。
+
+`codex/lite-unified` 保留为 Lite 工程历史，`lite-input` 是正式接续的长期 Lite 分支。
 
 ### 临床版功能
 

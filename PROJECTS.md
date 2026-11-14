@@ -11,6 +11,7 @@ Branches are used as product boundaries. They share the repository and project i
 | `main` | Suite overview, product catalog, privacy, architecture, and contribution guide | None | Current repository entry point |
 | `medical-record-app-v4` | **CareKey Clinical**: inpatient management, clinical documentation, skills, model configuration, and multi-terminal output | Optional DeepSeek / MiMo | Active development; current test 33 |
 | `lite-input` | **CareKey Lite**: direct text-to-HID input without model features | None for core use | Long-term lite edition based on the pre-LLM Android lineage |
+| `codex/lite-unified` | Unified Lite engineering lineage with send, pause, stop, and clear controls | None | Preserved as the source history for `lite-input` |
 | `multi-target-6` | Multi-target terminal work, including ESP32-S3 build and flashing profiles | Mixed | Engineering branch |
 | `esp32-s3-app` | Earlier ESP32-S3 terminal architecture and roadmap work | Mixed | Engineering archive |
 | `plain-bluetooth` | Android Bluetooth HID development lineage with later optional model work | Optional | Historical development branch |
@@ -33,6 +34,7 @@ Branches are used as product boundaries. They share the repository and project i
 | `main` | 套件总览、产品目录、隐私、架构和贡献说明 | 无 | 当前仓库入口 |
 | `medical-record-app-v4` | **医键临床版**：住院管理、临床文书、Skill、模型配置和多终端输出 | 可选 DeepSeek / MiMo | 活跃开发；当前 Test 33 |
 | `lite-input` | **医键 Lite**：不需要模型功能的直接文字 HID 输入 | 核心功能无 | 基于加入大模型前的 Android 产品线建立的长期 Lite 版 |
+| `codex/lite-unified` | 统一 Lite 工程线，包含发送、暂停、停止和清空控制 | 无 | 作为 `lite-input` 的来源历史保留 |
 | `multi-target-6` | 多目标终端、ESP32-S3 构建和烧录配置 | 混合 | 工程分支 |
 | `esp32-s3-app` | 早期 ESP32-S3 终端架构与路线图 | 混合 | 工程存档 |
 | `plain-bluetooth` | Android 蓝牙 HID 开发线，后期加入过可选模型功能 | 可选 | 历史开发分支 |
