@@ -18,7 +18,7 @@ Part of [CareKey Suite · 医键套件](https://github.com/halala1989/carekey-su
 - No desktop driver, companion service, screen capture, or remote-control agent
 - Text input, common phrases, output speed, and Chinese character modes
 - Alt+X, hexadecimal, decimal, and GBK output options in the original Lite lineage
-- No model configuration, API key, or network service required for basic input
+- Core text output does not require model configuration, API key, or network service
 
 ### Use
 
